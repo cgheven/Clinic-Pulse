@@ -6,6 +6,14 @@ import { RevenueSplitCard } from '@/components/settings/revenue-split-card'
 import type { DeptRevenueSplitData, PharmacyRevenueSplitData } from '@/app/actions/settings'
 import { updateDeptRevenueSplit, updatePharmacyRevenueSplit } from '@/app/actions/settings'
 
+// Premium muted palette — chosen to work as a harmonious triad on dark backgrounds.
+// Avoids electric blue / lime green that clash at full saturation.
+const C = {
+  doctor: '#F5A623', // amber gold  — brand primary, prominent
+  clinic: '#94a3b8', // slate-400   — cool, sophisticated, pairs with amber
+  staff:  '#a78bfa', // violet-400  — premium purple accent
+}
+
 interface RevenueSplitsTabProps {
   opdSplit: DeptRevenueSplitData
   labSplit: DeptRevenueSplitData
@@ -36,37 +44,39 @@ export function RevenueSplitsTab({ opdSplit, labSplit, pharmacySplit }: RevenueS
   }
 
   return (
-    <div className="space-y-4">
+    // 3-column grid on md+ — all departments visible simultaneously for easy comparison.
+    // On small screens collapses to a single column.
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       <RevenueSplitCard
-        title="OPD (Outpatient)"
-        description="Split of consultation fee revenue between doctor and clinic."
+        title="OPD"
+        description="Consultation fee split"
         icon={Stethoscope}
         fields={[
-          { key: 'doctor_pct', label: 'Doctor', color: 'bg-primary', valueBp: opdSplit.doctor_pct },
-          { key: 'clinic_pct', label: 'Clinic',  color: 'bg-info',    valueBp: opdSplit.clinic_pct },
+          { key: 'doctor_pct', label: 'Doctor', color: C.doctor, valueBp: opdSplit.doctor_pct },
+          { key: 'clinic_pct', label: 'Clinic',  color: C.clinic, valueBp: opdSplit.clinic_pct },
         ]}
         onSave={handleSaveOpd}
       />
 
       <RevenueSplitCard
         title="Laboratory"
-        description="Split of lab test revenue between doctor and clinic."
+        description="Lab test revenue split"
         icon={FlaskConical}
         fields={[
-          { key: 'doctor_pct', label: 'Doctor', color: 'bg-primary', valueBp: labSplit.doctor_pct },
-          { key: 'clinic_pct', label: 'Clinic',  color: 'bg-success', valueBp: labSplit.clinic_pct },
+          { key: 'doctor_pct', label: 'Doctor', color: C.doctor, valueBp: labSplit.doctor_pct },
+          { key: 'clinic_pct', label: 'Clinic',  color: C.clinic, valueBp: labSplit.clinic_pct },
         ]}
         onSave={handleSaveLab}
       />
 
       <RevenueSplitCard
         title="Pharmacy"
-        description="Three-way split of pharmacy sales revenue."
+        description="Three-way sales split"
         icon={ShoppingCart}
         fields={[
-          { key: 'doctor_pct', label: 'Doctor', color: 'bg-primary', valueBp: pharmacySplit.doctor_pct },
-          { key: 'clinic_pct', label: 'Clinic',  color: 'bg-info',    valueBp: pharmacySplit.clinic_pct },
-          { key: 'staff_pct',  label: 'Staff',   color: 'bg-success', valueBp: pharmacySplit.staff_pct  },
+          { key: 'doctor_pct', label: 'Doctor', color: C.doctor, valueBp: pharmacySplit.doctor_pct },
+          { key: 'clinic_pct', label: 'Clinic',  color: C.clinic, valueBp: pharmacySplit.clinic_pct },
+          { key: 'staff_pct',  label: 'Staff',   color: C.staff,  valueBp: pharmacySplit.staff_pct  },
         ]}
         onSave={handleSavePharmacy}
       />

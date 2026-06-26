@@ -14,8 +14,9 @@ import { Input } from '@/components/ui/input'
 export interface SplitField {
   key: string
   label: string
-  color: string   // bg-* Tailwind class (e.g. "bg-primary")
-  valueBp: number // current value in basis points (0–10000)
+  color: string       // hex — bar segment + dot
+  barTextColor?: string
+  valueBp: number
 }
 
 interface RevenueSplitCardProps {
@@ -39,15 +40,6 @@ function percentToBp(pct: string): number {
   const n = parseFloat(pct)
   if (isNaN(n)) return 0
   return Math.round(n * 100)
-}
-
-// Text color inside the stacked bar segment for each background
-const BAR_TEXT: Record<string, string> = {
-  'bg-primary': 'text-primary-foreground',
-  'bg-info': 'text-white',
-  'bg-success': 'text-white',
-  'bg-warning': 'text-white',
-  'bg-destructive': 'text-white',
 }
 
 // =============================================================================
@@ -90,120 +82,110 @@ export function RevenueSplitCard({
       const result = await onSave(bpValues)
       if (result.success) {
         setIsDirty(false)
-        toast({ title: `${title} saved`, description: 'Revenue split updated successfully.' })
+        toast({ title: `${title} saved`, description: 'Revenue split updated.' })
       } else {
         toast({ title: 'Save failed', description: result.error ?? 'Unknown error', variant: 'destructive' })
       }
     })
   }
 
-  const inputCols = fields.length === 2 ? 'sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'
-
   return (
     <div
       className={cn(
-        'group relative rounded-2xl border bg-card p-5 sm:p-6 transition-all duration-200',
+        'flex flex-col rounded-2xl border bg-card p-4 transition-all duration-200',
         isDirty
-          ? 'border-primary/30 shadow-[0_0_0_1px_hsl(var(--primary)/0.12),0_4px_16px_hsl(var(--primary)/0.06)]'
-          : 'border-border hover:border-border/80'
+          ? 'border-primary/30 shadow-[0_0_0_1px_hsl(var(--primary)/0.08)]'
+          : 'border-border hover:border-border/60'
       )}
     >
-      {/* Dirty left accent bar */}
-      {isDirty && (
-        <div className="absolute left-0 top-4 bottom-4 w-0.5 rounded-full bg-primary" />
-      )}
-
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-            <Icon className="h-5 w-5 text-muted-foreground" />
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <Icon className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground leading-tight">{title}</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground leading-snug">{description}</p>
+            <p className="text-sm font-semibold text-foreground leading-tight truncate">
+              {title}
+            </p>
+            <p className="text-[11px] text-muted-foreground/60 leading-tight mt-0.5 truncate">
+              {description}
+            </p>
           </div>
         </div>
 
-        {/* Total badge */}
+        {/* Validity badge */}
         <div
           className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold',
+            'flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
             isValid
-              ? 'bg-success/15 text-success'
-              : 'bg-destructive/15 text-destructive'
+              ? 'bg-success/10 text-success'
+              : 'bg-destructive/10 text-destructive'
           )}
         >
           {isValid
-            ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-            : <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-          }
+            ? <CheckCircle2 className="h-2.5 w-2.5" />
+            : <AlertCircle className="h-2.5 w-2.5" />}
           {(totalBp / 100).toFixed(0)}%
         </div>
       </div>
 
-      {/* ── Stacked bar ────────────────────────────────────────────────────── */}
-      <div className="space-y-2.5 mb-5">
-        <div className="flex h-9 w-full overflow-hidden rounded-xl bg-muted/40">
+      {/* ── Stacked bar ─────────────────────────────────────────────────────── */}
+      <div className="mb-4 space-y-1.5">
+        <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted/40">
           {fields.map((f) => {
             const pct = Math.max(0, Math.min(100, percentToBp(values[f.key] ?? '0') / 100))
-            const textClass = BAR_TEXT[f.color] ?? 'text-white'
             return (
               <div
                 key={f.key}
-                className={cn(
-                  'flex items-center justify-center overflow-hidden transition-all duration-300',
-                  f.color
-                )}
-                style={{ width: `${pct}%` }}
-              >
-                {pct >= 20 && (
-                  <span className={cn('select-none truncate px-2 text-xs font-semibold', textClass)}>
-                    {f.label} · {pct.toFixed(0)}%
-                  </span>
-                )}
+                className="h-full transition-all duration-300"
+                style={{ width: `${pct}%`, backgroundColor: f.color }}
+              />
+            )
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {fields.map((f) => {
+            const pct = (percentToBp(values[f.key] ?? '0') / 100).toFixed(0)
+            return (
+              <div key={f.key} className="flex items-center gap-1">
+                <div
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: f.color }}
+                />
+                <span className="text-[10px] text-muted-foreground/70">
+                  {f.label} <span className="font-medium text-muted-foreground">{pct}%</span>
+                </span>
               </div>
             )
           })}
-          {remainingBp > 0 && (
-            <div className="flex flex-1 items-center justify-center px-2">
-              <span className="truncate text-xs text-muted-foreground/40">
-                {(remainingBp / 100).toFixed(0)}% unallocated
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Legend dots */}
-        <div className="flex flex-wrap gap-4">
-          {fields.map((f) => (
-            <div key={f.key} className="flex items-center gap-1.5">
-              <div className={cn('h-2 w-2 rounded-full shrink-0', f.color)} />
-              <span className="text-xs text-muted-foreground">{f.label}</span>
-            </div>
-          ))}
         </div>
       </div>
 
-      {/* ── Percentage inputs ───────────────────────────────────────────────── */}
-      <div className={cn('grid gap-4 mb-5', inputCols)}>
+      {/* ── Percentage inputs — stacked, one per field ───────────────────────── */}
+      <div className="flex-1 space-y-2">
         {fields.map((field) => (
-          <div key={field.key} className="space-y-1.5">
-            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <div className={cn('h-2 w-2 rounded-full shrink-0', field.color)} />
+          <div key={field.key} className="flex items-center gap-2">
+            <div
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: field.color }}
+            />
+            <span className="w-11 shrink-0 text-xs text-muted-foreground">
               {field.label}
-            </label>
-            <div className="relative">
+            </span>
+            <div className="relative flex-1">
               <Input
                 type="text"
                 inputMode="decimal"
                 value={values[field.key] ?? ''}
                 onChange={(e) => handleChange(field.key, e.target.value)}
                 disabled={readOnly || isPending}
-                className="h-11 pr-9 text-right font-mono text-base font-semibold tracking-tight"
+                className="h-8 pr-7 text-right text-sm font-semibold font-mono"
                 placeholder="0.00"
               />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">
+              <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
                 %
               </span>
             </div>
@@ -211,19 +193,19 @@ export function RevenueSplitCard({
         ))}
       </div>
 
-      {/* ── Footer: status + save ───────────────────────────────────────────── */}
+      {/* ── Footer ──────────────────────────────────────────────────────────── */}
       {!readOnly && (
-        <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
-          <p className="text-xs">
+        <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+          <p className="text-[11px] leading-tight">
             {isValid ? (
-              <span className="font-medium text-success">Totals 100% — ready to save</span>
+              <span className="text-success font-medium">✓ Totals 100%</span>
             ) : remainingBp > 0 ? (
-              <span className="font-medium text-warning">
-                {(remainingBp / 100).toFixed(2)}% remaining to allocate
+              <span className="text-muted-foreground/60">
+                {(remainingBp / 100).toFixed(0)}% left
               </span>
             ) : (
-              <span className="font-medium text-destructive">
-                Over by {(Math.abs(remainingBp) / 100).toFixed(2)}%
+              <span className="text-destructive text-[10px]">
+                Over {(Math.abs(remainingBp) / 100).toFixed(0)}%
               </span>
             )}
           </p>
@@ -232,12 +214,11 @@ export function RevenueSplitCard({
             onClick={handleSave}
             disabled={!isValid || isPending || !isDirty}
             size="sm"
-            className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-7 px-3 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30"
           >
             {isPending
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <Save className="h-3.5 w-3.5" />
-            }
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <Save className="h-3 w-3" />}
             {isPending ? 'Saving…' : 'Save'}
           </Button>
         </div>
