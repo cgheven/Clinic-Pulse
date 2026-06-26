@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@theme inline {
+  /* Base palette */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-inter);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  /* Dark luxury palette — ClinicPulse */
+  --background:             #0a0a0f;
+  --foreground:             #f0f0f5;
+  --card:                   #111118;
+  --card-foreground:        #f0f0f5;
+  --popover:                #111118;
+  --popover-foreground:     #f0f0f5;
+  --primary:                #f59e0b;      /* amber-500 */
+  --primary-foreground:     #0a0a0f;
+  --secondary:              #1c1c27;
+  --secondary-foreground:   #c8c8d4;
+  --muted:                  #16161f;
+  --muted-foreground:       #7c7c9a;
+  --accent:                 #1c1c27;
+  --accent-foreground:      #f0f0f5;
+  --destructive:            #ef4444;
+  --destructive-foreground: #fef2f2;
+  --border:                 #1e1e2d;
+  --input:                  #1c1c27;
+  --ring:                   #f59e0b;
+  --success:                #22c55e;
+  --success-foreground:     #f0fdf4;
+  --warning:                #f59e0b;
+  --warning-foreground:     #0a0a0f;
+  --info:                   #3b82f6;
+  --info-foreground:        #eff6ff;
+
+  /* Sidebar-specific */
+  --sidebar:                #0d0d14;
+  --sidebar-foreground:     #c8c8d4;
+  --sidebar-border:         #1a1a24;
+  --sidebar-accent:         #f59e0b;
+  --sidebar-accent-foreground: #0a0a0f;
+}
+
+* {
+  border-color: var(--border);
+  outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

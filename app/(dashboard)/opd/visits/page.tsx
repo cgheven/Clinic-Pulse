@@ -1,0 +1,328 @@
+import { Suspense } from 'react'
+import Link from 'next/link'
+import {
+  Plus,
+  CalendarDays,
+  Stethoscope,
+  TrendingUp,
+  AlertCircle,
+  Clock,
+  CreditCard,
+  Filter,
+} from 'lucide-react'
+import { getDailyVisits, getDoctors } from '@/app/actions/opd'
+import { formatCurrencyPaisas, formatDate, getTodayPKT, cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+
+export const metadata = {
+  title: 'Visits — OPD — ClinicPulse',
+}
+
+const paymentStatusColor: Record<string, string> = {
+  completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
+  refunded: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+}
+
+async function VisitLog({
+  date,
+  doctorFilter,
+}: {
+  date: string
+  doctorFilter: string
+}) {
+  const result = await getDailyVisits(date)
+
+  if (!result.success) {
+    return (
+      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center">
+        <AlertCircle className="mx-auto mb-2 h-7 w-7 text-destructive" />
+        <p className="text-sm text-destructive">{result.error}</p>
+      </div>
+    )
+  }
+
+  const { visits: allVisits, total_visits, total_revenue, total_discount } = result.data
+
+  const visits = doctorFilter
+    ? allVisits.filter((v) => v.doctor?.id === doctorFilter)
+    : allVisits
+
+  return (
+    <div className="space-y-4">
+      {/* Summary Row */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <SummaryCard
+          label="Total Visits"
+          value={String(doctorFilter ? visits.length : total_visits)}
+          icon={<CalendarDays className="h-4 w-4" />}
+          color="text-primary"
+          bg="bg-primary/10"
+        />
+        <SummaryCard
+          label="Total Revenue"
+          value={formatCurrencyPaisas(
+            doctorFilter
+              ? visits.reduce((s, v) => s + v.net_fee, 0)
+              : total_revenue
+          )}
+          icon={<TrendingUp className="h-4 w-4" />}
+          color="text-emerald-400"
+          bg="bg-emerald-500/10"
+        />
+        <SummaryCard
+          label="Total Discount"
+          value={formatCurrencyPaisas(
+            doctorFilter
+              ? visits.reduce((s, v) => s + v.discount_amount, 0)
+              : total_discount
+          )}
+          icon={<CreditCard className="h-4 w-4" />}
+          color="text-amber-400"
+          bg="bg-amber-500/10"
+        />
+      </div>
+
+      {/* Visit Table */}
+      {visits.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-card/50 py-16 text-center">
+          <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
+          <p className="text-sm font-medium text-muted-foreground">
+            No visits recorded for {formatDate(date)}
+          </p>
+          <div className="mt-4">
+            <Button asChild size="sm">
+              <Link href="/opd/visits/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Record Visit
+              </Link>
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Time
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Patient
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Doctor
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Complaint
+                  </th>
+                  <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Fee
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Payment
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {visits.map((visit) => (
+                  <tr
+                    key={visit.id}
+                    className="hover:bg-muted/20 transition-colors"
+                  >
+                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 shrink-0" />
+                        {visit.visit_time?.slice(0, 5) ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/opd/patients/${visit.patient_id}`}
+                        className="hover:text-primary transition-colors"
+                      >
+                        <p className="text-sm font-medium text-foreground">
+                          {visit.patient.full_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {visit.patient.patient_no}
+                        </p>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      {visit.doctor ? (
+                        <Link
+                          href={`/opd/doctors/${visit.doctor.id}`}
+                          className="hover:text-primary transition-colors"
+                        >
+                          <p className="text-sm text-foreground">{visit.doctor.full_name}</p>
+                          {visit.doctor.specialty && (
+                            <p className="text-xs text-muted-foreground">{visit.doctor.specialty}</p>
+                          )}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 max-w-[200px]">
+                      <p className="truncate text-sm text-muted-foreground">
+                        {visit.chief_complaint ?? '—'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <p className="text-sm font-semibold text-primary">
+                        {formatCurrencyPaisas(visit.net_fee)}
+                      </p>
+                      {visit.discount_amount > 0 && (
+                        <p className="text-[10px] text-muted-foreground/60 line-through">
+                          {formatCurrencyPaisas(visit.consultation_fee)}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-xs text-muted-foreground">
+                        {visit.payment_method?.name ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize',
+                          paymentStatusColor[visit.payment_status] ??
+                            'bg-muted text-muted-foreground border-border'
+                        )}
+                      >
+                        {visit.payment_status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SummaryCard({
+  label,
+  value,
+  icon,
+  color,
+  bg,
+}: {
+  label: string
+  value: string
+  icon: React.ReactNode
+  color: string
+  bg: string
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg ${bg} ${color}`}>
+        {icon}
+      </div>
+      <p className="text-lg font-bold text-foreground">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  )
+}
+
+async function DoctorFilterOptions() {
+  const result = await getDoctors()
+  if (!result.success) return null
+
+  return (
+    <>
+      <option value="">All Doctors</option>
+      {result.data.map((d) => (
+        <option key={d.id} value={d.id}>
+          Dr. {d.full_name}
+        </option>
+      ))}
+    </>
+  )
+}
+
+interface VisitsPageProps {
+  searchParams: Promise<{ date?: string; doctor?: string }>
+}
+
+export default async function VisitsPage({ searchParams }: VisitsPageProps) {
+  const params = await searchParams
+  const date = params.date ?? getTodayPKT()
+  const doctorFilter = params.doctor ?? ''
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Daily Visit Log</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            All OPD visits for {formatDate(date)}
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/opd/visits/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Record Visit
+          </Link>
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <form method="GET" action="/opd/visits" className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+          <input
+            name="date"
+            type="date"
+            defaultValue={date}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+          <select
+            name="doctor"
+            defaultValue={doctorFilter}
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+          >
+            <Suspense fallback={<option>Loading...</option>}>
+              <DoctorFilterOptions />
+            </Suspense>
+          </select>
+        </div>
+
+        <Button type="submit" variant="outline" size="sm">
+          Apply Filter
+        </Button>
+      </form>
+
+      <Suspense
+        key={`${date}-${doctorFilter}`}
+        fallback={
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-24 animate-pulse rounded-xl border border-border bg-card" />
+              ))}
+            </div>
+            <div className="h-64 animate-pulse rounded-xl border border-border bg-card" />
+          </div>
+        }
+      >
+        <VisitLog date={date} doctorFilter={doctorFilter} />
+      </Suspense>
+    </div>
+  )
+}
