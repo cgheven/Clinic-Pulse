@@ -36,3 +36,22 @@ tsconfig.tsbuildinfo
 
 # vercel
 .vercel
+
+# supabase
+.supabase/
+
+# ide
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# os
+Thumbs.db
+
+# logs
+logs/
+*.log
+
+# sentry
+.sentryclirc
