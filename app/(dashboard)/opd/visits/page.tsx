@@ -7,7 +7,7 @@ import {
   TrendingUp,
   AlertCircle,
   Clock,
-  CreditCard,
+  Users,
   Filter,
 } from 'lucide-react'
 import { getDailyVisits, getDoctors } from '@/app/actions/opd'
@@ -18,11 +18,14 @@ export const metadata = {
   title: 'Visits — OPD — ClinicPulse',
 }
 
-const paymentStatusColor: Record<string, string> = {
-  completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
-  refunded: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+function formatPaymentMethod(method: string): string {
+  const labels: Record<string, string> = {
+    cash: 'Cash',
+    jazzcash: 'JazzCash',
+    easypaisa: 'Easypaisa',
+    bank_transfer: 'Bank Transfer',
+  }
+  return labels[method] ?? method
 }
 
 async function VisitLog({
@@ -43,11 +46,13 @@ async function VisitLog({
     )
   }
 
-  const { visits: allVisits, total_visits, total_revenue, total_discount } = result.data
+  const { visits: allVisits, total_visits, total_revenue } = result.data
 
   const visits = doctorFilter
     ? allVisits.filter((v) => v.doctor?.id === doctorFilter)
     : allVisits
+
+  const uniquePatients = new Set(visits.map((v) => v.patient_id)).size
 
   return (
     <div className="space-y-4">
@@ -64,7 +69,7 @@ async function VisitLog({
           label="Total Revenue"
           value={formatCurrencyPaisas(
             doctorFilter
-              ? visits.reduce((s, v) => s + v.net_fee, 0)
+              ? visits.reduce((s, v) => s + v.fee_paisas, 0)
               : total_revenue
           )}
           icon={<TrendingUp className="h-4 w-4" />}
@@ -72,13 +77,9 @@ async function VisitLog({
           bg="bg-emerald-500/10"
         />
         <SummaryCard
-          label="Total Discount"
-          value={formatCurrencyPaisas(
-            doctorFilter
-              ? visits.reduce((s, v) => s + v.discount_amount, 0)
-              : total_discount
-          )}
-          icon={<CreditCard className="h-4 w-4" />}
+          label="Unique Patients"
+          value={String(uniquePatients)}
+          icon={<Users className="h-4 w-4" />}
           color="text-amber-400"
           bg="bg-amber-500/10"
         />
@@ -107,25 +108,19 @@ async function VisitLog({
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Time
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Patient
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Doctor
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Complaint
+                    Diagnosis
                   </th>
                   <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Fee
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Payment
-                  </th>
-                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Status
                   </th>
                 </tr>
               </thead>
@@ -135,22 +130,16 @@ async function VisitLog({
                     key={visit.id}
                     className="hover:bg-muted/20 transition-colors"
                   >
-                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 shrink-0" />
-                        {visit.visit_time?.slice(0, 5) ?? '—'}
-                      </span>
-                    </td>
                     <td className="px-4 py-3">
                       <Link
                         href={`/opd/patients/${visit.patient_id}`}
                         className="hover:text-primary transition-colors"
                       >
                         <p className="text-sm font-medium text-foreground">
-                          {visit.patient.full_name}
+                          {visit.patient?.name ?? '—'}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {visit.patient.patient_no}
+                          {visit.patient?.patient_no}
                         </p>
                       </Link>
                     </td>
@@ -160,9 +149,9 @@ async function VisitLog({
                           href={`/opd/doctors/${visit.doctor.id}`}
                           className="hover:text-primary transition-colors"
                         >
-                          <p className="text-sm text-foreground">{visit.doctor.full_name}</p>
-                          {visit.doctor.specialty && (
-                            <p className="text-xs text-muted-foreground">{visit.doctor.specialty}</p>
+                          <p className="text-sm text-foreground">{visit.doctor.name}</p>
+                          {visit.doctor.specialization && (
+                            <p className="text-xs text-muted-foreground">{visit.doctor.specialization}</p>
                           )}
                         </Link>
                       ) : (
@@ -171,33 +160,17 @@ async function VisitLog({
                     </td>
                     <td className="px-4 py-3 max-w-[200px]">
                       <p className="truncate text-sm text-muted-foreground">
-                        {visit.chief_complaint ?? '—'}
+                        {visit.diagnosis ?? '—'}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <p className="text-sm font-semibold text-primary">
-                        {formatCurrencyPaisas(visit.net_fee)}
+                        {formatCurrencyPaisas(visit.fee_paisas)}
                       </p>
-                      {visit.discount_amount > 0 && (
-                        <p className="text-[10px] text-muted-foreground/60 line-through">
-                          {formatCurrencyPaisas(visit.consultation_fee)}
-                        </p>
-                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-xs text-muted-foreground">
-                        {visit.payment_method?.name ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={cn(
-                          'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize',
-                          paymentStatusColor[visit.payment_status] ??
-                            'bg-muted text-muted-foreground border-border'
-                        )}
-                      >
-                        {visit.payment_status}
+                        {visit.payment_method ? formatPaymentMethod(visit.payment_method) : '—'}
                       </span>
                     </td>
                   </tr>
@@ -244,7 +217,7 @@ async function DoctorFilterOptions() {
       <option value="">All Doctors</option>
       {result.data.map((d) => (
         <option key={d.id} value={d.id}>
-          Dr. {d.full_name}
+          Dr. {d.name}
         </option>
       ))}
     </>

@@ -5,32 +5,26 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth, requireAdmin } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
-import type {
-  CpLabTest,
-  CpLabChemical,
-  CpLabMachinery,
-  CpLabMachineryMaintenance,
-  CpLabExpense,
-  CpExpenseHead,
-  LabTestLogWithRelations,
-} from '@/types/index'
-
-// =============================================================================
-// Shared return type (mirrors settings.ts pattern)
-// =============================================================================
+import type { CpLabTest, CpLabChemical, CpLabMachinery, CpLabMaintenance, CpExpenseHead, CpLabTestLog, CpPatient, CpDoctor } from '@/types/index'
 
 export type ActionResult<T = undefined> =
   | { success: true; data: T }
   | { success: false; error: string }
 
 // =============================================================================
-// Exported data types
+// Types
 // =============================================================================
+
+export type LabTestLogWithRelations = CpLabTestLog & {
+  test?: Pick<CpLabTest, 'id' | 'name' | 'category'> | null
+  patient?: Pick<CpPatient, 'id' | 'name' | 'patient_no'> | null
+  doctor?: Pick<CpDoctor, 'id' | 'name'> | null
+}
 
 export type DailyTestLogResult = {
   entries: LabTestLogWithRelations[]
   totalTests: number
-  totalRevenue: number // paisas
+  totalRevenue: number
   pendingCount: number
   completedCount: number
 }
@@ -39,18 +33,7 @@ export type ChemicalWithLowStock = CpLabChemical & { isLowStock: boolean }
 
 export type MachineryWithStatus = CpLabMachinery & {
   status: 'operational' | 'maintenance_due' | 'overdue'
-  maintenanceRecords: CpLabMachineryMaintenance[]
-}
-
-export type LabExpenseEntry = CpLabExpense & {
-  expense_head_name: string | null
-  payment_method_name: string | null
-}
-
-export type LabExpenseResult = {
-  entries: LabExpenseEntry[]
-  totalAmount: number // paisas
-  byHead: Record<string, number> // head name → total paisas
+  maintenanceRecords: CpLabMaintenance[]
 }
 
 export type LabReportData = {
@@ -58,115 +41,119 @@ export type LabReportData = {
   clinicName: string
   entries: LabTestLogWithRelations[]
   totalTests: number
-  totalRevenue: number // paisas
-  doctorSplitPct: number // basis points
-  clinicSplitPct: number // basis points
-  doctorSplitAmount: number // paisas
-  clinicSplitAmount: number // paisas
+  totalRevenue: number
+  doctorSplitPct: number
+  clinicSplitPct: number
+  doctorSplitAmount: number
+  clinicSplitAmount: number
+}
+
+export type LabExpenseEntry = {
+  id: string
+  expense_date: string
+  expense_head_id: string | null
+  custom_head: string | null
+  amount: number // paisas
+  description: string | null
+  receipt_url: string | null
+  payment_method_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+  expense_head_name: string
+  payment_method_name: string | null
+}
+
+export type LabExpenseResult = {
+  entries: LabExpenseEntry[]
+  totalAmount: number
+  byHead: Record<string, number>
 }
 
 // =============================================================================
-// Zod Schemas
+// Schemas
 // =============================================================================
 
 const recordTestSchema = z.object({
-  log_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+  test_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
   test_id: z.string().uuid('Invalid test ID'),
-  patient_no: z.string().optional(),
-  quantity: z.number().int().min(1).default(1),
-  unit_price: z.number().int().min(0), // paisas
-  discount_amount: z.number().int().min(0).default(0), // paisas
-  result_value: z.string().max(500).optional(),
-  result_unit: z.string().max(50).optional(),
-  is_abnormal: z.boolean().default(false),
-  result_notes: z.string().max(1000).optional(),
-  payment_method_id: z.string().uuid().optional(),
-  payment_status: z
-    .enum(['pending', 'completed', 'cancelled', 'refunded'])
-    .default('completed'),
-  report_issued: z.boolean().default(false),
+  patient_id: z.string().uuid().nullable().optional(),
+  patient_name: z.string().max(200).nullable().optional(),
+  doctor_id: z.string().uuid().nullable().optional(),
+  price_paisas: z.number().int().min(0),
+  payment_method: z.enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer']).nullable().optional(),
+  payment_status: z.enum(['pending', 'completed', 'refunded']).default('completed'),
+  result: z.string().max(2000).nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+  qty: z.number().int().min(1).default(1),
 })
 
 const createTestSchema = z.object({
-  test_name: z.string().min(1, 'Test name is required').max(200),
-  test_code: z.string().max(50).optional(),
-  category: z.string().max(100).optional(),
-  price: z.number().int().min(0), // paisas
-  cost: z.number().int().min(0).default(0), // paisas
-  reference_range: z.string().max(300).optional(),
-  unit: z.string().max(50).optional(),
-  turnaround_time: z.string().max(100).optional(),
-  notes: z.string().max(1000).optional(),
+  name: z.string().min(1, 'Name is required').max(200),
+  category: z.string().max(100).nullable().optional(),
+  price_paisas: z.number().int().min(0),
+  duration_minutes: z.number().int().min(0).nullable().optional(),
+  is_active: z.boolean().default(true),
 })
 
-const updateTestSchema = z.object({
-  test_name: z.string().min(1).max(200).optional(),
-  test_code: z.string().max(50).optional(),
-  category: z.string().max(100).optional(),
-  price: z.number().int().min(0).optional(), // paisas
-  cost: z.number().int().min(0).optional(), // paisas
-  reference_range: z.string().max(300).optional(),
-  unit: z.string().max(50).optional(),
-  turnaround_time: z.string().max(100).optional(),
-  is_active: z.boolean().optional(),
-  notes: z.string().max(1000).optional(),
-})
+const updateTestSchema = createTestSchema.partial()
 
-const addMaintenanceRecordSchema = z.object({
-  maintenance_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  maintenance_type: z.enum(['routine', 'repair', 'calibration']),
-  cost: z.number().int().min(0).default(0), // paisas
-  performed_by: z.string().max(200).optional(),
-  notes: z.string().max(1000).optional(),
-  next_due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-})
-
-const addLabExpenseSchema = z.object({
-  expense_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  expense_head_id: z.string().uuid().optional(),
-  custom_head: z.string().max(200).optional(),
-  amount: z.number().int().min(0), // paisas
-  description: z.string().max(1000).optional(),
-  payment_method_id: z.string().uuid().optional(),
+const addMaintenanceSchema = z.object({
+  service_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  description: z.string().max(1000).nullable().optional(),
+  cost_paisas: z.number().int().min(0).default(0),
+  technician: z.string().max(200).nullable().optional(),
+  next_service: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 })
 
 // =============================================================================
-// Internal helpers
+// Helpers
 // =============================================================================
 
 function todayISO(): string {
-  return new Date().toISOString().split('T')[0]!
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 }
 
 // =============================================================================
-// getDailyTestLog — all tests for a given date, with joins + totals
+// getDailyTestLog
 // =============================================================================
 
-export async function getDailyTestLog(
-  date: string
-): Promise<ActionResult<DailyTestLogResult>> {
+export async function getDailyTestLog(date: string): Promise<ActionResult<DailyTestLogResult>> {
   try {
     await requireAuth()
+    const dateParsed = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).safeParse(date)
+    if (!dateParsed.success) return { success: false, error: 'Invalid date format' }
+
     const supabase = await createClient()
 
     const { data, error } = await supabase
       .from('cp_lab_test_logs')
       .select(
-        `*,
-        test:cp_lab_tests(id, test_name, category, reference_range, unit),
-        patient:cp_patients(id, full_name, patient_no),
-        payment_method:cp_payment_methods(id, name, slug)`
+        `*, cp_lab_tests!test_id(id, name, category),
+        cp_patients!patient_id(id, name, patient_no),
+        cp_doctors!doctor_id(id, name)`
       )
-      .eq('log_date', date)
+      .eq('test_date', date)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
 
     if (error) return { success: false, error: error.message }
 
-    const entries = (data ?? []) as unknown as LabTestLogWithRelations[]
-    const totalRevenue = entries.reduce((sum, e) => sum + (e.total_amount ?? 0), 0)
-    const pendingCount = entries.filter((e) => e.payment_status === 'pending').length
-    const completedCount = entries.filter((e) => e.payment_status === 'completed').length
+    type Row = CpLabTestLog & {
+      cp_lab_tests: Pick<CpLabTest, 'id' | 'name' | 'category'> | null
+      cp_patients: Pick<CpPatient, 'id' | 'name' | 'patient_no'> | null
+      cp_doctors: Pick<CpDoctor, 'id' | 'name'> | null
+    }
+
+    const entries: LabTestLogWithRelations[] = ((data ?? []) as unknown as Row[]).map((e) => ({
+      ...e,
+      test: e.cp_lab_tests ?? null,
+      patient: e.cp_patients ?? null,
+      doctor: e.cp_doctors ?? null,
+    }))
+
+    const totalRevenue = entries.reduce((sum, e) => sum + (e.price_paisas ?? 0), 0)
 
     return {
       success: true,
@@ -174,8 +161,8 @@ export async function getDailyTestLog(
         entries,
         totalTests: entries.length,
         totalRevenue,
-        pendingCount,
-        completedCount,
+        pendingCount: entries.filter((e) => e.payment_status === 'pending').length,
+        completedCount: entries.filter((e) => e.payment_status === 'completed').length,
       },
     }
   } catch (err) {
@@ -184,56 +171,39 @@ export async function getDailyTestLog(
 }
 
 // =============================================================================
-// recordTest — create a test log entry
+// recordTest
 // =============================================================================
 
 export async function recordTest(rawData: unknown): Promise<ActionResult<string>> {
   try {
     const authUser = await requireAuth()
-
     const parsed = recordTestSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
 
-    const {
-      patient_no,
-      payment_method_id,
-      result_value,
-      result_unit,
-      result_notes,
-      ...rest
-    } = parsed.data
-
-    // SECURITY FIX (FINDING-006): Prevent backdating of test log records
-    const dateCheck = validateFinancialDate(parsed.data.log_date)
-    if (!dateCheck.valid) {
-      return { success: false, error: dateCheck.error }
-    }
+    const dateCheck = validateFinancialDate(parsed.data.test_date)
+    if (!dateCheck.valid) return { success: false, error: dateCheck.error }
 
     const supabase = await createClient()
 
-    // Resolve patient_id from patient_no if provided
-    let patient_id: string | null = null
-    if (patient_no?.trim()) {
-      const { data: patient } = await supabase
-        .from('cp_patients')
-        .select('id')
-        .eq('patient_no', patient_no.trim().toUpperCase())
-        .single()
-      patient_id = patient?.id ?? null
-    }
+    // Denormalize test name
+    const { data: testData } = await supabase.from('cp_lab_tests').select('name').eq('id', parsed.data.test_id).single()
 
     const { data, error } = await supabase
       .from('cp_lab_test_logs')
       .insert({
-        ...rest,
-        patient_id,
-        payment_method_id: payment_method_id ?? null,
-        result_value: result_value ?? null,
-        result_unit: result_unit ?? null,
-        result_notes: result_notes ?? null,
-        performed_by: authUser.id,
+        test_date: parsed.data.test_date,
+        test_id: parsed.data.test_id,
+        test_name: (testData?.name as string) ?? '',
+        patient_id: parsed.data.patient_id ?? null,
+        patient_name: parsed.data.patient_name ?? null,
+        doctor_id: parsed.data.doctor_id ?? null,
+        price_paisas: parsed.data.price_paisas,
+        payment_method: parsed.data.payment_method ?? null,
+        payment_status: parsed.data.payment_status,
+        result: parsed.data.result ?? null,
+        notes: parsed.data.notes ?? null,
+        qty: parsed.data.qty,
+        created_by: authUser.id,
       })
       .select('id')
       .single()
@@ -241,7 +211,6 @@ export async function recordTest(rawData: unknown): Promise<ActionResult<string>
     if (error) return { success: false, error: error.message }
 
     revalidatePath('/lab')
-    revalidatePath('/lab/tests')
     return { success: true, data: data.id as string }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
@@ -249,7 +218,7 @@ export async function recordTest(rawData: unknown): Promise<ActionResult<string>
 }
 
 // =============================================================================
-// getTestCatalog — all active tests with pricing
+// getTestCatalog
 // =============================================================================
 
 export async function getTestCatalog(): Promise<ActionResult<CpLabTest[]>> {
@@ -262,82 +231,67 @@ export async function getTestCatalog(): Promise<ActionResult<CpLabTest[]>> {
       .select('*')
       .is('deleted_at', null)
       .order('category', { ascending: true })
-      .order('test_name', { ascending: true })
+      .order('name', { ascending: true })
 
     if (error) return { success: false, error: error.message }
-    return { success: true, data: (data ?? []) as CpLabTest[] }
+    return { success: true, data: (data ?? []) as unknown as CpLabTest[] }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
 
 // =============================================================================
-// createTest — add test to catalog (admin only)
+// createTest
 // =============================================================================
 
 export async function createTest(rawData: unknown): Promise<ActionResult<CpLabTest>> {
   try {
-    const authUser = await requireAdmin()
-
+    await requireAdmin()
     const parsed = createTestSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
 
     const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('cp_lab_tests')
-      .insert({
-        test_name: parsed.data.test_name,
-        test_code: parsed.data.test_code ?? null,
-        category: parsed.data.category ?? null,
-        price: parsed.data.price,
-        cost: parsed.data.cost,
-        reference_range: parsed.data.reference_range ?? null,
-        unit: parsed.data.unit ?? null,
-        turnaround_time: parsed.data.turnaround_time ?? null,
-        notes: parsed.data.notes ?? null,
-        is_active: true,
-        created_by: authUser.id,
-      })
-      .select('*')
-      .single()
-
+    const { data, error } = await supabase.from('cp_lab_tests').insert({
+      name: parsed.data.name,
+      category: parsed.data.category ?? null,
+      price_paisas: parsed.data.price_paisas,
+      is_active: parsed.data.is_active,
+    }).select('*').single()
     if (error) return { success: false, error: error.message }
 
     revalidatePath('/lab/catalog')
-    return { success: true, data: data as CpLabTest }
+    return { success: true, data: data as unknown as CpLabTest }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
 
 // =============================================================================
-// updateTest — update pricing / details (admin only)
+// updateTest
 // =============================================================================
 
-export async function updateTest(
-  id: string,
-  rawData: unknown
-): Promise<ActionResult<undefined>> {
+export async function updateTest(id: string, rawData: unknown): Promise<ActionResult<undefined>> {
   try {
     await requireAdmin()
-
     const idParsed = z.string().uuid().safeParse(id)
     if (!idParsed.success) return { success: false, error: 'Invalid test ID' }
 
     const parsed = updateTestSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
+
+    const updatePayload: {
+      name?: string
+      category?: string | null
+      price_paisas?: number
+      is_active?: boolean
+    } = {}
+    if (parsed.data.name !== undefined) updatePayload.name = parsed.data.name
+    if (parsed.data.category !== undefined) updatePayload.category = parsed.data.category ?? null
+    if (parsed.data.price_paisas !== undefined) updatePayload.price_paisas = parsed.data.price_paisas
+    if (parsed.data.is_active !== undefined) updatePayload.is_active = parsed.data.is_active
 
     const supabase = await createClient()
-    const { error } = await supabase
-      .from('cp_lab_tests')
-      .update(parsed.data)
-      .eq('id', id)
-      .is('deleted_at', null)
-
+    const { error } = await supabase.from('cp_lab_tests').update(updatePayload).eq('id', id).is('deleted_at', null)
     if (error) return { success: false, error: error.message }
 
     revalidatePath('/lab/catalog')
@@ -348,7 +302,7 @@ export async function updateTest(
 }
 
 // =============================================================================
-// getChemicals — chemical inventory with low stock flag
+// getChemicals
 // =============================================================================
 
 export async function getChemicals(): Promise<ActionResult<ChemicalWithLowStock[]>> {
@@ -360,13 +314,13 @@ export async function getChemicals(): Promise<ActionResult<ChemicalWithLowStock[
       .from('cp_lab_chemicals')
       .select('*')
       .is('deleted_at', null)
-      .order('chemical_name', { ascending: true })
+      .order('name', { ascending: true })
 
     if (error) return { success: false, error: error.message }
 
-    const chemicals = ((data ?? []) as CpLabChemical[]).map((c) => ({
+    const chemicals: ChemicalWithLowStock[] = ((data ?? []) as CpLabChemical[]).map((c) => ({
       ...c,
-      isLowStock: Number(c.quantity_in_stock) <= Number(c.low_stock_threshold),
+      isLowStock: Number(c.quantity) <= Number(c.reorder_level),
     }))
 
     return { success: true, data: chemicals }
@@ -376,40 +330,22 @@ export async function getChemicals(): Promise<ActionResult<ChemicalWithLowStock[
 }
 
 // =============================================================================
-// adjustChemicalStock — stock in / out
+// adjustChemicalStock
 // =============================================================================
 
-export async function adjustChemicalStock(
-  id: string,
-  qty: number,
-  type: 'in' | 'out'
-): Promise<ActionResult<undefined>> {
+export async function adjustChemicalStock(id: string, qty: number, type: 'in' | 'out'): Promise<ActionResult<undefined>> {
   try {
     await requireAuth()
-
     const idParsed = z.string().uuid().safeParse(id)
-    if (!idParsed.success) return { success: false, error: 'Invalid chemical ID' }
+    if (!idParsed.success) return { success: false, error: 'Invalid ID' }
     if (qty <= 0) return { success: false, error: 'Quantity must be positive' }
 
     const supabase = await createClient()
+    const { data: current, error: fetchErr } = await supabase.from('cp_lab_chemicals').select('quantity').eq('id', id).single()
+    if (fetchErr || !current) return { success: false, error: 'Chemical not found' }
 
-    const { data: current, error: fetchError } = await supabase
-      .from('cp_lab_chemicals')
-      .select('quantity_in_stock')
-      .eq('id', id)
-      .single()
-
-    if (fetchError || !current) return { success: false, error: 'Chemical not found' }
-
-    const currentQty = Number(current.quantity_in_stock)
-    const newQty =
-      type === 'in' ? currentQty + qty : Math.max(0, currentQty - qty)
-
-    const { error } = await supabase
-      .from('cp_lab_chemicals')
-      .update({ quantity_in_stock: newQty })
-      .eq('id', id)
-
+    const newQty = type === 'in' ? Number(current.quantity) + qty : Math.max(0, Number(current.quantity) - qty)
+    const { error } = await supabase.from('cp_lab_chemicals').update({ quantity: newQty }).eq('id', id)
     if (error) return { success: false, error: error.message }
 
     revalidatePath('/lab/chemicals')
@@ -420,7 +356,7 @@ export async function adjustChemicalStock(
 }
 
 // =============================================================================
-// getEquipment — machinery list with status and maintenance history
+// getEquipment
 // =============================================================================
 
 export async function getEquipment(): Promise<ActionResult<MachineryWithStatus[]>> {
@@ -429,37 +365,26 @@ export async function getEquipment(): Promise<ActionResult<MachineryWithStatus[]
     const supabase = await createClient()
 
     const [machineryRes, maintenanceRes] = await Promise.all([
-      supabase
-        .from('cp_lab_machinery')
-        .select('*')
-        .is('deleted_at', null)
-        .order('machine_name', { ascending: true }),
-      supabase
-        .from('cp_lab_machinery_maintenance')
-        .select('*')
-        .order('maintenance_date', { ascending: false }),
+      supabase.from('cp_lab_machinery').select('*').is('deleted_at', null).order('name', { ascending: true }),
+      supabase.from('cp_lab_maintenance').select('*').order('service_date', { ascending: false }),
     ])
 
     if (machineryRes.error) return { success: false, error: machineryRes.error.message }
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const allRecords = (maintenanceRes.data ?? []) as CpLabMachineryMaintenance[]
+    const today = new Date(todayISO())
+    const allRecords = (maintenanceRes.data ?? []) as CpLabMaintenance[]
 
     const result = ((machineryRes.data ?? []) as CpLabMachinery[]).map((m) => {
-      const records = allRecords.filter((r) => r.machine_id === m.id)
+      const records = allRecords.filter((r) => r.machinery_id === m.id)
 
       let status: 'operational' | 'maintenance_due' | 'overdue' = 'operational'
-      if (m.next_maintenance_date) {
-        const nextDue = new Date(m.next_maintenance_date)
-        nextDue.setHours(0, 0, 0, 0)
+      if (m.next_service) {
+        const nextDue = new Date(m.next_service)
         if (nextDue < today) {
           status = 'overdue'
         } else {
-          const msPerDay = 1000 * 60 * 60 * 24
-          const daysUntilDue = (nextDue.getTime() - today.getTime()) / msPerDay
-          if (daysUntilDue <= 7) status = 'maintenance_due'
+          const daysUntil = (nextDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+          if (daysUntil <= 7) status = 'maintenance_due'
         }
       }
 
@@ -473,56 +398,37 @@ export async function getEquipment(): Promise<ActionResult<MachineryWithStatus[]
 }
 
 // =============================================================================
-// addMaintenanceRecord — log maintenance for a machine
+// addMaintenanceRecord
 // =============================================================================
 
-export async function addMaintenanceRecord(
-  machineryId: string,
-  rawData: unknown
-): Promise<ActionResult<undefined>> {
+export async function addMaintenanceRecord(machineryId: string, rawData: unknown): Promise<ActionResult<undefined>> {
   try {
     const authUser = await requireAuth()
-
     const idParsed = z.string().uuid().safeParse(machineryId)
     if (!idParsed.success) return { success: false, error: 'Invalid machinery ID' }
 
-    const parsed = addMaintenanceRecordSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    const parsed = addMaintenanceSchema.safeParse(rawData)
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
 
     const supabase = await createClient()
 
-    const { error: insertError } = await supabase
-      .from('cp_lab_machinery_maintenance')
-      .insert({
-        machine_id: machineryId,
-        maintenance_date: parsed.data.maintenance_date,
-        maintenance_type: parsed.data.maintenance_type,
-        cost: parsed.data.cost,
-        performed_by: parsed.data.performed_by ?? null,
-        notes: parsed.data.notes ?? null,
-        next_due_date: parsed.data.next_due_date ?? null,
-        created_by: authUser.id,
-      })
+    const { error: insertErr } = await supabase.from('cp_lab_maintenance').insert({
+      machinery_id: machineryId,
+      service_date: parsed.data.service_date,
+      description: parsed.data.description ?? null,
+      cost_paisas: parsed.data.cost_paisas,
+      technician: parsed.data.technician ?? null,
+      next_service: parsed.data.next_service ?? null,
+      created_by: authUser.id,
+    })
 
-    if (insertError) return { success: false, error: insertError.message }
+    if (insertErr) return { success: false, error: insertErr.message }
 
-    // Update machinery's last and next maintenance dates
-    const machineUpdate: {
-      last_maintenance_date: string
-      next_maintenance_date?: string
-    } = {
-      last_maintenance_date: parsed.data.maintenance_date,
-    }
-    if (parsed.data.next_due_date) {
-      machineUpdate.next_maintenance_date = parsed.data.next_due_date
-    }
+    // Update machinery's last and next service dates
+    const machineUpdate: { last_service: string; next_service?: string } = { last_service: parsed.data.service_date }
+    if (parsed.data.next_service) machineUpdate.next_service = parsed.data.next_service
 
-    await supabase
-      .from('cp_lab_machinery')
-      .update(machineUpdate)
-      .eq('id', machineryId)
+    await supabase.from('cp_lab_machinery').update(machineUpdate).eq('id', machineryId)
 
     revalidatePath('/lab/equipment')
     return { success: true, data: undefined }
@@ -532,173 +438,68 @@ export async function addMaintenanceRecord(
 }
 
 // =============================================================================
-// getLabExpenses — lab expenses by head for a month (YYYY-MM)
+// Lab revenue split
 // =============================================================================
 
-export async function getLabExpenses(
-  month: string
-): Promise<ActionResult<LabExpenseResult>> {
+export async function getLabRevenueSplit(): Promise<ActionResult<{ doctor_pct: number; clinic_pct: number }>> {
   try {
     await requireAuth()
     const supabase = await createClient()
-
-    const startDate = `${month}-01`
-    const [yearStr, monStr] = month.split('-')
-    const year = parseInt(yearStr!, 10)
-    const mon = parseInt(monStr!, 10)
-    const lastDay = new Date(year, mon, 0) // day=0 → last day of previous month
-    const endDate = lastDay.toISOString().split('T')[0]!
-
-    const { data, error } = await supabase
-      .from('cp_lab_expenses')
-      .select(
-        `*,
-        expense_head:cp_expense_heads(id, name),
-        payment_method:cp_payment_methods(id, name, slug)`
-      )
-      .gte('expense_date', startDate)
-      .lte('expense_date', endDate)
-      .is('deleted_at', null)
-      .order('expense_date', { ascending: false })
-
-    if (error) return { success: false, error: error.message }
-
-    type RawRow = CpLabExpense & {
-      expense_head: Pick<CpExpenseHead, 'id' | 'name'> | null
-      payment_method: { id: string; name: string; slug: string } | null
-    }
-
-    const entries: LabExpenseEntry[] = ((data ?? []) as unknown as RawRow[]).map((e) => ({
-      ...e,
-      expense_head_name: e.expense_head?.name ?? e.custom_head ?? null,
-      payment_method_name: e.payment_method?.name ?? null,
-    }))
-
-    const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0)
-
-    const byHead: Record<string, number> = {}
-    for (const e of entries) {
-      const head = e.expense_head_name ?? 'Other'
-      byHead[head] = (byHead[head] ?? 0) + e.amount
-    }
-
-    return { success: true, data: { entries, totalAmount, byHead } }
+    const { data } = await supabase.from('cp_settings').select('setting_value').eq('setting_key', 'lab.revenue_split').single()
+    if (!data?.setting_value) return { success: true, data: { doctor_pct: 50, clinic_pct: 50 } }
+    return { success: true, data: data.setting_value as { doctor_pct: number; clinic_pct: number } }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
 
 // =============================================================================
-// addLabExpense — create a lab expense with audit log
+// generateLabReport
 // =============================================================================
 
-export async function addLabExpense(rawData: unknown): Promise<ActionResult<undefined>> {
-  try {
-    const authUser = await requireAuth()
-
-    const parsed = addLabExpenseSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
-
-    // SECURITY FIX (FINDING-006): Prevent backdating of expense records
-    const expenseDateCheck = validateFinancialDate(parsed.data.expense_date)
-    if (!expenseDateCheck.valid) {
-      return { success: false, error: expenseDateCheck.error }
-    }
-
-    const supabase = await createClient()
-    const { error } = await supabase.from('cp_lab_expenses').insert({
-      expense_date: parsed.data.expense_date,
-      expense_head_id: parsed.data.expense_head_id ?? null,
-      custom_head: parsed.data.custom_head ?? null,
-      amount: parsed.data.amount,
-      description: parsed.data.description ?? null,
-      payment_method_id: parsed.data.payment_method_id ?? null,
-      created_by: authUser.id,
-    })
-
-    if (error) return { success: false, error: error.message }
-
-    revalidatePath('/lab/expenses')
-    return { success: true, data: undefined }
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
-  }
-}
-
-// =============================================================================
-// generateLabReport — aggregate data for PDF report
-// =============================================================================
-
-export async function generateLabReport(
-  date: string
-): Promise<ActionResult<LabReportData>> {
+export async function generateLabReport(date: string): Promise<ActionResult<LabReportData>> {
   try {
     await requireAuth()
     const supabase = await createClient()
 
-    const [testLogsRes, revenueSplitRes, clinicNameRes] = await Promise.all([
-      supabase
-        .from('cp_lab_test_logs')
-        .select(
-          `*,
-          test:cp_lab_tests(id, test_name, category),
-          patient:cp_patients(id, full_name, patient_no),
-          payment_method:cp_payment_methods(id, name, slug)`
-        )
-        .eq('log_date', date)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('cp_settings')
-        .select('value')
-        .eq('setting_group', 'lab')
-        .eq('key', 'revenue_split')
-        .single(),
-      supabase
-        .from('cp_settings')
-        .select('value')
-        .eq('setting_group', 'clinic')
-        .eq('key', 'clinic_name')
-        .single(),
+    const [logsRes, splitRes, clinicRes] = await Promise.all([
+      supabase.from('cp_lab_test_logs').select(
+        `*, cp_lab_tests!test_id(id, name, category), cp_patients!patient_id(id, name, patient_no), cp_doctors!doctor_id(id, name)`
+      ).eq('test_date', date).is('deleted_at', null).order('created_at', { ascending: true }),
+      supabase.from('cp_settings').select('setting_value').eq('setting_key', 'lab.revenue_split').single(),
+      supabase.from('cp_settings').select('setting_value').eq('setting_key', 'clinic.general').single(),
     ])
 
-    const entries = (testLogsRes.data ?? []) as unknown as LabTestLogWithRelations[]
-    const totalRevenue = entries.reduce((sum, e) => sum + (e.total_amount ?? 0), 0)
-
-    let doctorSplitPct = 5000
-    let clinicSplitPct = 5000
-    if (revenueSplitRes.data?.value) {
-      try {
-        const split = JSON.parse(revenueSplitRes.data.value) as {
-          doctor_pct: number
-          clinic_pct: number
-        }
-        doctorSplitPct = split.doctor_pct
-        clinicSplitPct = split.clinic_pct
-      } catch {
-        // keep defaults
-      }
+    type Row = CpLabTestLog & {
+      cp_lab_tests: Pick<CpLabTest, 'id' | 'name' | 'category'> | null
+      cp_patients: Pick<CpPatient, 'id' | 'name' | 'patient_no'> | null
+      cp_doctors: Pick<CpDoctor, 'id' | 'name'> | null
     }
 
-    const clinicName =
-      clinicNameRes.data?.value ?? 'ClinicPulse Medical Center'
-    const doctorSplitAmount = Math.round((totalRevenue * doctorSplitPct) / 10000)
-    const clinicSplitAmount = Math.round((totalRevenue * clinicSplitPct) / 10000)
+    const entries: LabTestLogWithRelations[] = ((logsRes.data ?? []) as unknown as Row[]).map((e) => ({
+      ...e,
+      test: e.cp_lab_tests ?? null,
+      patient: e.cp_patients ?? null,
+      doctor: e.cp_doctors ?? null,
+    }))
+
+    const totalRevenue = entries.reduce((sum, e) => sum + (e.price_paisas ?? 0), 0)
+    const splitVal = splitRes.data?.setting_value as { doctor_pct?: number; clinic_pct?: number } | undefined
+    const doctorSplitPct = splitVal?.doctor_pct ?? 50
+    const clinicSplitPct = splitVal?.clinic_pct ?? 50
+    const clinicGeneral = clinicRes.data?.setting_value as { clinic_name?: string } | undefined
+    const clinicName = clinicGeneral?.clinic_name ?? 'ClinicPulse Medical Center'
 
     return {
       success: true,
       data: {
-        date,
-        clinicName,
-        entries,
+        date, clinicName, entries,
         totalTests: entries.length,
         totalRevenue,
         doctorSplitPct,
         clinicSplitPct,
-        doctorSplitAmount,
-        clinicSplitAmount,
+        doctorSplitAmount: Math.round((totalRevenue * doctorSplitPct) / 100),
+        clinicSplitAmount: Math.round((totalRevenue * clinicSplitPct) / 100),
       },
     }
   } catch (err) {
@@ -707,52 +508,96 @@ export async function generateLabReport(
 }
 
 // =============================================================================
-// getPaymentMethods — helper for forms
+// Helpers for forms
 // =============================================================================
 
-export async function getPaymentMethodsForLab() {
+export async function getPaymentMethodsForLab(): Promise<ActionResult<Array<{ method: string; label: string }>>> {
   try {
     await requireAuth()
     const supabase = await createClient()
+    const { data, error } = await supabase.from('cp_payment_methods').select('method, label').eq('is_enabled', true).order('sort_order', { ascending: true })
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: (data ?? []) as Array<{ method: string; label: string }> }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
 
+export async function getExpenseHeadsForLab(): Promise<ActionResult<CpExpenseHead[]>> {
+  try {
+    await requireAuth()
+    const supabase = await createClient()
     const { data, error } = await supabase
-      .from('cp_payment_methods')
+      .from('cp_expense_heads')
       .select('*')
       .eq('is_active', true)
+      .is('deleted_at', null)
       .order('sort_order', { ascending: true })
 
-    if (error) return { success: false as const, error: error.message }
-    return { success: true as const, data: data ?? [] }
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: (data ?? []) as CpExpenseHead[] }
   } catch (err) {
-    return {
-      success: false as const,
-      error: err instanceof Error ? err.message : 'Unexpected error',
-    }
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
 
 // =============================================================================
-// getExpenseHeadsForLab — helper for expense form
+// addLabExpense
 // =============================================================================
 
-export async function getExpenseHeadsForLab() {
+export async function addLabExpense(input: {
+  expense_date: string
+  expense_head_id?: string
+  custom_head?: string
+  amount: number // paisas
+  description?: string
+  payment_method_id?: string
+}): Promise<ActionResult<undefined>> {
   try {
-    await requireAuth()
+    const authUser = await requireAuth()
     const supabase = await createClient()
 
-    const { data, error } = await supabase
-      .from('cp_expense_heads')
-      .select('*')
-      .is('deleted_at', null)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-
-    if (error) return { success: false as const, error: error.message }
-    return { success: true as const, data: (data ?? []) as CpExpenseHead[] }
-  } catch (err) {
-    return {
-      success: false as const,
-      error: err instanceof Error ? err.message : 'Unexpected error',
+    // Resolve head_name
+    let headName = input.custom_head ?? 'General'
+    if (input.expense_head_id) {
+      const { data: headData } = await supabase
+        .from('cp_expense_heads')
+        .select('name')
+        .eq('id', input.expense_head_id)
+        .single()
+      if (headData?.name) headName = headData.name
     }
+
+    // Resolve payment_method enum value from UUID
+    let paymentMethod: string | null = null
+    if (input.payment_method_id) {
+      const { data: pmData } = await supabase
+        .from('cp_payment_methods')
+        .select('method')
+        .eq('id', input.payment_method_id)
+        .single()
+      paymentMethod = pmData?.method ?? null
+    }
+
+    const { error } = await supabase
+      .from('cp_expenses')
+      .insert({
+        expense_date: input.expense_date,
+        head_id: input.expense_head_id ?? null,
+        head_name: headName,
+        department: 'lab' as const,
+        amount_paisas: input.amount,
+        payment_method: paymentMethod as "cash" | "jazzcash" | "easypaisa" | "bank_transfer" | null,
+        description: input.description ?? null,
+        status: 'active' as const,
+        created_by: authUser.id,
+      })
+
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath('/lab/expenses')
+    return { success: true, data: undefined }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }

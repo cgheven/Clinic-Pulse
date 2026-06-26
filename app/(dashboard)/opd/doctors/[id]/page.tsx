@@ -40,16 +40,16 @@ async function DoctorDetailContent({ id }: { id: string }) {
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-            {doctor.full_name
+            {doctor.name
               .split(' ')
               .slice(0, 2)
-              .map((n) => n[0]?.toUpperCase())
+              .map((n: string) => n[0]?.toUpperCase())
               .join('')}
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold text-foreground">Dr. {doctor.full_name}</h2>
+              <h2 className="text-xl font-bold text-foreground">Dr. {doctor.name}</h2>
               <span
                 className={cn(
                   'rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide',
@@ -62,8 +62,8 @@ async function DoctorDetailContent({ id }: { id: string }) {
               </span>
             </div>
 
-            {doctor.specialty && (
-              <p className="mt-0.5 text-sm text-muted-foreground">{doctor.specialty}</p>
+            {doctor.specialization && (
+              <p className="mt-0.5 text-sm text-muted-foreground">{doctor.specialization}</p>
             )}
 
             <div className="mt-2 flex flex-wrap items-center gap-4">
@@ -81,11 +81,11 @@ async function DoctorDetailContent({ id }: { id: string }) {
               )}
             </div>
 
-            {doctor.earning_model === 'commission' && doctor.current_commission_pct !== null && (
+            {doctor.earning_model === 'commission' && doctor.commission_pct !== null && (
               <p className="mt-2 text-xs text-muted-foreground">
                 Commission rate:{' '}
                 <span className="font-semibold text-amber-400">
-                  {formatBasisPoints(doctor.current_commission_pct)}
+                  {formatBasisPoints(doctor.commission_pct)}
                 </span>
               </p>
             )}
@@ -120,12 +120,6 @@ async function DoctorDetailContent({ id }: { id: string }) {
           />
         </div>
 
-        {doctor.notes && (
-          <p className="mt-4 rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground/70">Notes: </span>
-            {doctor.notes}
-          </p>
-        )}
       </div>
 
       {/* Earnings Calculator */}

@@ -14,12 +14,10 @@ import { createClient } from '@/lib/supabase/server'
 import {
   getExpenses,
   getExpenseSummary,
-  getCrossDeptSplit,
 } from '@/app/actions/expenses'
 import { ExpenseTable } from '@/components/expenses/expense-table'
-import { DeptSplitCard } from '@/components/expenses/dept-split-card'
 import { getTodayPKT, formatCurrencyPaisas } from '@/lib/utils'
-import type { CpDepartment, CpExpenseHead, CpPaymentMethod } from '@/types/index'
+import type { CpExpenseHead, CpPaymentMethod } from '@/types/index'
 
 export const metadata: Metadata = {
   title: 'Expenses — ClinicPulse',
@@ -85,25 +83,16 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const [
     expensesResult,
     summaryResult,
-    splitResult,
-    departmentsData,
     headsData,
     methodsData,
   ] = await Promise.all([
     getExpenses({
       month: selectedMonth,
-      department_id: departmentId || null,
+      department: departmentId || null,
       head_id: headId || null,
-      payment_method_id: paymentMethodId || null,
+      payment_method: paymentMethodId || null,
     }),
     getExpenseSummary(selectedMonth),
-    getCrossDeptSplit(selectedMonth),
-    supabase
-      .from('cp_departments')
-      .select('*')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-      .order('sort_order', { ascending: true }),
     supabase
       .from('cp_expense_heads')
       .select('*')
@@ -113,18 +102,16 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     supabase
       .from('cp_payment_methods')
       .select('*')
-      .eq('is_active', true)
+      .eq('is_enabled', true)
       .order('sort_order', { ascending: true }),
   ])
 
   const expenses = expensesResult.success ? expensesResult.data : []
   const summary = summaryResult.success ? summaryResult.data : null
-  const splitData = splitResult.success ? splitResult.data : null
-  const departments = (departmentsData.data ?? []) as CpDepartment[]
   const expenseHeads = (headsData.data ?? []) as CpExpenseHead[]
   const paymentMethods = (methodsData.data ?? []) as CpPaymentMethod[]
 
-  const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0)
+  const totalAmount = expenses.reduce((sum, e) => sum + e.amount_paisas, 0)
 
   return (
     <div className="space-y-6">
@@ -262,40 +249,20 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* ── Main content: Table + Split Card ─────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Expense Table — takes 2/3 */}
-        <div className="lg:col-span-2">
-          <ExpenseTable
-            expenses={expenses}
-            departments={departments}
-            expenseHeads={expenseHeads}
-            paymentMethods={paymentMethods}
-            filters={{
-              month: selectedMonth,
-              department_id: departmentId,
-              head_id: headId,
-              payment_method_id: paymentMethodId,
-            }}
-            totalAmount={totalAmount}
-          />
-        </div>
-
-        {/* Dept Split Card — takes 1/3 */}
-        <div>
-          {splitData ? (
-            <DeptSplitCard data={splitData} />
-          ) : (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3">
-              <p className="text-xs text-destructive">
-                {splitResult.success
-                  ? 'No split data.'
-                  : `Error: ${splitResult.error}`}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Expense Table ─────────────────────────────────────────────────────── */}
+      <ExpenseTable
+        expenses={expenses}
+        departments={[]}
+        expenseHeads={expenseHeads}
+        paymentMethods={paymentMethods}
+        filters={{
+          month: selectedMonth,
+          department_id: departmentId,
+          head_id: headId,
+          payment_method_id: paymentMethodId,
+        }}
+        totalAmount={totalAmount}
+      />
 
       {/* ── Error state ──────────────────────────────────────────────────────── */}
       {!expensesResult.success && (

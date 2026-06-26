@@ -10,16 +10,19 @@ interface PatientHistoryProps {
   className?: string
 }
 
-const paymentStatusColor: Record<string, string> = {
-  completed: 'bg-emerald-500/10 text-emerald-400',
-  pending: 'bg-yellow-500/10 text-yellow-400',
-  cancelled: 'bg-red-500/10 text-red-400',
-  refunded: 'bg-blue-500/10 text-blue-400',
+function formatPaymentMethod(method: string): string {
+  const labels: Record<string, string> = {
+    cash: 'Cash',
+    jazzcash: 'JazzCash',
+    easypaisa: 'Easypaisa',
+    bank_transfer: 'Bank Transfer',
+  }
+  return labels[method] ?? method
 }
 
 function VisitItem({ visit }: { visit: VisitWithRelations }) {
   const [expanded, setExpanded] = useState(false)
-  const hasClinicalData = visit.chief_complaint || visit.diagnosis || visit.prescription
+  const hasClinicalData = visit.diagnosis || visit.prescription || visit.notes
 
   return (
     <div className="relative pl-6">
@@ -36,37 +39,20 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
               <span className="text-sm font-semibold text-foreground">
                 {formatDate(visit.visit_date)}
               </span>
-              {visit.is_follow_up && (
-                <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                  Follow-up
-                </span>
-              )}
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-[10px] font-medium capitalize',
-                  paymentStatusColor[visit.payment_status] ?? 'bg-muted text-muted-foreground'
-                )}
-              >
-                {visit.payment_status}
-              </span>
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {visit.visit_time?.slice(0, 5) ?? '—'}
-              </span>
               {visit.doctor && (
                 <span className="flex items-center gap-1">
                   <Stethoscope className="h-3 w-3" />
-                  Dr. {visit.doctor.full_name}
-                  {visit.doctor.specialty ? ` · ${visit.doctor.specialty}` : ''}
+                  Dr. {visit.doctor.name}
+                  {visit.doctor.specialization ? ` · ${visit.doctor.specialization}` : ''}
                 </span>
               )}
               {visit.payment_method && (
                 <span className="flex items-center gap-1">
                   <CreditCard className="h-3 w-3" />
-                  {visit.payment_method.name}
+                  {formatPaymentMethod(visit.payment_method)}
                 </span>
               )}
             </div>
@@ -75,23 +61,10 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
           {/* Fee */}
           <div className="shrink-0 text-right">
             <p className="text-sm font-bold text-primary">
-              {formatCurrencyPaisas(visit.net_fee)}
+              {formatCurrencyPaisas(visit.fee_paisas)}
             </p>
-            {visit.discount_amount > 0 && (
-              <p className="text-[10px] text-muted-foreground/60 line-through">
-                {formatCurrencyPaisas(visit.consultation_fee)}
-              </p>
-            )}
           </div>
         </div>
-
-        {/* Chief complaint preview */}
-        {visit.chief_complaint && !expanded && (
-          <p className="mt-2 truncate text-xs text-muted-foreground">
-            <span className="font-medium text-foreground/70">Complaint: </span>
-            {visit.chief_complaint}
-          </p>
-        )}
 
         {/* Expand button */}
         {hasClinicalData && (
@@ -116,15 +89,9 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
         {/* Expanded clinical data */}
         {expanded && hasClinicalData && (
           <div className="mt-3 space-y-2 border-t border-border pt-3">
-            {visit.chief_complaint && (
-              <Field label="Chief Complaint" value={visit.chief_complaint} />
-            )}
             {visit.diagnosis && <Field label="Diagnosis" value={visit.diagnosis} />}
             {visit.prescription && <Field label="Prescription" value={visit.prescription} />}
             {visit.notes && <Field label="Notes" value={visit.notes} />}
-            {visit.follow_up_date && (
-              <Field label="Follow-up Date" value={formatDate(visit.follow_up_date)} />
-            )}
           </div>
         )}
       </div>

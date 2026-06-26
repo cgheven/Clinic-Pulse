@@ -9,7 +9,6 @@ import {
   MapPin,
   Calendar,
   Droplets,
-  AlertTriangle,
   FileText,
   Stethoscope,
 } from 'lucide-react'
@@ -58,7 +57,7 @@ async function PatientDetailContent({ id }: { id: string }) {
           <div className="flex items-start gap-4">
             {/* Avatar */}
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-              {patient.full_name
+              {patient.name
                 .split(' ')
                 .slice(0, 2)
                 .map((n) => n[0]?.toUpperCase())
@@ -67,16 +66,16 @@ async function PatientDetailContent({ id }: { id: string }) {
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-bold text-foreground">{patient.full_name}</h2>
+                <h2 className="text-xl font-bold text-foreground">{patient.name}</h2>
                 <span
                   className={cn(
                     'rounded-full px-2.5 py-0.5 text-xs font-medium',
-                    genderColor[patient.gender] ?? 'bg-muted text-muted-foreground'
+                    genderColor[patient.gender ?? ''] ?? 'bg-muted text-muted-foreground'
                   )}
                 >
-                  {genderLabel[patient.gender] ?? patient.gender}
+                  {genderLabel[patient.gender ?? ''] ?? patient.gender}
                 </span>
-                {patient.blood_group !== 'unknown' && (
+                {patient.blood_group && patient.blood_group !== 'unknown' && (
                   <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400">
                     <Droplets className="h-3 w-3" />
                     {patient.blood_group}
@@ -85,25 +84,19 @@ async function PatientDetailContent({ id }: { id: string }) {
               </div>
 
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground/70">{patient.patient_no}</span>
+                {patient.patient_no && (
+                  <span className="font-medium text-foreground/70">{patient.patient_no}</span>
+                )}
                 {patient.phone && (
                   <span className="flex items-center gap-1">
                     <Phone className="h-3.5 w-3.5" />
                     {patient.phone}
                   </span>
                 )}
-                {(patient.date_of_birth || patient.age_years) && (
+                {patient.date_of_birth && (
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
-                    {patient.date_of_birth
-                      ? `${formatDate(patient.date_of_birth)} (${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} yrs)`
-                      : `${patient.age_years} yrs`}
-                  </span>
-                )}
-                {patient.city && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {patient.city}
+                    {formatDate(patient.date_of_birth)} ({new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} yrs)
                   </span>
                 )}
               </div>
@@ -118,51 +111,21 @@ async function PatientDetailContent({ id }: { id: string }) {
           </Button>
         </div>
 
-        {/* Additional info row */}
-        {(patient.father_name ||
-          patient.address ||
-          patient.cnic ||
-          patient.referred_by) && (
-          <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4">
-            {patient.father_name && (
-              <InfoItem label="Father/Guardian" value={patient.father_name} />
-            )}
-            {patient.cnic && <InfoItem label="CNIC" value={patient.cnic} />}
-            {patient.address && <InfoItem label="Address" value={patient.address} />}
-            {patient.referred_by && (
-              <InfoItem label="Referred By" value={patient.referred_by} />
-            )}
+        {/* Address */}
+        {patient.address && (
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>{patient.address}</span>
+            </div>
           </div>
         )}
 
-        {/* Alerts */}
-        {(patient.known_allergies || patient.chronic_conditions) && (
-          <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-            {patient.known_allergies && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-red-400 mb-1">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Known Allergies
-                </div>
-                <p className="text-xs text-foreground/80">{patient.known_allergies}</p>
-              </div>
-            )}
-            {patient.chronic_conditions && (
-              <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-orange-400 mb-1">
-                  <FileText className="h-3.5 w-3.5" />
-                  Chronic Conditions
-                </div>
-                <p className="text-xs text-foreground/80">{patient.chronic_conditions}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {patient.notes && (
+        {/* History / Notes */}
+        {patient.history && (
           <div className="mt-3 rounded-lg bg-muted/30 p-3 text-xs text-muted-foreground">
             <span className="font-medium text-foreground/70">Notes: </span>
-            {patient.notes}
+            {patient.history}
           </div>
         )}
       </div>

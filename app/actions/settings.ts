@@ -41,11 +41,11 @@ export type PharmacyRevenueSplitData = {
 }
 
 export type XrayPartnerWithSplit = CpXrayPartner & {
-  split_pct: number // basis points stored in cp_settings
+  split_pct: number // percentage (0-100)
 }
 
 export type DoctorWithCommission = CpDoctor & {
-  current_commission_pct: number | null // basis points; null when salaried
+  current_commission_pct: number | null // percentage; null when salaried
 }
 
 // =============================================================================
@@ -92,17 +92,15 @@ const updateExpenseHeadSchema = z.object({
 
 const xrayPartnerSchema = z.object({
   id: z.string().optional(),
-  partner_name: z.string().min(1, 'Partner name is required').max(200),
-  partner_type: z.enum(['clinic', 'individual', 'equipment_owner']),
+  name: z.string().min(1, 'Partner name is required').max(200),
   phone: z.string().max(50).nullable().optional(),
-  bank_account: z.string().max(100).nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
-  split_pct: z.number().int().min(0).max(10000),
+  split_pct: z.number().min(0).max(100),
 })
 
 const doctorSettingsSchema = z.object({
   earning_model: z.enum(['salaried', 'commission']),
-  commission_pct: z.number().int().min(0).max(10000).optional(),
+  commission_pct: z.number().min(0).max(100).optional(),
   monthly_salary: z.number().int().min(0).optional(),
 })
 
@@ -125,39 +123,37 @@ function todayISO(): string {
   return new Date().toISOString().split('T')[0]!
 }
 
-// Fetch xray partner splits config from cp_settings
+/** Fetch xray partner splits config from cp_settings */
 async function fetchXrayPartnerSplitsConfig(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<Record<string, number>> {
   const { data } = await supabase
     .from('cp_settings')
-    .select('*')
-    .eq('setting_group', 'xray')
-    .eq('key', 'partner_splits_config')
-    .single()
+    .select('setting_value')
+    .eq('setting_key', 'xray.partner_splits_config')
+    .maybeSingle()
 
-  if (!data?.value) return {}
+  if (!data?.setting_value) return {}
   try {
-    return JSON.parse(data.value) as Record<string, number>
+    const val = data.setting_value
+    if (typeof val === 'object' && val !== null) return val as Record<string, number>
+    return JSON.parse(val as string) as Record<string, number>
   } catch {
     return {}
   }
 }
 
-// Persist xray partner splits config to cp_settings
+/** Persist xray partner splits config to cp_settings */
 async function saveXrayPartnerSplitsConfig(
   supabase: Awaited<ReturnType<typeof createClient>>,
   config: Record<string, number>
 ): Promise<void> {
   const { error } = await supabase.from('cp_settings').upsert(
     {
-      setting_group: 'xray',
-      key: 'partner_splits_config',
-      value: JSON.stringify(config),
-      label: 'X-Ray Partner Default Splits',
-      description: 'Default basis-point splits per partner (stored as JSON)',
+      setting_key: 'xray.partner_splits_config',
+      setting_value: config,
     },
-    { onConflict: 'setting_group,key' }
+    { onConflict: 'setting_key' }
   )
   if (error) throw new Error(error.message)
 }
@@ -173,33 +169,34 @@ export async function getGeneralSettings(): Promise<ActionResult<GeneralSettings
 
     const { data, error } = await supabase
       .from('cp_settings')
-      .select('*')
-      .eq('setting_group', 'clinic')
+      .select('setting_key, setting_value')
+      .like('setting_key', 'clinic.%')
 
     if (error) return { success: false, error: error.message }
 
-    const map: Record<string, string> = {}
+    const map: Record<string, unknown> = {}
     for (const row of data ?? []) {
-      map[row.key] = row.value
+      const subKey = (row.setting_key as string).slice('clinic.'.length)
+      map[subKey] = row.setting_value
     }
 
     let working_days: string[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-    try {
-      const raw = map['working_days']
-      if (raw) working_days = JSON.parse(raw) as string[]
-    } catch {
-      // keep default
+    const rawDays = map['working_days']
+    if (Array.isArray(rawDays)) {
+      working_days = rawDays as string[]
+    } else if (typeof rawDays === 'string') {
+      try { working_days = JSON.parse(rawDays) as string[] } catch { /* keep default */ }
     }
 
     return {
       success: true,
       data: {
-        clinic_name: map['clinic_name'] ?? 'ClinicPulse Medical Center',
-        clinic_address: map['clinic_address'] ?? '',
-        clinic_phone: map['clinic_phone'] ?? '',
-        clinic_email: map['clinic_email'] ?? '',
+        clinic_name: (map['clinic_name'] as string) ?? 'ClinicPulse Medical Center',
+        clinic_address: (map['clinic_address'] as string) ?? '',
+        clinic_phone: (map['clinic_phone'] as string) ?? '',
+        clinic_email: (map['clinic_email'] as string) ?? '',
         working_days,
-        currency_symbol: map['currency_symbol'] ?? 'Rs.',
+        currency_symbol: (map['currency_symbol'] as string) ?? 'Rs.',
       },
     }
   } catch (err) {
@@ -221,24 +218,19 @@ export async function updateGeneralSettings(
     const data = parsed.data
     const supabase = await createClient()
 
-    const upserts: Array<{
-      setting_group: string
-      key: string
-      value: string
-      label?: string
-    }> = [
-      { setting_group: 'clinic', key: 'clinic_name', value: data.clinic_name, label: 'Clinic Name' },
-      { setting_group: 'clinic', key: 'clinic_address', value: data.clinic_address, label: 'Address' },
-      { setting_group: 'clinic', key: 'clinic_phone', value: data.clinic_phone, label: 'Phone' },
-      { setting_group: 'clinic', key: 'clinic_email', value: data.clinic_email, label: 'Email' },
-      { setting_group: 'clinic', key: 'working_days', value: JSON.stringify(data.working_days), label: 'Working Days' },
-      { setting_group: 'clinic', key: 'currency_symbol', value: data.currency_symbol, label: 'Currency Symbol' },
+    const upserts: Array<{ setting_key: string; setting_value: unknown }> = [
+      { setting_key: 'clinic.clinic_name', setting_value: data.clinic_name },
+      { setting_key: 'clinic.clinic_address', setting_value: data.clinic_address },
+      { setting_key: 'clinic.clinic_phone', setting_value: data.clinic_phone },
+      { setting_key: 'clinic.clinic_email', setting_value: data.clinic_email },
+      { setting_key: 'clinic.working_days', setting_value: data.working_days },
+      { setting_key: 'clinic.currency_symbol', setting_value: data.currency_symbol },
     ]
 
     for (const row of upserts) {
       const { error } = await supabase
         .from('cp_settings')
-        .upsert(row, { onConflict: 'setting_group,key' })
+        .upsert(row, { onConflict: 'setting_key' })
       if (error) return { success: false, error: error.message }
     }
 
@@ -262,12 +254,11 @@ export async function getDeptRevenueSplit(
 
     const { data } = await supabase
       .from('cp_settings')
-      .select('*')
-      .eq('setting_group', dept)
-      .eq('key', 'revenue_split')
-      .single()
+      .select('setting_value')
+      .eq('setting_key', `${dept}.split`)
+      .maybeSingle()
 
-    if (!data?.value) {
+    if (!data?.setting_value) {
       return {
         success: true,
         data: { doctor_pct: 5000, clinic_pct: 5000 },
@@ -275,7 +266,8 @@ export async function getDeptRevenueSplit(
     }
 
     try {
-      const split = JSON.parse(data.value) as DeptRevenueSplitData
+      const val = data.setting_value
+      const split = (typeof val === 'object' ? val : JSON.parse(val as string)) as DeptRevenueSplitData
       return { success: true, data: split }
     } catch {
       return { success: true, data: { doctor_pct: 5000, clinic_pct: 5000 } }
@@ -300,13 +292,10 @@ export async function updateDeptRevenueSplit(
     const supabase = await createClient()
     const { error } = await supabase.from('cp_settings').upsert(
       {
-        setting_group: dept,
-        key: 'revenue_split',
-        value: JSON.stringify(parsed.data),
-        label: `${dept.toUpperCase()} Revenue Split`,
-        description: 'Doctor vs Clinic revenue split in basis points',
+        setting_key: `${dept}.split`,
+        setting_value: parsed.data,
       },
-      { onConflict: 'setting_group,key' }
+      { onConflict: 'setting_key' }
     )
 
     if (error) return { success: false, error: error.message }
@@ -335,7 +324,6 @@ export async function getPharmacyRevenueSplit(): Promise<ActionResult<PharmacyRe
       .single()
 
     if (error || !data) {
-      // Return sensible default
       return {
         success: true,
         data: {
@@ -429,7 +417,7 @@ export async function togglePaymentMethod(
     const supabase = await createClient()
     const { error } = await supabase
       .from('cp_payment_methods')
-      .update({ is_active: enabled })
+      .update({ is_enabled: enabled })
       .eq('id', id)
 
     if (error) return { success: false, error: error.message }
@@ -474,29 +462,14 @@ export async function createExpenseHead(rawData: unknown): Promise<ActionResult<
     }
 
     const { name, department_id } = parsed.data
-    const baseSlug = slugify(name)
 
     const supabase = await createClient()
-
-    // Check slug uniqueness; append timestamp suffix if needed
-    const { data: existing } = await supabase
-      .from('cp_expense_heads')
-      .select('*')
-      .like('slug', `${baseSlug}%`)
-      .is('deleted_at', null)
-
-    const usedSlugs = new Set((existing ?? []).map((r) => r.slug))
-    let slug = baseSlug
-    if (usedSlugs.has(slug)) {
-      slug = `${baseSlug}_${Date.now()}`
-    }
 
     const { data, error } = await supabase
       .from('cp_expense_heads')
       .insert({
         name,
-        slug,
-        department_id: department_id ?? null,
+        department: (department_id ?? 'general') as "opd" | "pharmacy" | "lab" | "xray" | "general",
         is_active: true,
         is_system: false,
         sort_order: 99,
@@ -530,15 +503,12 @@ export async function updateExpenseHead(
 
     const supabase = await createClient()
 
-    // Build update payload; regenerate slug if name changed
     const updatePayload: Partial<{
       name: string
-      slug: string
       is_active: boolean
     }> = {}
     if (parsed.data.name !== undefined) {
       updatePayload.name = parsed.data.name
-      updatePayload.slug = slugify(parsed.data.name) + '_' + Date.now()
     }
     if (parsed.data.is_active !== undefined) {
       updatePayload.is_active = parsed.data.is_active
@@ -568,7 +538,6 @@ export async function deleteExpenseHead(id: string): Promise<ActionResult<undefi
 
     const supabase = await createClient()
 
-    // Prevent deletion of system heads
     const { data: head } = await supabase
       .from('cp_expense_heads')
       .select('*')
@@ -607,7 +576,6 @@ export async function getXrayPartners(): Promise<ActionResult<XrayPartnerWithSpl
         .from('cp_xray_partners')
         .select('*')
         .eq('is_active', true)
-        .is('deleted_at', null)
         .order('created_at', { ascending: true }),
       fetchXrayPartnerSplitsConfig(supabase),
     ])
@@ -635,13 +603,12 @@ export async function upsertXrayPartner(rawData: unknown): Promise<ActionResult<
       return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
     }
 
-    const { id, split_pct, ...partnerFields } = parsed.data
+    const { id, split_pct, notes: _notes, ...partnerFields } = parsed.data
     const supabase = await createClient()
 
     let partnerId: string
 
     if (id) {
-      // Update existing partner
       const { data, error } = await supabase
         .from('cp_xray_partners')
         .update({ ...partnerFields, is_active: true })
@@ -652,10 +619,9 @@ export async function upsertXrayPartner(rawData: unknown): Promise<ActionResult<
       if (error) return { success: false, error: error.message }
       partnerId = data.id
     } else {
-      // Insert new partner
       const { data, error } = await supabase
         .from('cp_xray_partners')
-        .insert({ ...partnerFields, is_active: true, created_by: authUser.id })
+        .insert({ ...partnerFields, is_active: true })
         .select('*')
         .single()
 
@@ -667,12 +633,11 @@ export async function upsertXrayPartner(rawData: unknown): Promise<ActionResult<
     const splitsConfig = await fetchXrayPartnerSplitsConfig(supabase)
     splitsConfig[partnerId] = split_pct
 
-    // Remove splits for inactive/deleted partners (clean up stale keys)
+    // Validate: sum of all active partner splits must equal 100
     const { data: activePartners } = await supabase
       .from('cp_xray_partners')
-      .select('*')
+      .select('id')
       .eq('is_active', true)
-      .is('deleted_at', null)
 
     const activeIds = new Set((activePartners ?? []).map((p) => p.id as string))
     const cleaned: Record<string, number> = {}
@@ -698,10 +663,9 @@ export async function deleteXrayPartner(id: string): Promise<ActionResult<undefi
 
     const supabase = await createClient()
 
-    const now = new Date().toISOString()
     const { error } = await supabase
       .from('cp_xray_partners')
-      .update({ deleted_at: now, is_active: false })
+      .update({ is_active: false })
       .eq('id', id)
 
     if (error) return { success: false, error: error.message }
@@ -720,6 +684,7 @@ export async function deleteXrayPartner(id: string): Promise<ActionResult<undefi
 
 // =============================================================================
 // Doctor Settings
+// commission_pct is stored directly on cp_doctors (not a separate table)
 // =============================================================================
 
 export async function getDoctorSettings(): Promise<ActionResult<DoctorWithCommission[]>> {
@@ -727,28 +692,18 @@ export async function getDoctorSettings(): Promise<ActionResult<DoctorWithCommis
     await requireAdmin()
     const supabase = await createClient()
 
-    const [doctorsRes, commissionsRes] = await Promise.all([
-      supabase
-        .from('cp_doctors')
-        .select('*')
-        .is('deleted_at', null)
-        .order('full_name', { ascending: true }),
-      supabase
-        .from('cp_doctor_commissions')
-        .select('*')
-        .is('effective_to', null),
-    ])
+    const doctorsRes = await supabase
+      .from('cp_doctors')
+      .select('*')
+      .is('deleted_at', null)
+      .order('name', { ascending: true })
 
     if (doctorsRes.error) return { success: false, error: doctorsRes.error.message }
 
-    const commMap: Record<string, number> = {}
-    for (const row of commissionsRes.data ?? []) {
-      commMap[row.doctor_id] = row.commission_pct
-    }
-
     const result: DoctorWithCommission[] = ((doctorsRes.data ?? []) as CpDoctor[]).map((d) => ({
       ...d,
-      current_commission_pct: commMap[d.id] ?? null,
+      current_commission_pct:
+        (d as unknown as { commission_pct: number | null }).commission_pct ?? null,
     }))
 
     return { success: true, data: result }
@@ -762,7 +717,7 @@ export async function updateDoctorSettings(
   rawData: unknown
 ): Promise<ActionResult<undefined>> {
   try {
-    const authUser = await requireAdmin()
+    await requireAdmin()
 
     const idParsed = z.string().uuid().safeParse(doctorId)
     if (!idParsed.success) return { success: false, error: 'Invalid doctor ID' }
@@ -774,16 +729,18 @@ export async function updateDoctorSettings(
 
     const { earning_model, commission_pct, monthly_salary } = parsed.data
     const supabase = await createClient()
-    const today = todayISO()
 
-    // Update doctor record
     const doctorUpdate: {
       earning_model: 'salaried' | 'commission'
       monthly_salary?: number | null
+      commission_pct?: number | null
     } = { earning_model }
-    if (earning_model === 'salaried' && monthly_salary !== undefined) {
-      doctorUpdate.monthly_salary = monthly_salary
-    } else if (earning_model === 'commission') {
+
+    if (earning_model === 'salaried') {
+      doctorUpdate.monthly_salary = monthly_salary ?? null
+      doctorUpdate.commission_pct = null
+    } else {
+      doctorUpdate.commission_pct = commission_pct ?? null
       doctorUpdate.monthly_salary = null
     }
 
@@ -793,27 +750,6 @@ export async function updateDoctorSettings(
       .eq('id', doctorId)
 
     if (doctorError) return { success: false, error: doctorError.message }
-
-    // Update commission if commission model
-    if (earning_model === 'commission' && commission_pct !== undefined) {
-      // Close existing open-ended commission
-      await supabase
-        .from('cp_doctor_commissions')
-        .update({ effective_to: today })
-        .eq('doctor_id', doctorId)
-        .is('effective_to', null)
-
-      // Insert new commission record
-      const { error: commError } = await supabase.from('cp_doctor_commissions').insert({
-        doctor_id: doctorId,
-        commission_pct,
-        effective_from: today,
-        effective_to: null,
-        created_by: authUser.id,
-      })
-
-      if (commError) return { success: false, error: commError.message }
-    }
 
     revalidatePath('/settings')
     return { success: true, data: undefined }
@@ -833,20 +769,21 @@ export async function getStaffTypes(): Promise<ActionResult<string[]>> {
 
     const { data } = await supabase
       .from('cp_settings')
-      .select('*')
-      .eq('setting_group', 'staff')
-      .eq('key', 'staff_types')
-      .single()
+      .select('setting_value')
+      .eq('setting_key', 'staff.staff_types')
+      .maybeSingle()
 
-    if (!data?.value) {
+    if (!data?.setting_value) {
       return {
         success: true,
         data: ['Receptionist', 'Nurse', 'Technician', 'Cleaner', 'Security Guard'],
       }
     }
 
+    const val = data.setting_value
+    if (Array.isArray(val)) return { success: true, data: val as string[] }
     try {
-      return { success: true, data: JSON.parse(data.value) as string[] }
+      return { success: true, data: JSON.parse(val as string) as string[] }
     } catch {
       return { success: true, data: [] }
     }
@@ -867,13 +804,10 @@ export async function updateStaffTypes(rawData: unknown): Promise<ActionResult<u
     const supabase = await createClient()
     const { error } = await supabase.from('cp_settings').upsert(
       {
-        setting_group: 'staff',
-        key: 'staff_types',
-        value: JSON.stringify(parsed.data.types),
-        label: 'Staff Types',
-        description: 'Configurable list of staff designations',
+        setting_key: 'staff.staff_types',
+        setting_value: parsed.data.types,
       },
-      { onConflict: 'setting_group,key' }
+      { onConflict: 'setting_key' }
     )
 
     if (error) return { success: false, error: error.message }

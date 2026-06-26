@@ -86,12 +86,9 @@ export function EquipmentCard({ machine, onAddMaintenance }: EquipmentCardProps)
             />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-foreground">{machine.machine_name}</h3>
-            {machine.model_no && (
-              <p className="text-xs text-muted-foreground">Model: {machine.model_no}</p>
-            )}
-            {machine.manufacturer && (
-              <p className="text-xs text-muted-foreground">{machine.manufacturer}</p>
+            <h3 className="font-semibold text-foreground">{machine.name}</h3>
+            {machine.model && (
+              <p className="text-xs text-muted-foreground">Model: {machine.model}</p>
             )}
           </div>
         </div>
@@ -108,16 +105,10 @@ export function EquipmentCard({ machine, onAddMaintenance }: EquipmentCardProps)
       <CardContent className="space-y-4">
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          {machine.serial_no && (
+          {machine.serial_number && (
             <>
               <span className="text-muted-foreground">Serial No.</span>
-              <span className="text-foreground">{machine.serial_no}</span>
-            </>
-          )}
-          {machine.location && (
-            <>
-              <span className="text-muted-foreground">Location</span>
-              <span className="text-foreground">{machine.location}</span>
+              <span className="text-foreground">{machine.serial_number}</span>
             </>
           )}
           {machine.purchase_date && (
@@ -128,39 +119,17 @@ export function EquipmentCard({ machine, onAddMaintenance }: EquipmentCardProps)
               </span>
             </>
           )}
-          {machine.purchase_cost !== null && machine.purchase_cost !== undefined && (
+          {machine.last_service && (
             <>
-              <span className="text-muted-foreground">Cost</span>
+              <span className="text-muted-foreground">Last Serviced</span>
               <span className="text-foreground">
-                {formatCurrencyPaisas(machine.purchase_cost)}
+                {formatDate(machine.last_service)}
               </span>
             </>
           )}
-          {machine.warranty_expiry && (
+          {machine.next_service && (
             <>
-              <span className="text-muted-foreground">Warranty Until</span>
-              <span
-                className={cn(
-                  'text-foreground',
-                  new Date(machine.warranty_expiry) < new Date() &&
-                    'text-muted-foreground line-through'
-                )}
-              >
-                {formatDate(machine.warranty_expiry)}
-              </span>
-            </>
-          )}
-          {machine.last_maintenance_date && (
-            <>
-              <span className="text-muted-foreground">Last Maintained</span>
-              <span className="text-foreground">
-                {formatDate(machine.last_maintenance_date)}
-              </span>
-            </>
-          )}
-          {machine.next_maintenance_date && (
-            <>
-              <span className="text-muted-foreground">Next Due</span>
+              <span className="text-muted-foreground">Next Service</span>
               <span
                 className={cn(
                   'font-medium',
@@ -171,7 +140,7 @@ export function EquipmentCard({ machine, onAddMaintenance }: EquipmentCardProps)
                       : 'text-foreground'
                 )}
               >
-                {formatDate(machine.next_maintenance_date)}
+                {formatDate(machine.next_service)}
               </span>
             </>
           )}
@@ -191,21 +160,21 @@ export function EquipmentCard({ machine, onAddMaintenance }: EquipmentCardProps)
                 >
                   <div className="flex items-center gap-2">
                     <span className="capitalize text-foreground">
-                      {r.maintenance_type}
+                      {r.description ?? 'Service'}
                     </span>
-                    {r.performed_by && (
+                    {r.technician && (
                       <span className="text-muted-foreground">
-                        by {r.performed_by}
+                        by {r.technician}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-muted-foreground">
-                      {formatDate(r.maintenance_date)}
+                      {formatDate(r.service_date)}
                     </span>
-                    {r.cost > 0 && (
+                    {r.cost_paisas > 0 && (
                       <span className="text-primary">
-                        {formatCurrencyPaisas(r.cost)}
+                        {formatCurrencyPaisas(r.cost_paisas)}
                       </span>
                     )}
                   </div>

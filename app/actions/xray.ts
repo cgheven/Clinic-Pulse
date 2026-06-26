@@ -5,10 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
-import type { CpXrayRevenue, CpXrayPartner, CpXrayExpense } from '@/types/index'
+import type { CpXrayRevenue, CpXrayPartner, CpExpense } from '@/types/index'
 
 // =============================================================================
-// Shared return type (same pattern as settings.ts)
+// Shared return type
 // =============================================================================
 
 export type ActionResult<T = undefined> =
@@ -21,7 +21,7 @@ export type ActionResult<T = undefined> =
 
 /** Active partner enriched with their default split % from cp_settings */
 export type XrayPartnerWithSplit = CpXrayPartner & {
-  split_pct: number // basis points (0–10000)
+  split_pct: number // percentage (0–100)
 }
 
 /** One partner's calculated payout for a period */
@@ -48,7 +48,7 @@ export type MonthlyReportData = {
 }
 
 /** Single expense with per-partner share calculated */
-export type XrayExpenseWithSplit = CpXrayExpense & {
+export type XrayExpenseWithSplit = CpExpense & {
   expense_head_name: string | null
   payment_method_name: string | null
   per_partner_amount: number // paisas (floor division)
@@ -80,11 +80,10 @@ const recordRevenueSchema = z.object({
       (v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0,
       'Amount must be a positive number'
     ),
-  patient_count: z.coerce.number().int().min(1).max(1000).default(1),
-  payment_method_id: z.string().uuid().nullable().optional(),
-  payment_status: z
-    .enum(['pending', 'completed', 'cancelled', 'refunded'])
-    .default('completed'),
+  payment_method: z
+    .enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer'])
+    .nullable()
+    .optional(),
   notes: z.string().max(1000).nullable().optional(),
 })
 
@@ -115,14 +114,15 @@ async function fetchPartnerSplitsConfig(
 ): Promise<Record<string, number>> {
   const { data } = await supabase
     .from('cp_settings')
-    .select('value')
-    .eq('setting_group', 'xray')
-    .eq('key', 'partner_splits_config')
+    .select('setting_value')
+    .eq('setting_key', 'xray.partner_splits_config')
     .maybeSingle()
 
-  if (!data?.value) return {}
+  if (!data?.setting_value) return {}
   try {
-    return JSON.parse(data.value) as Record<string, number>
+    const val = data.setting_value
+    if (typeof val === 'object' && val !== null) return val as Record<string, number>
+    return JSON.parse(val as string) as Record<string, number>
   } catch {
     return {}
   }
@@ -155,9 +155,8 @@ export async function getDailyRevenue(
 
     const { data: rawEntries, error } = await supabase
       .from('cp_xray_revenue')
-      .select('*, cp_payment_methods(name)')
+      .select('*')
       .eq('revenue_date', date)
-      .is('deleted_at', null)
       .order('created_at', { ascending: false })
 
     if (error) return { success: false, error: error.message }
@@ -166,18 +165,19 @@ export async function getDailyRevenue(
     const entries = (rawEntries ?? []).map((e: RawEntry) => ({
       ...(e as unknown as CpXrayRevenue),
       payment_method_name:
-        (e as unknown as { cp_payment_methods: { name: string } | null })
-          .cp_payment_methods?.name ?? null,
+        (e as unknown as { payment_method: string | null }).payment_method ?? null,
     }))
 
-    const totalGross = entries.reduce((sum, e) => sum + (e.gross_amount ?? 0), 0)
+    const totalGross = entries.reduce(
+      (sum, e) => sum + ((e as unknown as { amount_paisas: number }).amount_paisas ?? 0),
+      0
+    )
 
     const [partnersResult, splitsConfig] = await Promise.all([
       supabase
         .from('cp_xray_partners')
         .select('*')
         .eq('is_active', true)
-        .is('deleted_at', null)
         .order('created_at', { ascending: true }),
       fetchPartnerSplitsConfig(supabase),
     ])
@@ -189,7 +189,7 @@ export async function getDailyRevenue(
 
     const partnerPayouts: PartnerPayoutData[] = partners.map((partner) => ({
       partner,
-      payout_amount: Math.round((totalGross * partner.split_pct) / 10000),
+      payout_amount: Math.round((totalGross * partner.split_pct) / 100),
     }))
 
     return {
@@ -233,9 +233,7 @@ export async function recordRevenue(
       service_type,
       patient_name,
       gross_amount_pkr,
-      patient_count,
-      payment_method_id,
-      payment_status,
+      payment_method,
       notes,
     } = parsed.data
 
@@ -250,22 +248,16 @@ export async function recordRevenue(
       return { success: false, error: 'Amount must be greater than zero' }
     }
 
-    // Build description from service type + optional patient name
-    const description = patient_name
-      ? `${service_type} — ${patient_name}`
-      : service_type
-
     const supabase = await createClient()
 
     const { data: revenue, error: revenueError } = await supabase
       .from('cp_xray_revenue')
       .insert({
         revenue_date,
-        gross_amount: grossAmount,
-        description,
-        patient_count,
-        payment_method_id: payment_method_id ?? null,
-        payment_status,
+        amount_paisas: grossAmount,
+        service_type,
+        patient_name: patient_name ?? null,
+        payment_method: payment_method ?? null,
         notes: notes ?? null,
         created_by: authUser.id,
       })
@@ -273,41 +265,6 @@ export async function recordRevenue(
       .single()
 
     if (revenueError) return { success: false, error: revenueError.message }
-
-    // Auto-create partner splits for auditability (best-effort — won't block revenue)
-    const [partnersResult, splitsConfig] = await Promise.all([
-      supabase
-        .from('cp_xray_partners')
-        .select('id')
-        .eq('is_active', true)
-        .is('deleted_at', null),
-      fetchPartnerSplitsConfig(supabase),
-    ])
-
-    const partners = partnersResult.data ?? []
-    const totalSplitBp = partners.reduce(
-      (sum, p) => sum + (splitsConfig[p.id] ?? 0),
-      0
-    )
-
-    if (partners.length > 0 && totalSplitBp > 0 && totalSplitBp <= 10000) {
-      const splitInserts = partners
-        .filter((p) => (splitsConfig[p.id] ?? 0) > 0)
-        .map((p) => {
-          const splitPct = splitsConfig[p.id] ?? 0
-          return {
-            revenue_id: revenue.id,
-            partner_id: p.id,
-            split_pct: splitPct,
-            split_amount: Math.round((grossAmount * splitPct) / 10000),
-          }
-        })
-
-      if (splitInserts.length > 0) {
-        // Ignore errors — splits are advisory; revenue is the source of truth
-        await supabase.from('cp_xray_partner_splits').insert(splitInserts)
-      }
-    }
 
     revalidatePath('/xray')
     revalidatePath('/xray/revenue')
@@ -336,7 +293,6 @@ export async function getPartners(): Promise<ActionResult<XrayPartnerWithSplit[]
         .from('cp_xray_partners')
         .select('*')
         .eq('is_active', true)
-        .is('deleted_at', null)
         .order('created_at', { ascending: true }),
       fetchPartnerSplitsConfig(supabase),
     ])
@@ -362,8 +318,8 @@ export async function getPartners(): Promise<ActionResult<XrayPartnerWithSplit[]
 // =============================================================================
 // getPartnerPayouts
 // Calculate each partner's revenue share for a given month.
-// Formula: payout = total_revenue × (split_pct / 10000)
-// Validates that all partner splits sum to exactly 10000 bp (100%).
+// Formula: payout = total_revenue x (split_pct / 100)
+// Validates that all partner splits sum to exactly 100%.
 // =============================================================================
 
 export async function getPartnerPayouts(
@@ -374,7 +330,7 @@ export async function getPartnerPayouts(
     total_revenue: number
     partner_payouts: PartnerPayoutData[]
     split_valid: boolean
-    split_total_bp: number
+    split_total_pct: number
   }>
 > {
   try {
@@ -391,15 +347,14 @@ export async function getPartnerPayouts(
 
     const { data: revenueRows, error: revenueError } = await supabase
       .from('cp_xray_revenue')
-      .select('gross_amount')
+      .select('amount_paisas')
       .gte('revenue_date', startDate)
       .lte('revenue_date', endDate)
-      .is('deleted_at', null)
 
     if (revenueError) return { success: false, error: revenueError.message }
 
     const totalRevenue = (revenueRows ?? []).reduce(
-      (sum, r) => sum + (r.gross_amount ?? 0),
+      (sum, r) => sum + ((r as { amount_paisas: number }).amount_paisas ?? 0),
       0
     )
 
@@ -408,7 +363,6 @@ export async function getPartnerPayouts(
         .from('cp_xray_partners')
         .select('*')
         .eq('is_active', true)
-        .is('deleted_at', null)
         .order('created_at', { ascending: true }),
       fetchPartnerSplitsConfig(supabase),
     ])
@@ -422,13 +376,13 @@ export async function getPartnerPayouts(
       split_pct: splitsConfig[p.id] ?? 0,
     }))
 
-    // Validate that all partner split_pcts sum to exactly 10000 bp (100%)
-    const splitTotalBp = partners.reduce((sum, p) => sum + p.split_pct, 0)
-    const splitValid = splitTotalBp === 10000
+    // Validate that all partner split_pcts sum to exactly 100%
+    const splitTotalPct = partners.reduce((sum, p) => sum + p.split_pct, 0)
+    const splitValid = Math.round(splitTotalPct) === 100
 
     const partnerPayouts: PartnerPayoutData[] = partners.map((partner) => ({
       partner,
-      payout_amount: Math.round((totalRevenue * partner.split_pct) / 10000),
+      payout_amount: Math.round((totalRevenue * partner.split_pct) / 100),
     }))
 
     return {
@@ -438,7 +392,7 @@ export async function getPartnerPayouts(
         total_revenue: totalRevenue,
         partner_payouts: partnerPayouts,
         split_valid: splitValid,
-        split_total_bp: splitTotalBp,
+        split_total_pct: splitTotalPct,
       },
     }
   } catch (err) {
@@ -472,21 +426,20 @@ export async function getMonthlyReport(
       await Promise.all([
         supabase
           .from('cp_xray_revenue')
-          .select('gross_amount')
+          .select('amount_paisas')
           .gte('revenue_date', startDate)
-          .lte('revenue_date', endDate)
-          .is('deleted_at', null),
+          .lte('revenue_date', endDate),
         supabase
-          .from('cp_xray_expenses')
-          .select('amount')
+          .from('cp_expenses')
+          .select('amount_paisas')
+          .eq('department', 'xray')
+          .eq('status', 'active')
           .gte('expense_date', startDate)
-          .lte('expense_date', endDate)
-          .is('deleted_at', null),
+          .lte('expense_date', endDate),
         supabase
           .from('cp_xray_partners')
           .select('*')
           .eq('is_active', true)
-          .is('deleted_at', null)
           .order('created_at', { ascending: true }),
         fetchPartnerSplitsConfig(supabase),
       ])
@@ -494,11 +447,11 @@ export async function getMonthlyReport(
     if (revenueResult.error) return { success: false, error: revenueResult.error.message }
 
     const totalRevenue = (revenueResult.data ?? []).reduce(
-      (sum, r) => sum + (r.gross_amount ?? 0),
+      (sum, r) => sum + ((r as { amount_paisas: number }).amount_paisas ?? 0),
       0
     )
     const totalExpenses = (expensesResult.data ?? []).reduce(
-      (sum, e) => sum + (e.amount ?? 0),
+      (sum, e) => sum + ((e as unknown as { amount_paisas: number }).amount_paisas ?? 0),
       0
     )
 
@@ -509,7 +462,7 @@ export async function getMonthlyReport(
 
     const partnerPayouts: PartnerPayoutData[] = partners.map((partner) => ({
       partner,
-      payout_amount: Math.round((totalRevenue * partner.split_pct) / 10000),
+      payout_amount: Math.round((totalRevenue * partner.split_pct) / 100),
     }))
 
     return {
@@ -552,47 +505,37 @@ export async function getXrayExpenses(
 
     const [expensesResult, partnersResult] = await Promise.all([
       supabase
-        .from('cp_xray_expenses')
-        .select('*, cp_expense_heads(name), cp_payment_methods(name)')
+        .from('cp_expenses')
+        .select('*')
+        .eq('department', 'xray')
+        .eq('status', 'active')
         .gte('expense_date', startDate)
         .lte('expense_date', endDate)
-        .is('deleted_at', null)
         .order('expense_date', { ascending: false }),
       supabase
         .from('cp_xray_partners')
         .select('id')
-        .eq('is_active', true)
-        .is('deleted_at', null),
+        .eq('is_active', true),
     ])
 
     if (expensesResult.error) return { success: false, error: expensesResult.error.message }
 
     const activePartnerCount = (partnersResult.data ?? []).length
 
-    type RawExpense = (typeof expensesResult.data)[number]
-    const expenses: XrayExpenseWithSplit[] = (expensesResult.data ?? []).map(
-      (e: RawExpense) => ({
-        ...(e as unknown as CpXrayExpense),
-        expense_head_name:
-          (
-            e as unknown as {
-              cp_expense_heads: { name: string } | null
-            }
-          ).cp_expense_heads?.name ?? null,
-        payment_method_name:
-          (
-            e as unknown as {
-              cp_payment_methods: { name: string } | null
-            }
-          ).cp_payment_methods?.name ?? null,
+    const expenses: XrayExpenseWithSplit[] = (expensesResult.data ?? []).map((e) => {
+      const expense = e as unknown as CpExpense
+      return {
+        ...expense,
+        expense_head_name: expense.head_name ?? null,
+        payment_method_name: expense.payment_method ?? null,
         per_partner_amount:
           activePartnerCount > 0
-            ? Math.floor((e.amount ?? 0) / activePartnerCount)
+            ? Math.floor(expense.amount_paisas / activePartnerCount)
             : 0,
-      })
-    )
+      }
+    })
 
-    const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0)
+    const totalAmount = expenses.reduce((sum, e) => sum + e.amount_paisas, 0)
     const perPartnerTotal =
       activePartnerCount > 0 ? Math.floor(totalAmount / activePartnerCount) : 0
 
@@ -621,7 +564,7 @@ export async function getXrayExpenses(
 
 export async function recordXrayExpense(
   rawData: unknown
-): Promise<ActionResult<CpXrayExpense>> {
+): Promise<ActionResult<XrayExpenseWithSplit>> {
   try {
     const authUser = await requireAuth()
 
@@ -648,22 +591,46 @@ export async function recordXrayExpense(
       return { success: false, error: expenseDateCheck.error }
     }
 
-    const amount = pkrToPaisas(amount_pkr)
-    if (amount <= 0) {
+    const amount_paisas = pkrToPaisas(amount_pkr)
+    if (amount_paisas <= 0) {
       return { success: false, error: 'Amount must be greater than zero' }
     }
 
     const supabase = await createClient()
 
+    // Resolve head_name from expense_head_id, fall back to custom_head or 'General'
+    let headName = custom_head ?? 'General'
+    if (expense_head_id) {
+      const { data: headData } = await supabase
+        .from('cp_expense_heads')
+        .select('name')
+        .eq('id', expense_head_id)
+        .single()
+      if (headData?.name) headName = headData.name
+    }
+
+    // Resolve payment_method enum value from payment_method_id UUID
+    let paymentMethod: string | null = null
+    if (payment_method_id) {
+      const { data: pmData } = await supabase
+        .from('cp_payment_methods')
+        .select('method')
+        .eq('id', payment_method_id)
+        .single()
+      paymentMethod = pmData?.method ?? null
+    }
+
     const { data, error } = await supabase
-      .from('cp_xray_expenses')
+      .from('cp_expenses')
       .insert({
         expense_date,
-        expense_head_id: expense_head_id ?? null,
-        custom_head: custom_head ?? null,
-        amount,
+        head_id: expense_head_id ?? null,
+        head_name: headName,
+        department: 'xray' as const,
+        amount_paisas,
+        payment_method: paymentMethod as "cash" | "jazzcash" | "easypaisa" | "bank_transfer" | null,
         description: description ?? null,
-        payment_method_id: payment_method_id ?? null,
+        status: 'active' as const,
         created_by: authUser.id,
       })
       .select()
@@ -671,10 +638,29 @@ export async function recordXrayExpense(
 
     if (error) return { success: false, error: error.message }
 
+    // Compute per_partner_amount based on current active partner count
+    const { data: partnersData } = await supabase
+      .from('cp_xray_partners')
+      .select('id')
+      .eq('is_active', true)
+
+    const activePartnerCount = (partnersData ?? []).length
+    const expense = data as unknown as CpExpense
+
+    const result: XrayExpenseWithSplit = {
+      ...expense,
+      expense_head_name: expense.head_name ?? null,
+      payment_method_name: expense.payment_method ?? null,
+      per_partner_amount:
+        activePartnerCount > 0
+          ? Math.floor(expense.amount_paisas / activePartnerCount)
+          : 0,
+    }
+
     revalidatePath('/xray/expenses')
     revalidatePath('/xray')
 
-    return { success: true, data: data as CpXrayExpense }
+    return { success: true, data: result }
   } catch (err) {
     return {
       success: false,

@@ -8,7 +8,7 @@ import { requireAuth } from '@/lib/auth'
 const PKT_TIMEZONE = 'Asia/Karachi'
 
 // =============================================================================
-// Shared result type (same pattern across all action files)
+// Shared result type
 // =============================================================================
 
 export type ActionResult<T = undefined> =
@@ -69,44 +69,22 @@ export type DailyTrendPoint = {
 // Internal helpers
 // =============================================================================
 
-type MethodSlug = 'cash' | 'jazzcash' | 'easypaisa' | 'bank_transfer'
-type MethodMap = Record<string, MethodSlug>
-
-/** Fetch a UUID → slug mapping for all active payment methods. */
-async function getPaymentMethodMap(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<MethodMap> {
-  const { data } = await supabase
-    .from('cp_payment_methods')
-    .select('id, slug')
-    .eq('is_active', true)
-
-  const map: MethodMap = {}
-  for (const m of data ?? []) {
-    map[m.id] = m.slug as MethodSlug
-  }
-  return map
-}
-
 /** Return a zeroed PaymentMethodTotals object. */
 function zeroTotals(): PaymentMethodTotals {
   return { cash: 0, jazzcash: 0, easypaisa: 0, bank_transfer: 0 }
 }
 
-/** Add a single payment amount into the correct method bucket. */
+/** Add a single payment amount into the correct enum method bucket. */
 function addToTotals(
   totals: PaymentMethodTotals,
   amount: number,
-  methodId: string | null,
-  map: MethodMap
+  method: string | null
 ): void {
-  if (!methodId) return
-  const slug = map[methodId]
-  if (!slug) return
-  if (slug === 'cash') totals.cash += amount
-  else if (slug === 'jazzcash') totals.jazzcash += amount
-  else if (slug === 'easypaisa') totals.easypaisa += amount
-  else if (slug === 'bank_transfer') totals.bank_transfer += amount
+  if (!method) return
+  if (method === 'cash') totals.cash += amount
+  else if (method === 'jazzcash') totals.jazzcash += amount
+  else if (method === 'easypaisa') totals.easypaisa += amount
+  else if (method === 'bank_transfer') totals.bank_transfer += amount
 }
 
 /** Sum all four method buckets into a single grand total. */
@@ -135,9 +113,8 @@ function lastDayOfMonth(month: string): string {
 
 // =============================================================================
 // getDailyPayments
-// Aggregate completed payments across all modules by method for a single date.
+// Aggregate payments across all modules by method for a single date.
 // Queries: cp_patient_visits, cp_pharmacy_sales, cp_lab_test_logs, cp_xray_revenue
-// Returns: { cash, jazzcash, easypaisa, bank_transfer } in paisas
 // =============================================================================
 
 export async function getDailyPayments(
@@ -147,47 +124,38 @@ export async function getDailyPayments(
     await requireAuth()
     const supabase = await createClient()
 
-    const [methodMap, visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
-      getPaymentMethodMap(supabase),
+    const [visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
       supabase
         .from('cp_patient_visits')
-        .select('net_fee, payment_method_id')
-        .eq('visit_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('fee_paisas, payment_method')
+        .eq('visit_date', date),
       supabase
         .from('cp_pharmacy_sales')
-        .select('total_amount, payment_method_id')
-        .eq('sale_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('total_paisas, payment_method')
+        .eq('sale_date', date),
       supabase
         .from('cp_lab_test_logs')
-        .select('total_amount, payment_method_id')
-        .eq('log_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('price_paisas, payment_method')
+        .eq('test_date', date),
       supabase
         .from('cp_xray_revenue')
-        .select('gross_amount, payment_method_id')
-        .eq('revenue_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('amount_paisas, payment_method')
+        .eq('revenue_date', date),
     ])
 
     const totals = zeroTotals()
 
     for (const v of visitsRes.data ?? []) {
-      addToTotals(totals, v.net_fee ?? 0, v.payment_method_id, methodMap)
+      addToTotals(totals, (v as { fee_paisas: number }).fee_paisas ?? 0, (v as { payment_method: string | null }).payment_method)
     }
     for (const s of pharmRes.data ?? []) {
-      addToTotals(totals, s.total_amount ?? 0, s.payment_method_id, methodMap)
+      addToTotals(totals, (s as { total_paisas: number }).total_paisas ?? 0, (s as { payment_method: string | null }).payment_method)
     }
     for (const l of labRes.data ?? []) {
-      addToTotals(totals, l.total_amount ?? 0, l.payment_method_id, methodMap)
+      addToTotals(totals, (l as { price_paisas: number }).price_paisas ?? 0, (l as { payment_method: string | null }).payment_method)
     }
     for (const x of xrayRes.data ?? []) {
-      addToTotals(totals, x.gross_amount ?? 0, x.payment_method_id, methodMap)
+      addToTotals(totals, (x as { amount_paisas: number }).amount_paisas ?? 0, (x as { payment_method: string | null }).payment_method)
     }
 
     return { success: true, data: { date, totals, grand_total: grandTotal(totals) } }
@@ -211,32 +179,23 @@ export async function getPaymentsByDepartment(
     await requireAuth()
     const supabase = await createClient()
 
-    const [methodMap, visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
-      getPaymentMethodMap(supabase),
+    const [visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
       supabase
         .from('cp_patient_visits')
-        .select('net_fee, payment_method_id')
-        .eq('visit_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('fee_paisas, payment_method')
+        .eq('visit_date', date),
       supabase
         .from('cp_pharmacy_sales')
-        .select('total_amount, payment_method_id')
-        .eq('sale_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('total_paisas, payment_method')
+        .eq('sale_date', date),
       supabase
         .from('cp_lab_test_logs')
-        .select('total_amount, payment_method_id')
-        .eq('log_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('price_paisas, payment_method')
+        .eq('test_date', date),
       supabase
         .from('cp_xray_revenue')
-        .select('gross_amount, payment_method_id')
-        .eq('revenue_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('amount_paisas, payment_method')
+        .eq('revenue_date', date),
     ])
 
     const opdT   = zeroTotals()
@@ -245,16 +204,16 @@ export async function getPaymentsByDepartment(
     const xrayT  = zeroTotals()
 
     for (const v of visitsRes.data ?? []) {
-      addToTotals(opdT, v.net_fee ?? 0, v.payment_method_id, methodMap)
+      addToTotals(opdT, (v as { fee_paisas: number }).fee_paisas ?? 0, (v as { payment_method: string | null }).payment_method)
     }
     for (const s of pharmRes.data ?? []) {
-      addToTotals(pharmT, s.total_amount ?? 0, s.payment_method_id, methodMap)
+      addToTotals(pharmT, (s as { total_paisas: number }).total_paisas ?? 0, (s as { payment_method: string | null }).payment_method)
     }
     for (const l of labRes.data ?? []) {
-      addToTotals(labT, l.total_amount ?? 0, l.payment_method_id, methodMap)
+      addToTotals(labT, (l as { price_paisas: number }).price_paisas ?? 0, (l as { payment_method: string | null }).payment_method)
     }
     for (const x of xrayRes.data ?? []) {
-      addToTotals(xrayT, x.gross_amount ?? 0, x.payment_method_id, methodMap)
+      addToTotals(xrayT, (x as { amount_paisas: number }).amount_paisas ?? 0, (x as { payment_method: string | null }).payment_method)
     }
 
     const rows: DeptPaymentRow[] = [
@@ -311,36 +270,27 @@ export async function getMonthlyPaymentSummary(
     const endDate   = lastDayOfMonth(month)
     const supabase  = await createClient()
 
-    const [methodMap, visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
-      getPaymentMethodMap(supabase),
+    const [visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
       supabase
         .from('cp_patient_visits')
-        .select('net_fee, payment_method_id')
+        .select('fee_paisas, payment_method')
         .gte('visit_date', startDate)
-        .lte('visit_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .lte('visit_date', endDate),
       supabase
         .from('cp_pharmacy_sales')
-        .select('total_amount, payment_method_id')
+        .select('total_paisas, payment_method')
         .gte('sale_date', startDate)
-        .lte('sale_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .lte('sale_date', endDate),
       supabase
         .from('cp_lab_test_logs')
-        .select('total_amount, payment_method_id')
-        .gte('log_date', startDate)
-        .lte('log_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('price_paisas, payment_method')
+        .gte('test_date', startDate)
+        .lte('test_date', endDate),
       supabase
         .from('cp_xray_revenue')
-        .select('gross_amount, payment_method_id')
+        .select('amount_paisas, payment_method')
         .gte('revenue_date', startDate)
-        .lte('revenue_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .lte('revenue_date', endDate),
     ])
 
     const opdT   = zeroTotals()
@@ -349,16 +299,16 @@ export async function getMonthlyPaymentSummary(
     const xrayT  = zeroTotals()
 
     for (const v of visitsRes.data ?? []) {
-      addToTotals(opdT, v.net_fee ?? 0, v.payment_method_id, methodMap)
+      addToTotals(opdT, (v as { fee_paisas: number }).fee_paisas ?? 0, (v as { payment_method: string | null }).payment_method)
     }
     for (const s of pharmRes.data ?? []) {
-      addToTotals(pharmT, s.total_amount ?? 0, s.payment_method_id, methodMap)
+      addToTotals(pharmT, (s as { total_paisas: number }).total_paisas ?? 0, (s as { payment_method: string | null }).payment_method)
     }
     for (const l of labRes.data ?? []) {
-      addToTotals(labT, l.total_amount ?? 0, l.payment_method_id, methodMap)
+      addToTotals(labT, (l as { price_paisas: number }).price_paisas ?? 0, (l as { payment_method: string | null }).payment_method)
     }
     for (const x of xrayRes.data ?? []) {
-      addToTotals(xrayT, x.gross_amount ?? 0, x.payment_method_id, methodMap)
+      addToTotals(xrayT, (x as { amount_paisas: number }).amount_paisas ?? 0, (x as { payment_method: string | null }).payment_method)
     }
 
     const by_department: DeptPaymentRow[] = [
@@ -409,36 +359,27 @@ export async function getDailyTrend(
 
     const supabase = await createClient()
 
-    const [methodMap, visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
-      getPaymentMethodMap(supabase),
+    const [visitsRes, pharmRes, labRes, xrayRes] = await Promise.all([
       supabase
         .from('cp_patient_visits')
-        .select('visit_date, net_fee, payment_method_id')
+        .select('visit_date, fee_paisas, payment_method')
         .gte('visit_date', startDate)
-        .lte('visit_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .lte('visit_date', endDate),
       supabase
         .from('cp_pharmacy_sales')
-        .select('sale_date, total_amount, payment_method_id')
+        .select('sale_date, total_paisas, payment_method')
         .gte('sale_date', startDate)
-        .lte('sale_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .lte('sale_date', endDate),
       supabase
         .from('cp_lab_test_logs')
-        .select('log_date, total_amount, payment_method_id')
-        .gte('log_date', startDate)
-        .lte('log_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('test_date, price_paisas, payment_method')
+        .gte('test_date', startDate)
+        .lte('test_date', endDate),
       supabase
         .from('cp_xray_revenue')
-        .select('revenue_date, gross_amount, payment_method_id')
+        .select('revenue_date, amount_paisas, payment_method')
         .gte('revenue_date', startDate)
-        .lte('revenue_date', endDate)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .lte('revenue_date', endDate),
     ])
 
     // Build a date → aggregated totals map
@@ -450,16 +391,20 @@ export async function getDailyTrend(
     }
 
     for (const v of visitsRes.data ?? []) {
-      addToTotals(ensureDate(v.visit_date), v.net_fee ?? 0, v.payment_method_id, methodMap)
+      const row = v as { visit_date: string; fee_paisas: number; payment_method: string | null }
+      addToTotals(ensureDate(row.visit_date), row.fee_paisas ?? 0, row.payment_method)
     }
     for (const s of pharmRes.data ?? []) {
-      addToTotals(ensureDate(s.sale_date), s.total_amount ?? 0, s.payment_method_id, methodMap)
+      const row = s as { sale_date: string; total_paisas: number; payment_method: string | null }
+      addToTotals(ensureDate(row.sale_date), row.total_paisas ?? 0, row.payment_method)
     }
     for (const l of labRes.data ?? []) {
-      addToTotals(ensureDate(l.log_date), l.total_amount ?? 0, l.payment_method_id, methodMap)
+      const row = l as { test_date: string; price_paisas: number; payment_method: string | null }
+      addToTotals(ensureDate(row.test_date), row.price_paisas ?? 0, row.payment_method)
     }
     for (const x of xrayRes.data ?? []) {
-      addToTotals(ensureDate(x.revenue_date), x.gross_amount ?? 0, x.payment_method_id, methodMap)
+      const row = x as { revenue_date: string; amount_paisas: number; payment_method: string | null }
+      addToTotals(ensureDate(row.revenue_date), row.amount_paisas ?? 0, row.payment_method)
     }
 
     // Generate the full date series, backfilling zeros for days with no data
@@ -478,3 +423,4 @@ export async function getDailyTrend(
     }
   }
 }
+

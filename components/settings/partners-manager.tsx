@@ -36,11 +36,8 @@ import { upsertXrayPartner, deleteXrayPartner } from '@/app/actions/settings'
 
 interface PartnerRow {
   id: string
-  partner_name: string
-  partner_type: string
+  name: string
   phone: string | null
-  bank_account: string | null
-  notes: string | null
   split_pct: number
   // local edit state
   editing_split: string // display string like "30.00"
@@ -107,11 +104,8 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
   const [partners, setPartners] = useState<PartnerRow[]>(() =>
     initialPartners.map((p) => ({
       id: p.id,
-      partner_name: p.partner_name,
-      partner_type: p.partner_type,
+      name: p.name,
       phone: p.phone,
-      bank_account: p.bank_account,
-      notes: p.notes,
       split_pct: p.split_pct,
       editing_split: bpToDisplay(p.split_pct),
       isDirty: false,
@@ -163,11 +157,8 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
     startTransition(async () => {
       const result = await upsertXrayPartner({
         id: partner.id,
-        partner_name: partner.partner_name,
-        partner_type: partner.partner_type,
+        name: partner.name,
         phone: partner.phone,
-        bank_account: partner.bank_account,
-        notes: partner.notes,
         split_pct: displayToBp(partner.editing_split),
       })
 
@@ -181,7 +172,7 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
               : p
           )
         )
-        toast({ title: 'Partner saved', description: `${partner.partner_name} split updated.` })
+        toast({ title: 'Partner saved', description: `${partner.name} split updated.` })
       } else {
         toast({
           title: 'Save failed',
@@ -238,11 +229,8 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
     setIsAdding(true)
     startTransition(async () => {
       const result = await upsertXrayPartner({
-        partner_name: parsed.data.partner_name,
-        partner_type: parsed.data.partner_type,
+        name: parsed.data.partner_name,
         phone: parsed.data.phone || null,
-        bank_account: parsed.data.bank_account || null,
-        notes: parsed.data.notes || null,
         split_pct: displayToBp(parsed.data.split_pct),
       })
 
@@ -260,11 +248,8 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
           ...prev,
           {
             id: tempId,
-            partner_name: parsed.data.partner_name,
-            partner_type: parsed.data.partner_type,
+            name: parsed.data.partner_name,
             phone: parsed.data.phone || null,
-            bank_account: parsed.data.bank_account || null,
-            notes: parsed.data.notes || null,
             split_pct: displayToBp(parsed.data.split_pct),
             editing_split: parsed.data.split_pct,
             isDirty: false,
@@ -343,7 +328,7 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
                   width: `${Math.max(0, Math.min(100, bp / 100))}%`,
                   backgroundColor: `hsl(${hue}, 70%, 55%)`,
                 }}
-                title={`${p.partner_name}: ${(bp / 100).toFixed(2)}%`}
+                title={`${p.name}: ${(bp / 100).toFixed(2)}%`}
               />
             )
           })}
@@ -383,7 +368,7 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
             </thead>
             <tbody className="divide-y divide-border">
               {partners.map((partner) => {
-                const TypeIcon = partnerTypeIcon(partner.partner_type)
+                const TypeIcon = Building2
                 const isSaving = savingId === partner.id
                 const isDeleting = deletingId === partner.id
 
@@ -397,12 +382,7 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
                   >
                     {/* Name */}
                     <td className="py-3 pl-4 pr-3">
-                      <span className="font-medium text-foreground">{partner.partner_name}</span>
-                      {partner.bank_account && (
-                        <p className="text-[10px] text-muted-foreground">
-                          Bank: {partner.bank_account}
-                        </p>
-                      )}
+                      <span className="font-medium text-foreground">{partner.name}</span>
                     </td>
 
                     {/* Type badge */}
@@ -412,8 +392,7 @@ export function PartnersManager({ initialPartners }: PartnersManagerProps) {
                         className="gap-1 text-[10px]"
                       >
                         <TypeIcon className="h-2.5 w-2.5" />
-                        {PARTNER_TYPES.find((t) => t.value === partner.partner_type)?.label ??
-                          partner.partner_type}
+                        Partner
                       </Badge>
                     </td>
 

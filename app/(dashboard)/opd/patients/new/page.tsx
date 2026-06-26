@@ -23,46 +23,32 @@ export default function NewPatientPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Form fields
-  const [fullName, setFullName] = useState('')
-  const [fatherName, setFatherName] = useState('')
+  const [name, setName] = useState('')
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male')
   const [dob, setDob] = useState('')
-  const [ageYears, setAgeYears] = useState('')
   const [bloodGroup, setBloodGroup] = useState('unknown')
-  const [cnic, setCnic] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
-  const [city, setCity] = useState('')
-  const [knownAllergies, setKnownAllergies] = useState('')
-  const [chronicConditions, setChronicConditions] = useState('')
-  const [notes, setNotes] = useState('')
-  const [referredBy, setReferredBy] = useState('')
+  const [history, setHistory] = useState('')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
-    if (!fullName.trim()) {
+    if (!name.trim()) {
       setError('Full name is required')
       return
     }
 
     startTransition(async () => {
       const result = await createPatient({
-        full_name: fullName.trim(),
-        father_name: fatherName.trim() || null,
+        name: name.trim(),
         gender,
         date_of_birth: dob || null,
-        age_years: ageYears ? parseInt(ageYears) : null,
         blood_group: bloodGroup as 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | 'unknown',
-        cnic: cnic.trim() || null,
         phone: phone.trim() || null,
         address: address.trim() || null,
-        city: city.trim() || null,
-        known_allergies: knownAllergies.trim() || null,
-        chronic_conditions: chronicConditions.trim() || null,
-        notes: notes.trim() || null,
-        referred_by: referredBy.trim() || null,
+        history: history.trim() || null,
       })
 
       if (!result.success) {
@@ -103,24 +89,14 @@ export default function NewPatientPage() {
         {/* Personal Info */}
         <Section title="Personal Information" icon={<User className="h-4 w-4 text-primary" />}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="full_name">Full Name *</Label>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="name">Full Name *</Label>
               <Input
-                id="full_name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Muhammad Ahmed"
                 required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="father_name">Father / Guardian Name</Label>
-              <Input
-                id="father_name"
-                value={fatherName}
-                onChange={(e) => setFatherName(e.target.value)}
-                placeholder="e.g. Muhammad Ali"
               />
             </div>
 
@@ -170,25 +146,6 @@ export default function NewPatientPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="age_years">Age (years) — if DOB unknown</Label>
-              <Input
-                id="age_years"
-                type="number"
-                min="0"
-                max="150"
-                value={ageYears}
-                onChange={(e) => setAgeYears(e.target.value)}
-                placeholder="e.g. 35"
-                disabled={!!dob}
-              />
-            </div>
-          </div>
-        </Section>
-
-        {/* Contact */}
-        <Section title="Contact Information">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
               <Label htmlFor="phone">Phone Number</Label>
               <Input
                 id="phone"
@@ -196,36 +153,6 @@ export default function NewPatientPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="03XX-XXXXXXX"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="cnic">CNIC</Label>
-              <Input
-                id="cnic"
-                value={cnic}
-                onChange={(e) => setCnic(e.target.value)}
-                placeholder="XXXXX-XXXXXXX-X"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="e.g. Karachi"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="referred_by">Referred By</Label>
-              <Input
-                id="referred_by"
-                value={referredBy}
-                onChange={(e) => setReferredBy(e.target.value)}
-                placeholder="Doctor or clinic name"
               />
             </div>
 
@@ -239,42 +166,15 @@ export default function NewPatientPage() {
                 rows={2}
               />
             </div>
-          </div>
-        </Section>
 
-        {/* Medical */}
-        <Section title="Medical Information">
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="known_allergies">Known Allergies</Label>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="history">Medical History / Notes</Label>
               <Textarea
-                id="known_allergies"
-                value={knownAllergies}
-                onChange={(e) => setKnownAllergies(e.target.value)}
-                placeholder="List any known drug or food allergies..."
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="chronic_conditions">Chronic Conditions</Label>
-              <Textarea
-                id="chronic_conditions"
-                value={chronicConditions}
-                onChange={(e) => setChronicConditions(e.target.value)}
-                placeholder="e.g. Diabetes, Hypertension..."
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any additional notes..."
-                rows={2}
+                id="history"
+                value={history}
+                onChange={(e) => setHistory(e.target.value)}
+                placeholder="Any relevant medical history, allergies, chronic conditions..."
+                rows={3}
               />
             </div>
           </div>

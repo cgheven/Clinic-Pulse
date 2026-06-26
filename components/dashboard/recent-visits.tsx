@@ -1,57 +1,5 @@
-import { CheckCircle2, Clock, XCircle, RotateCcw } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 import type { RecentVisit } from '@/app/actions/dashboard'
 import { formatCurrencyPaisas, formatDate } from '@/lib/utils'
-import { cn } from '@/lib/utils'
-
-// =============================================================================
-// Status badge config
-// =============================================================================
-
-type StatusConfig = {
-  label: string
-  icon: LucideIcon
-  className: string
-}
-
-const STATUS_MAP: Record<string, StatusConfig> = {
-  completed: {
-    label: 'Completed',
-    icon: CheckCircle2,
-    className: 'text-success bg-success/10',
-  },
-  pending: {
-    label: 'Pending',
-    icon: Clock,
-    className: 'text-warning bg-warning/10',
-  },
-  cancelled: {
-    label: 'Cancelled',
-    icon: XCircle,
-    className: 'text-destructive bg-destructive/10',
-  },
-  refunded: {
-    label: 'Refunded',
-    icon: RotateCcw,
-    className: 'text-info bg-info/10',
-  },
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_MAP[status] ?? STATUS_MAP.pending
-  const Icon = cfg.icon
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-        cfg.className
-      )}
-    >
-      <Icon className="h-3 w-3" />
-      {cfg.label}
-    </span>
-  )
-}
 
 // =============================================================================
 // Loading skeleton
@@ -68,7 +16,7 @@ function TableSkeleton() {
             <div className="h-3 w-24 rounded bg-muted" />
           </div>
           <div className="h-3 w-20 rounded bg-muted" />
-          <div className="h-5 w-16 rounded-full bg-muted" />
+          <div className="h-3 w-16 rounded bg-muted" />
         </div>
       ))}
     </div>
@@ -127,28 +75,21 @@ export function RecentVisits({ data, loading = false }: RecentVisitsProps) {
               {visit.patient_name}
             </p>
             <p className="text-xs text-muted-foreground">
-              {visit.patient_no}
-              {visit.doctor_name ? ` · Dr. ${visit.doctor_name}` : ''}
+              {visit.doctor_name ? `Dr. ${visit.doctor_name}` : 'No doctor assigned'}
             </p>
           </div>
 
-          {/* Date + time */}
+          {/* Date */}
           <div className="hidden text-right sm:block">
             <p className="text-xs text-muted-foreground">
               {formatDate(visit.visit_date, 'dd MMM')}
             </p>
-            <p className="text-xs text-muted-foreground">
-              {visit.visit_time?.slice(0, 5) ?? '—'}
-            </p>
           </div>
 
           {/* Fee */}
-          <p className="hidden whitespace-nowrap text-sm font-medium text-foreground sm:block">
-            {formatCurrencyPaisas(visit.net_fee)}
+          <p className="whitespace-nowrap text-sm font-medium text-foreground">
+            {formatCurrencyPaisas(visit.fee_paisas)}
           </p>
-
-          {/* Status */}
-          <StatusBadge status={visit.payment_status} />
         </div>
       ))}
     </div>

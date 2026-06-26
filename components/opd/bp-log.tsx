@@ -256,7 +256,7 @@ export function BpLog({ patientId, logs: initialLogs, className }: BpLogProps) {
                         {log.pulse} bpm
                       </span>
                     )}
-                    <span>{formatDateTime(log.measured_at)}</span>
+                    <span>{formatDateTime(log.recorded_at)}</span>
                   </div>
 
                   {log.notes && (

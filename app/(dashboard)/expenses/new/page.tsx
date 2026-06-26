@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ExpenseForm } from '@/components/expenses/expense-form'
 import { getTodayPKT } from '@/lib/utils'
-import type { CpDepartment, CpExpenseHead, CpPaymentMethod } from '@/types/index'
+import type { CpExpenseHead, CpPaymentMethod } from '@/types/index'
 
 export const metadata: Metadata = {
   title: 'New Expense — ClinicPulse',
@@ -26,13 +26,7 @@ export default async function NewExpensePage() {
   const today = getTodayPKT()
   const supabase = await createClient()
 
-  const [departmentsData, headsData, methodsData] = await Promise.all([
-    supabase
-      .from('cp_departments')
-      .select('*')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-      .order('sort_order', { ascending: true }),
+  const [headsData, methodsData] = await Promise.all([
     supabase
       .from('cp_expense_heads')
       .select('*')
@@ -42,11 +36,10 @@ export default async function NewExpensePage() {
     supabase
       .from('cp_payment_methods')
       .select('*')
-      .eq('is_active', true)
+      .eq('is_enabled', true)
       .order('sort_order', { ascending: true }),
   ])
 
-  const departments = (departmentsData.data ?? []) as CpDepartment[]
   const expenseHeads = (headsData.data ?? []) as CpExpenseHead[]
   const paymentMethods = (methodsData.data ?? []) as CpPaymentMethod[]
 
@@ -76,7 +69,7 @@ export default async function NewExpensePage() {
 
       {/* ── Form ─────────────────────────────────────────────────────────────── */}
       <ExpenseForm
-        departments={departments}
+        departments={[]}
         expenseHeads={expenseHeads}
         paymentMethods={paymentMethods}
         defaultDate={today}

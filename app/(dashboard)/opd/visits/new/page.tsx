@@ -20,7 +20,7 @@ async function NewVisitForm({ patientId }: { patientId?: string }) {
       const patient = result.data
       return (
         <VisitForm
-          patient={{ id: patient.id, full_name: patient.full_name, patient_no: patient.patient_no }}
+          patient={{ id: patient.id, name: patient.name, patient_no: patient.patient_no ?? 0 }}
         />
       )
     }
@@ -34,8 +34,8 @@ async function NewVisitForm({ patientId }: { patientId?: string }) {
     <VisitForm
       patients={patients.map((p) => ({
         id: p.id,
-        full_name: p.full_name,
-        patient_no: p.patient_no,
+        name: p.name,
+        patient_no: p.patient_no ?? 0,
         phone: p.phone,
       }))}
     />

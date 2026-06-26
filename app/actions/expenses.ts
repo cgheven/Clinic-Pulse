@@ -29,13 +29,13 @@ export type ExpenseWithRelations = CpExpense & {
 
 export type ExpenseFilterParams = {
   month?: string // YYYY-MM
-  department_id?: string | null
+  department?: string | null  // enum value e.g. 'opd', 'pharmacy', 'lab', 'xray'
   head_id?: string | null
-  payment_method_id?: string | null
+  payment_method?: string | null  // enum value e.g. 'cash', 'jazzcash'
 }
 
 export type DeptExpenseGroup = {
-  department_id: string | null
+  department: string | null
   department_name: string
   total: number // paisas
   expenses: ExpenseWithRelations[]
@@ -57,7 +57,7 @@ export type ExpenseCategoryTotal = {
 }
 
 export type ExpenseDeptTotal = {
-  department_id: string | null
+  department: string | null
   department_name: string
   total: number // paisas
   count: number
@@ -78,9 +78,8 @@ const createExpenseSchema = z.object({
   expense_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date — expected YYYY-MM-DD'),
-  department_id: z.string().uuid().nullable().optional(),
-  expense_head_id: z.string().uuid().nullable().optional(),
-  custom_head: z.string().max(200).nullable().optional(),
+  department: z.string().max(100).nullable().optional(),
+  head_id: z.string().uuid().nullable().optional(),
   amount_pkr: z
     .string()
     .min(1, 'Amount is required')
@@ -89,7 +88,10 @@ const createExpenseSchema = z.object({
       'Amount must be a positive number'
     ),
   description: z.string().min(1, 'Description is required').max(500),
-  payment_method_id: z.string().uuid().nullable().optional(),
+  payment_method: z
+    .enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer'])
+    .nullable()
+    .optional(),
 })
 
 // =============================================================================
@@ -115,19 +117,19 @@ async function fetchExpenseDivisor(
 ): Promise<number> {
   const { data } = await supabase
     .from('cp_settings')
-    .select('value')
-    .eq('setting_group', 'expense')
-    .eq('key', 'divisor')
+    .select('setting_value')
+    .eq('setting_key', 'expense.divisor')
     .maybeSingle()
 
-  if (!data?.value) return 4
-  const parsed = parseInt(data.value, 10)
+  if (!data?.setting_value) return 4
+  const val = data.setting_value
+  const parsed = typeof val === 'number' ? val : parseInt(String(val), 10)
   return isNaN(parsed) || parsed < 1 ? 4 : parsed
 }
 
 // =============================================================================
 // getExpenses
-// Returns a filtered list of active (non-voided) expenses.
+// Returns a filtered list of expenses.
 // =============================================================================
 
 export async function getExpenses(
@@ -139,10 +141,7 @@ export async function getExpenses(
 
     let query = supabase
       .from('cp_expenses')
-      .select(
-        '*, cp_departments(name), cp_expense_heads(name), cp_payment_methods(name)'
-      )
-      .is('deleted_at', null)
+      .select('*, cp_expense_heads!head_id(name)')
       .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false })
 
@@ -152,16 +151,16 @@ export async function getExpenses(
       query = query.gte('expense_date', startDate).lte('expense_date', endDate)
     }
 
-    if (filters.department_id) {
-      query = query.eq('department_id', filters.department_id)
+    if (filters.department) {
+      query = query.eq('department', filters.department as "opd" | "pharmacy" | "lab" | "xray" | "general")
     }
 
     if (filters.head_id) {
-      query = query.eq('expense_head_id', filters.head_id)
+      query = query.eq('head_id', filters.head_id)
     }
 
-    if (filters.payment_method_id) {
-      query = query.eq('payment_method_id', filters.payment_method_id)
+    if (filters.payment_method) {
+      query = query.eq('payment_method', filters.payment_method as "cash" | "jazzcash" | "easypaisa" | "bank_transfer")
     }
 
     const { data, error } = await query
@@ -169,19 +168,22 @@ export async function getExpenses(
     if (error) return { success: false, error: error.message }
 
     type RawRow = (typeof data)[number]
-    const expenses: ExpenseWithRelations[] = (data ?? []).map((row: RawRow) => ({
-      ...(row as unknown as CpExpense),
-      department_name:
-        (row as unknown as { cp_departments: { name: string } | null })
-          .cp_departments?.name ?? null,
-      expense_head_name:
-        (row as unknown as { cp_expense_heads: { name: string } | null })
-          .cp_expense_heads?.name ?? null,
-      payment_method_name:
-        (row as unknown as { cp_payment_methods: { name: string } | null })
-          .cp_payment_methods?.name ?? null,
-      is_voided: false,
-    }))
+    const expenses: ExpenseWithRelations[] = (data ?? []).map((row: RawRow) => {
+      const r = row as unknown as {
+        department: string | null
+        payment_method: string | null
+        amount_paisas: number
+        is_voided: boolean
+        cp_expense_heads: { name: string } | null
+      }
+      return {
+        ...(row as unknown as CpExpense),
+        department_name: r.department ?? null,
+        expense_head_name: r.cp_expense_heads?.name ?? null,
+        payment_method_name: r.payment_method ?? null,
+        is_voided: r.is_voided ?? false,
+      }
+    })
 
     return { success: true, data: expenses }
   } catch (err) {
@@ -194,7 +196,7 @@ export async function getExpenses(
 
 // =============================================================================
 // getExpenseById
-// Fetches a single expense (including voided) using admin client to bypass RLS.
+// Fetches a single expense using admin client to bypass RLS.
 // =============================================================================
 
 export async function getExpenseById(
@@ -206,28 +208,26 @@ export async function getExpenseById(
 
     const { data, error } = await admin
       .from('cp_expenses')
-      .select(
-        '*, cp_departments(name), cp_expense_heads(name), cp_payment_methods(name)'
-      )
+      .select('*, cp_expense_heads!head_id(name)')
       .eq('id', id)
       .maybeSingle()
 
     if (error) return { success: false, error: error.message }
     if (!data) return { success: false, error: 'Expense not found' }
 
-    type RawRow = typeof data
+    const r = data as unknown as {
+      department: string | null
+      payment_method: string | null
+      is_voided: boolean
+      cp_expense_heads: { name: string } | null
+    }
+
     const expense: ExpenseWithRelations = {
       ...(data as unknown as CpExpense),
-      department_name:
-        (data as unknown as { cp_departments: { name: string } | null })
-          .cp_departments?.name ?? null,
-      expense_head_name:
-        (data as unknown as { cp_expense_heads: { name: string } | null })
-          .cp_expense_heads?.name ?? null,
-      payment_method_name:
-        (data as unknown as { cp_payment_methods: { name: string } | null })
-          .cp_payment_methods?.name ?? null,
-      is_voided: (data as unknown as { deleted_at: string | null }).deleted_at !== null,
+      department_name: r.department ?? null,
+      expense_head_name: r.cp_expense_heads?.name ?? null,
+      payment_method_name: r.payment_method ?? null,
+      is_voided: r.is_voided ?? false,
     }
 
     return { success: true, data: expense }
@@ -261,12 +261,11 @@ export async function createExpense(
 
     const {
       expense_date,
-      department_id,
-      expense_head_id,
-      custom_head,
+      department,
+      head_id,
       amount_pkr,
       description,
-      payment_method_id,
+      payment_method,
     } = parsed.data
 
     // SECURITY FIX (FINDING-006): Prevent backdating of financial records
@@ -286,12 +285,12 @@ export async function createExpense(
       .from('cp_expenses')
       .insert({
         expense_date,
-        department_id: department_id ?? null,
-        expense_head_id: expense_head_id ?? null,
-        custom_head: custom_head?.trim() ?? null,
-        amount,
+        department: (department ?? 'general') as "opd" | "pharmacy" | "lab" | "xray" | "general",
+        head_name: 'General',
+        head_id: head_id ?? null,
+        amount_paisas: amount,
         description: description.trim(),
-        payment_method_id: payment_method_id ?? null,
+        payment_method: payment_method ?? null,
         created_by: authUser.id,
       })
       .select()
@@ -312,9 +311,8 @@ export async function createExpense(
 
 // =============================================================================
 // voidExpense
-// Marks an expense as voided by setting deleted_at = NOW().
+// Marks an expense as voided via is_voided flag.
 // Uses admin client to bypass the RLS WITH CHECK restriction.
-// Manually verifies authentication + authorization.
 // =============================================================================
 
 export async function voidExpense(id: string): Promise<ActionResult<undefined>> {
@@ -332,21 +330,21 @@ export async function voidExpense(id: string): Promise<ActionResult<undefined>> 
     // Verify the expense exists and is not already voided
     const { data: existing, error: fetchError } = await admin
       .from('cp_expenses')
-      .select('id, deleted_at')
+      .select('id, status')
       .eq('id', id)
       .maybeSingle()
 
     if (fetchError) return { success: false, error: fetchError.message }
     if (!existing) return { success: false, error: 'Expense not found' }
 
-    const existingRow = existing as unknown as { id: string; deleted_at: string | null }
-    if (existingRow.deleted_at !== null) {
+    const existingRow = existing as unknown as { id: string; status: string }
+    if (existingRow.status === 'void') {
       return { success: false, error: 'Expense is already voided' }
     }
 
     const { error: updateError } = await admin
       .from('cp_expenses')
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ status: 'void' as "active" | "void" })
       .eq('id', id)
 
     if (updateError) return { success: false, error: updateError.message }
@@ -384,57 +382,57 @@ export async function getExpensesByDepartment(
 
     const { data, error } = await supabase
       .from('cp_expenses')
-      .select(
-        '*, cp_departments(name), cp_expense_heads(name), cp_payment_methods(name)'
-      )
+      .select('*, cp_expense_heads!head_id(name)')
       .gte('expense_date', startDate)
       .lte('expense_date', endDate)
-      .is('deleted_at', null)
       .order('expense_date', { ascending: false })
 
     if (error) return { success: false, error: error.message }
 
     type RawRow = (typeof data)[number]
 
-    const enriched: ExpenseWithRelations[] = (data ?? []).map((row: RawRow) => ({
-      ...(row as unknown as CpExpense),
-      department_name:
-        (row as unknown as { cp_departments: { name: string } | null })
-          .cp_departments?.name ?? null,
-      expense_head_name:
-        (row as unknown as { cp_expense_heads: { name: string } | null })
-          .cp_expense_heads?.name ?? null,
-      payment_method_name:
-        (row as unknown as { cp_payment_methods: { name: string } | null })
-          .cp_payment_methods?.name ?? null,
-      is_voided: false,
-    }))
+    const enriched: ExpenseWithRelations[] = (data ?? []).map((row: RawRow) => {
+      const r = row as unknown as {
+        department: string | null
+        payment_method: string | null
+        amount_paisas: number
+        is_voided: boolean
+        cp_expense_heads: { name: string } | null
+      }
+      return {
+        ...(row as unknown as CpExpense),
+        department_name: r.department ?? null,
+        expense_head_name: r.cp_expense_heads?.name ?? null,
+        payment_method_name: r.payment_method ?? null,
+        is_voided: r.is_voided ?? false,
+      }
+    })
 
-    // Group by department
+    // Group by department enum value
     const groupMap = new Map<string | null, DeptExpenseGroup>()
 
     for (const expense of enriched) {
-      const key = expense.department_id ?? null
-      const deptName = expense.department_name ?? 'General / Admin'
+      const dept = (expense as unknown as { department: string | null }).department ?? null
+      const deptName = dept ?? 'General / Admin'
 
-      if (!groupMap.has(key)) {
-        groupMap.set(key, {
-          department_id: key,
+      if (!groupMap.has(dept)) {
+        groupMap.set(dept, {
+          department: dept,
           department_name: deptName,
           total: 0,
           expenses: [],
         })
       }
 
-      const group = groupMap.get(key)!
-      group.total += expense.amount
+      const group = groupMap.get(dept)!
+      group.total += (expense as unknown as { amount_paisas: number }).amount_paisas ?? 0
       group.expenses.push(expense)
     }
 
     // Sort groups: named depts first, General last
     const groups = Array.from(groupMap.values()).sort((a, b) => {
-      if (a.department_id === null) return 1
-      if (b.department_id === null) return -1
+      if (a.department === null) return 1
+      if (b.department === null) return -1
       return a.department_name.localeCompare(b.department_name)
     })
 
@@ -450,7 +448,7 @@ export async function getExpensesByDepartment(
 // =============================================================================
 // getCrossDeptSplit
 // Divides total expenses by the configured divisor to get per-department share.
-// Setting key: cp_settings (setting_group = 'expense', key = 'divisor')
+// Setting key: cp_settings (setting_key = 'expense.divisor')
 // Default divisor: 4
 // =============================================================================
 
@@ -471,12 +469,9 @@ export async function getCrossDeptSplit(
     const [expensesResult, divisor] = await Promise.all([
       supabase
         .from('cp_expenses')
-        .select(
-          '*, cp_departments(name), cp_expense_heads(name), cp_payment_methods(name)'
-        )
+        .select('*, cp_expense_heads!head_id(name)')
         .gte('expense_date', startDate)
         .lte('expense_date', endDate)
-        .is('deleted_at', null)
         .order('expense_date', { ascending: false }),
       fetchExpenseDivisor(supabase),
     ])
@@ -487,46 +482,51 @@ export async function getCrossDeptSplit(
 
     type RawRow = (typeof expensesResult.data)[number]
     const enriched: ExpenseWithRelations[] = (expensesResult.data ?? []).map(
-      (row: RawRow) => ({
-        ...(row as unknown as CpExpense),
-        department_name:
-          (row as unknown as { cp_departments: { name: string } | null })
-            .cp_departments?.name ?? null,
-        expense_head_name:
-          (row as unknown as { cp_expense_heads: { name: string } | null })
-            .cp_expense_heads?.name ?? null,
-        payment_method_name:
-          (row as unknown as { cp_payment_methods: { name: string } | null })
-            .cp_payment_methods?.name ?? null,
-        is_voided: false,
-      })
+      (row: RawRow) => {
+        const r = row as unknown as {
+          department: string | null
+          payment_method: string | null
+          amount_paisas: number
+          is_voided: boolean
+          cp_expense_heads: { name: string } | null
+        }
+        return {
+          ...(row as unknown as CpExpense),
+          department_name: r.department ?? null,
+          expense_head_name: r.cp_expense_heads?.name ?? null,
+          payment_method_name: r.payment_method ?? null,
+          is_voided: r.is_voided ?? false,
+        }
+      }
     )
 
-    const totalExpenses = enriched.reduce((sum, e) => sum + e.amount, 0)
+    const totalExpenses = enriched.reduce(
+      (sum, e) => sum + ((e as unknown as { amount_paisas: number }).amount_paisas ?? 0),
+      0
+    )
     const perDeptShare = Math.floor(totalExpenses / divisor)
 
-    // Group by department for the breakdown card
     const groupMap = new Map<string | null, DeptExpenseGroup>()
     for (const expense of enriched) {
-      const key = expense.department_id ?? null
-      const deptName = expense.department_name ?? 'General / Admin'
+      const dept = (expense as unknown as { department: string | null }).department ?? null
+      const deptName = dept ?? 'General / Admin'
 
-      if (!groupMap.has(key)) {
-        groupMap.set(key, {
-          department_id: key,
+      if (!groupMap.has(dept)) {
+        groupMap.set(dept, {
+          department: dept,
           department_name: deptName,
           total: 0,
           expenses: [],
         })
       }
-      const group = groupMap.get(key)!
-      group.total += expense.amount
+      const group = groupMap.get(dept)!
+      group.total += (expense as unknown as { amount_paisas: number }).amount_paisas ?? 0
       group.expenses.push(expense)
     }
 
     const departmentGroups = Array.from(groupMap.values()).sort((a, b) => {
-      if (a.department_id === null) return 1
-      if (b.department_id === null) return -1
+      if (a.department === null) return 1
+      if (b.department === null) return -1
       return a.department_name.localeCompare(b.department_name)
     })
 
@@ -569,64 +569,57 @@ export async function getExpenseSummary(
 
     const { data, error } = await supabase
       .from('cp_expenses')
-      .select(
-        'amount, expense_head_id, department_id, cp_expense_heads(name), cp_departments(name), custom_head'
-      )
+      .select('amount_paisas, head_id, department, cp_expense_heads!head_id(name)')
       .gte('expense_date', startDate)
       .lte('expense_date', endDate)
-      .is('deleted_at', null)
 
     if (error) return { success: false, error: error.message }
 
     const rows = data ?? []
     let grandTotal = 0
 
-    // By category
     const categoryMap = new Map<string, ExpenseCategoryTotal>()
-    // By department
     const deptMap = new Map<string, ExpenseDeptTotal>()
 
     for (const row of rows) {
       const r = row as unknown as {
-        amount: number
-        expense_head_id: string | null
-        department_id: string | null
-        custom_head: string | null
+        amount_paisas: number
+        head_id: string | null
+        department: string | null
         cp_expense_heads: { name: string } | null
-        cp_departments: { name: string } | null
       }
 
-      grandTotal += r.amount
+      const amount = r.amount_paisas ?? 0
+      grandTotal += amount
 
       // Category grouping
-      const catKey = r.expense_head_id ?? `custom:${r.custom_head ?? 'uncategorised'}`
-      const catName =
-        r.cp_expense_heads?.name ?? r.custom_head ?? 'Uncategorised'
+      const catKey = r.head_id ?? 'uncategorised'
+      const catName = r.cp_expense_heads?.name ?? 'Uncategorised'
       if (!categoryMap.has(catKey)) {
         categoryMap.set(catKey, {
-          head_id: r.expense_head_id,
+          head_id: r.head_id,
           head_name: catName,
           total: 0,
           count: 0,
         })
       }
       const catEntry = categoryMap.get(catKey)!
-      catEntry.total += r.amount
+      catEntry.total += amount
       catEntry.count += 1
 
       // Department grouping
-      const deptKey = r.department_id ?? 'general'
-      const deptName = r.cp_departments?.name ?? 'General / Admin'
+      const deptKey = r.department ?? 'general'
+      const deptName = r.department ?? 'General / Admin'
       if (!deptMap.has(deptKey)) {
         deptMap.set(deptKey, {
-          department_id: r.department_id,
+          department: r.department,
           department_name: deptName,
           total: 0,
           count: 0,
         })
       }
       const deptEntry = deptMap.get(deptKey)!
-      deptEntry.total += r.amount
+      deptEntry.total += amount
       deptEntry.count += 1
     }
 

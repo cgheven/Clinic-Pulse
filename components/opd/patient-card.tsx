@@ -28,19 +28,19 @@ export function PatientCard({ patient, className }: PatientCardProps) {
     >
       {/* Avatar */}
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
-        {getInitials(patient.full_name)}
+        {getInitials(patient.name)}
       </div>
 
       {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-            {patient.full_name}
+            {patient.name}
           </p>
           <span
             className={cn(
               'text-[10px] font-medium capitalize',
-              genderColor[patient.gender] ?? 'text-muted-foreground'
+              genderColor[patient.gender ?? ''] ?? 'text-muted-foreground'
             )}
           >
             {patient.gender}

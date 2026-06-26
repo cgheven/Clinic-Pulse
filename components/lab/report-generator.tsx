@@ -15,7 +15,6 @@ import {
 } from 'lucide-react'
 import { generateLabReport } from '@/app/actions/lab'
 import type { LabReportData } from '@/app/actions/lab'
-import type { LabTestLogWithRelations } from '@/types/index'
 
 // =============================================================================
 // Props
@@ -118,21 +117,19 @@ function ReportPreview({ data }: { data: LabReportData }) {
                   {data.entries.map((e) => (
                     <tr key={e.id} className="hover:bg-muted/10">
                       <td className="py-2.5 pl-4 pr-3 text-foreground">
-                        {e.test?.test_name ?? '—'}
+                        {e.test?.name ?? '—'}
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground">
-                        {e.patient?.full_name ?? 'Walk-in'}
+                        {e.patient?.name ?? 'Walk-in'}
                       </td>
                       <td className="px-3 py-2.5 text-muted-foreground">
-                        {e.result_value
-                          ? `${e.result_value}${e.result_unit ? ' ' + e.result_unit : ''}`
-                          : '—'}
+                        {e.result ?? '—'}
                       </td>
                       <td className="px-3 py-2.5 text-right font-medium text-foreground">
-                        {formatCurrencyPaisas(e.total_amount)}
+                        {formatCurrencyPaisas(e.price_paisas)}
                       </td>
-                      <td className="py-2.5 pl-3 pr-4 capitalize text-muted-foreground">
-                        {e.payment_method?.name ?? '—'}
+                      <td className="py-2.5 pl-3 pr-4 text-muted-foreground">
+                        {({ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' } as Record<string, string>)[e.payment_method ?? ''] ?? e.payment_method ?? '—'}
                       </td>
                     </tr>
                   ))}
@@ -177,13 +174,11 @@ async function downloadPDF(data: LabReportData) {
 
   // ─── Table ─────────────────────────────────────────────────────────────────
   const rows = data.entries.map((e) => [
-    e.test?.test_name ?? '—',
-    e.patient?.full_name ?? 'Walk-in',
-    e.result_value
-      ? `${e.result_value}${e.result_unit ? ' ' + e.result_unit : ''}`
-      : '—',
-    `Rs. ${(e.total_amount / 100).toFixed(2)}`,
-    e.payment_method?.name ?? '—',
+    e.test?.name ?? '—',
+    e.patient?.name ?? 'Walk-in',
+    e.result ?? '—',
+    `Rs. ${(e.price_paisas / 100).toFixed(2)}`,
+    ({ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' } as Record<string, string>)[e.payment_method ?? ''] ?? e.payment_method ?? '—',
   ])
 
   autoTable(doc, {

@@ -114,8 +114,8 @@ async function OpdDashboardContent() {
                     <p className="truncate text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                       Dr. {ds.doctor_name}
                     </p>
-                    {ds.specialty && (
-                      <p className="text-[11px] text-muted-foreground">{ds.specialty}</p>
+                    {ds.specialization && (
+                      <p className="text-[11px] text-muted-foreground">{ds.specialization}</p>
                     )}
                   </div>
 

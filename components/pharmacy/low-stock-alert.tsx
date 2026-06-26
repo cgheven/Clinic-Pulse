@@ -137,7 +137,7 @@ function StockItemRow({ item }: { item: LowStockItem }) {
             )}
           />
           <p className="truncate text-sm font-medium text-foreground">
-            {item.medicine_name}
+            {item.name}
           </p>
           {item.generic_name && (
             <span className="hidden truncate text-xs text-muted-foreground sm:block">
@@ -145,11 +145,6 @@ function StockItemRow({ item }: { item: LowStockItem }) {
             </span>
           )}
         </div>
-        {item.location && (
-          <p className="mt-0.5 pl-4 text-[11px] text-muted-foreground">
-            Location: {item.location}
-          </p>
-        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-3 text-xs">
@@ -160,10 +155,10 @@ function StockItemRow({ item }: { item: LowStockItem }) {
               isCritical ? 'text-red-400' : 'text-amber-400'
             )}
           >
-            {item.quantity} {item.unit}
+            {item.stock_qty} {item.unit}
           </p>
           <p className="text-muted-foreground">
-            Min: {item.low_stock_threshold}
+            Min: {item.reorder_level}
           </p>
         </div>
 

@@ -135,26 +135,19 @@ export function DailySummary({ data, showAddLink = false }: DailySummaryProps) {
               <div key={entry.id} className="flex items-start justify-between gap-4 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">
-                    {entry.description ?? 'X-Ray Service'}
+                    {entry.notes ?? 'X-Ray Service'}
                   </p>
                   <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    {entry.payment_method_name && (
+                    {entry.payment_method && (
                       <span className="text-[11px] text-muted-foreground">
-                        {entry.payment_method_name}
+                        {{ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' }[entry.payment_method ?? ''] ?? entry.payment_method ?? '—'}
                       </span>
                     )}
-                    {entry.patient_count > 0 && (
-                      <span className="text-[11px] text-muted-foreground">
-                        {entry.patient_count}{' '}
-                        {entry.patient_count === 1 ? 'patient' : 'patients'}
-                      </span>
-                    )}
-                    <PaymentStatusBadge status={entry.payment_status} />
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-bold text-foreground">
-                    {formatCurrencyPaisas(entry.gross_amount)}
+                    {formatCurrencyPaisas(entry.amount_paisas)}
                   </p>
                   {entry.notes && (
                     <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-muted-foreground">

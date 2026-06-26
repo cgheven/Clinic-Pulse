@@ -6,7 +6,6 @@ import { Loader2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -16,9 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
-import { updateMedicine } from '@/app/actions/pharmacy'
+import { updateInventoryItem } from '@/app/actions/pharmacy'
 import type { CpPharmacyInventory } from '@/types/index'
 
 const UNIT_OPTIONS = [
@@ -37,19 +35,12 @@ export function MedicineEditForm({ medicine }: MedicineEditFormProps) {
   const [isEditing, setIsEditing] = useState(false)
 
   const [form, setForm] = useState({
-    medicine_name: medicine.medicine_name,
+    name: medicine.name,
     generic_name: medicine.generic_name ?? '',
-    manufacturer: medicine.manufacturer ?? '',
-    batch_no: medicine.batch_no ?? '',
-    barcode: medicine.barcode ?? '',
     unit: medicine.unit,
-    pack_size: String(medicine.pack_size),
-    cost_price_per_unit: (medicine.cost_price_per_unit / 100).toFixed(2),
-    selling_price_per_unit: (medicine.selling_price_per_unit / 100).toFixed(2),
-    low_stock_threshold: String(medicine.low_stock_threshold),
+    sale_price_paisas: (medicine.sale_price_paisas / 100).toFixed(2),
+    reorder_level: String(medicine.reorder_level),
     expiry_date: medicine.expiry_date ?? '',
-    location: medicine.location ?? '',
-    notes: medicine.notes ?? '',
     is_active: medicine.is_active,
   })
 
@@ -59,20 +50,13 @@ export function MedicineEditForm({ medicine }: MedicineEditFormProps) {
 
   function handleSave() {
     startTransition(async () => {
-      const result = await updateMedicine(medicine.id, {
-        medicine_name: form.medicine_name.trim(),
+      const result = await updateInventoryItem(medicine.id, {
+        name: form.name.trim(),
         generic_name: form.generic_name.trim() || null,
-        manufacturer: form.manufacturer.trim() || null,
-        batch_no: form.batch_no.trim() || null,
-        barcode: form.barcode.trim() || null,
         unit: form.unit,
-        pack_size: parseInt(form.pack_size) || 1,
-        cost_price_per_unit: Math.round(parseFloat(form.cost_price_per_unit || '0') * 100),
-        selling_price_per_unit: Math.round(parseFloat(form.selling_price_per_unit || '0') * 100),
-        low_stock_threshold: parseInt(form.low_stock_threshold) || 10,
+        sale_price_paisas: Math.round(parseFloat(form.sale_price_paisas || '0') * 100),
+        reorder_level: parseInt(form.reorder_level) || 0,
         expiry_date: form.expiry_date || null,
-        location: form.location.trim() || null,
-        notes: form.notes.trim() || null,
         is_active: form.is_active,
       })
 
@@ -107,12 +91,12 @@ export function MedicineEditForm({ medicine }: MedicineEditFormProps) {
           <Label className="text-xs">Medicine Name</Label>
           {isEditing ? (
             <Input
-              value={form.medicine_name}
-              onChange={(e) => set('medicine_name', e.target.value)}
+              value={form.name}
+              onChange={(e) => set('name', e.target.value)}
               disabled={isPending}
             />
           ) : (
-            <p className="text-sm text-foreground">{form.medicine_name}</p>
+            <p className="text-sm text-foreground">{form.name}</p>
           )}
         </div>
 
@@ -131,107 +115,48 @@ export function MedicineEditForm({ medicine }: MedicineEditFormProps) {
           )}
         </div>
 
-        {/* Manufacturer */}
+        {/* Unit */}
         <div className="space-y-1.5">
-          <Label className="text-xs">Manufacturer</Label>
+          <Label className="text-xs">Unit</Label>
           {isEditing ? (
-            <Input
-              value={form.manufacturer}
-              onChange={(e) => set('manufacturer', e.target.value)}
-              disabled={isPending}
-              placeholder="Optional"
-            />
+            <Select value={form.unit} onValueChange={(v) => set('unit', v)} disabled={isPending}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {UNIT_OPTIONS.map((u) => (
+                  <SelectItem key={u} value={u} className="capitalize text-xs">
+                    {u}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
-            <p className="text-sm text-foreground">{form.manufacturer || '—'}</p>
+            <p className="text-sm capitalize text-foreground">{form.unit}</p>
           )}
         </div>
 
-        <Separator className="bg-border" />
-
-        {/* Unit */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Unit</Label>
-            {isEditing ? (
-              <Select value={form.unit} onValueChange={(v) => set('unit', v)} disabled={isPending}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNIT_OPTIONS.map((u) => (
-                    <SelectItem key={u} value={u} className="capitalize text-xs">
-                      {u}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-sm capitalize text-foreground">{form.unit}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Pack Size</Label>
-            {isEditing ? (
+        {/* Sale Price */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Sale Price</Label>
+          {isEditing ? (
+            <div className="relative">
+              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                Rs.
+              </span>
               <Input
                 type="number"
-                min="1"
-                value={form.pack_size}
-                onChange={(e) => set('pack_size', e.target.value)}
+                min="0"
+                step="0.01"
+                value={form.sale_price_paisas}
+                onChange={(e) => set('sale_price_paisas', e.target.value)}
                 disabled={isPending}
-                className="h-8 text-xs"
+                className="h-8 pl-8 text-xs"
               />
-            ) : (
-              <p className="text-sm text-foreground">{form.pack_size}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Pricing */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Cost Price</Label>
-            {isEditing ? (
-              <div className="relative">
-                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  Rs.
-                </span>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.cost_price_per_unit}
-                  onChange={(e) => set('cost_price_per_unit', e.target.value)}
-                  disabled={isPending}
-                  className="h-8 pl-8 text-xs"
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-foreground">Rs. {form.cost_price_per_unit}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Selling Price</Label>
-            {isEditing ? (
-              <div className="relative">
-                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  Rs.
-                </span>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.selling_price_per_unit}
-                  onChange={(e) => set('selling_price_per_unit', e.target.value)}
-                  disabled={isPending}
-                  className="h-8 pl-8 text-xs"
-                />
-              </div>
-            ) : (
-              <p className="text-sm font-medium text-foreground">Rs. {form.selling_price_per_unit}</p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <p className="text-sm font-medium text-foreground">Rs. {form.sale_price_paisas}</p>
+          )}
         </div>
 
         {/* Reorder Level */}
@@ -241,13 +166,13 @@ export function MedicineEditForm({ medicine }: MedicineEditFormProps) {
             <Input
               type="number"
               min="0"
-              value={form.low_stock_threshold}
-              onChange={(e) => set('low_stock_threshold', e.target.value)}
+              value={form.reorder_level}
+              onChange={(e) => set('reorder_level', e.target.value)}
               disabled={isPending}
               className="h-8 text-xs"
             />
           ) : (
-            <p className="text-sm text-foreground">{form.low_stock_threshold} {form.unit}</p>
+            <p className="text-sm text-foreground">{form.reorder_level} {form.unit}</p>
           )}
         </div>
 
@@ -274,36 +199,6 @@ export function MedicineEditForm({ medicine }: MedicineEditFormProps) {
             </p>
           )}
         </div>
-
-        {/* Location */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">Location</Label>
-          {isEditing ? (
-            <Input
-              value={form.location}
-              onChange={(e) => set('location', e.target.value)}
-              disabled={isPending}
-              placeholder="e.g. Rack A, Shelf 2"
-              className="h-8 text-xs"
-            />
-          ) : (
-            <p className="text-sm text-foreground">{form.location || '—'}</p>
-          )}
-        </div>
-
-        {/* Notes */}
-        {isEditing && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Notes</Label>
-            <Textarea
-              value={form.notes}
-              onChange={(e) => set('notes', e.target.value)}
-              disabled={isPending}
-              rows={2}
-              className="text-xs"
-            />
-          </div>
-        )}
 
         {/* Active toggle */}
         {isEditing && (

@@ -2,8 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
-import { getTodayPKT } from '@/lib/utils'
 import { format, addDays } from 'date-fns'
+
+function getTodayPKT(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
+}
 
 // =============================================================================
 // Return types
@@ -15,45 +18,40 @@ export type DeptRevenue = {
 }
 
 export type PaymentTotal = {
-  id: string
-  name: string
-  slug: string
-  icon_name: string | null
+  method: string
+  label: string
   total: number // paisas
 }
 
 export type RecentVisit = {
   id: string
   visit_date: string
-  visit_time: string
   patient_name: string
-  patient_no: string
   doctor_name: string | null
-  net_fee: number // paisas
-  payment_status: string
+  fee_paisas: number
 }
 
 export type LowStockItem = {
   id: string
-  medicine_name: string
-  quantity: number
-  low_stock_threshold: number
+  name: string
+  stock_qty: number
+  reorder_level: number
   unit: string
 }
 
 export type UpcomingService = {
   id: string
-  machine_name: string
-  model_no: string | null
-  next_maintenance_date: string
+  name: string
+  model: string | null
+  next_service: string
   days_until: number
 }
 
 export type DashboardStats = {
-  revenue: number          // total today — paisas
-  patients: number         // OPD patient visits today
-  pharmSales: number       // pharmacy sales today — paisas
-  labTests: number         // lab test logs today count
+  revenue: number
+  patients: number
+  pharmSales: number
+  labTests: number
   revenueByDept: DeptRevenue[]
   paymentTotals: PaymentTotal[]
   recentVisits: RecentVisit[]
@@ -72,128 +70,100 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
   const supabase = await createClient()
   const today = date ?? getTodayPKT()
 
-  // Run all queries in parallel
   const [
     visitsResult,
     pharmSalesResult,
     labLogsResult,
     xrayResult,
     paymentMethodsResult,
-    lowStockResult,
     machineryResult,
   ] = await Promise.all([
-    // OPD visits today
+    // OPD visits today — fee_paisas, payment_method (enum), no deleted_at on visits
     supabase
       .from('cp_patient_visits')
       .select(
-        'id, visit_date, visit_time, net_fee, payment_status, payment_method_id, ' +
-        'cp_patients!patient_id(full_name, patient_no), ' +
-        'cp_doctors!doctor_id(full_name)'
+        'id, visit_date, fee_paisas, payment_method,' +
+        'cp_patients!patient_id(name, patient_no),' +
+        'cp_doctors!doctor_id(name)'
       )
       .eq('visit_date', today)
-      .is('deleted_at', null)
-      .order('visit_time', { ascending: false }),
+      .order('created_at', { ascending: false }),
 
-    // Pharmacy sales today
+    // Pharmacy sales today — total_paisas, payment_method (enum)
     supabase
       .from('cp_pharmacy_sales')
-      .select('id, total_amount, payment_method_id, payment_status')
-      .eq('sale_date', today)
-      .is('deleted_at', null),
+      .select('id, total_paisas, payment_method')
+      .eq('sale_date', today),
 
-    // Lab test logs today
+    // Lab test logs today — price_paisas, payment_method (enum), test_date
     supabase
       .from('cp_lab_test_logs')
-      .select('id, total_amount, payment_method_id, payment_status')
-      .eq('log_date', today)
-      .is('deleted_at', null),
+      .select('id, price_paisas, payment_method')
+      .eq('test_date', today),
 
-    // X-Ray revenue today
+    // X-Ray revenue today — amount_paisas, payment_method (enum)
     supabase
       .from('cp_xray_revenue')
-      .select('id, gross_amount, payment_method_id, payment_status')
-      .eq('revenue_date', today)
-      .is('deleted_at', null),
+      .select('id, amount_paisas, payment_method')
+      .eq('revenue_date', today),
 
-    // Payment methods
+    // Payment methods for labels
     supabase
       .from('cp_payment_methods')
-      .select('id, name, slug, icon_name')
-      .eq('is_active', true)
+      .select('method, label')
+      .eq('is_enabled', true)
       .order('sort_order'),
-
-    // Low stock pharmacy items
-    supabase
-      .from('cp_pharmacy_inventory')
-      .select('id, medicine_name, quantity, low_stock_threshold, unit')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-      .filter('quantity', 'lte', 'low_stock_threshold'),
 
     // Lab machinery with upcoming service (next 30 days)
     supabase
       .from('cp_lab_machinery')
-      .select('id, machine_name, model_no, next_maintenance_date')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-      .not('next_maintenance_date', 'is', null)
-      .lte('next_maintenance_date', format(addDays(new Date(today), 30), 'yyyy-MM-dd'))
-      .order('next_maintenance_date', { ascending: true })
+      .select('id, name, model, next_service')
+      .not('next_service', 'is', null)
+      .lte('next_service', format(addDays(new Date(today), 30), 'yyyy-MM-dd'))
+      .order('next_service', { ascending: true })
       .limit(5),
   ])
 
   type VisitRow = {
     id: string
     visit_date: string
-    visit_time: string
-    net_fee: number
-    payment_status: string
-    payment_method_id: string | null
-    cp_patients: { full_name: string; patient_no: string } | null
-    cp_doctors: { full_name: string } | null
+    fee_paisas: number
+    payment_method: string
+    cp_patients: { name: string; patient_no: number } | null
+    cp_doctors: { name: string } | null
   }
 
-  const visits: VisitRow[] = (visitsResult.data as unknown as VisitRow[]) ?? []
-
+  const visits = (visitsResult.data as unknown as VisitRow[]) ?? []
   const pharmSales = pharmSalesResult.data ?? []
   const labLogs = labLogsResult.data ?? []
   const xrayRevenue = xrayResult.data ?? []
   const paymentMethods = paymentMethodsResult.data ?? []
   const machineryRaw = machineryResult.data ?? []
 
-  // ── Low stock: re-query correctly (Supabase can't compare two columns in .filter)
+  // Low stock — separate query (Supabase can't compare two columns inline)
   const { data: allInventory } = await supabase
     .from('cp_pharmacy_inventory')
-    .select('id, medicine_name, quantity, low_stock_threshold, unit')
+    .select('id, name, stock_qty, reorder_level, unit')
     .eq('is_active', true)
     .is('deleted_at', null)
-    .gt('low_stock_threshold', 0)
+    .gt('reorder_level', 0)
 
   const lowStockItems: LowStockItem[] = (allInventory ?? [])
-    .filter((item) => item.quantity <= item.low_stock_threshold)
+    .filter((item) => (item.stock_qty as number) <= (item.reorder_level as number))
     .slice(0, 8)
     .map((item) => ({
       id: item.id as string,
-      medicine_name: item.medicine_name as string,
-      quantity: item.quantity as number,
-      low_stock_threshold: item.low_stock_threshold as number,
+      name: item.name as string,
+      stock_qty: item.stock_qty as number,
+      reorder_level: item.reorder_level as number,
       unit: item.unit as string,
     }))
 
-  // ── Revenue sums
-  const opdRevenue = visits.reduce((s, v) => s + (v.net_fee ?? 0), 0)
-  const pharmRevenue = pharmSales.reduce(
-    (s: number, p: { total_amount: number }) => s + (p.total_amount ?? 0),
-    0
-  )
-  const labRevenue = labLogs.reduce(
-    (s: number, l: { total_amount: number }) => s + (l.total_amount ?? 0),
-    0
-  )
-  const xrayRev = xrayRevenue.reduce(
-    (s: number, x: { gross_amount: number }) => s + (x.gross_amount ?? 0),
-    0
-  )
+  // Revenue sums
+  const opdRevenue = visits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
+  const pharmRevenue = pharmSales.reduce((s, p: { total_paisas: number }) => s + (p.total_paisas ?? 0), 0)
+  const labRevenue = labLogs.reduce((s, l: { price_paisas: number }) => s + (l.price_paisas ?? 0), 0)
+  const xrayRev = xrayRevenue.reduce((s, x: { amount_paisas: number }) => s + (x.amount_paisas ?? 0), 0)
 
   const revenueByDept: DeptRevenue[] = [
     { dept: 'OPD', revenue: opdRevenue },
@@ -202,55 +172,46 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
     { dept: 'X-Ray', revenue: xrayRev },
   ]
 
-  // ── Payment method totals (across all depts)
+  // Payment totals — group by enum value
   const pmMap = new Map<string, number>()
-
-  const addPayments = (
-    rows: Array<{ payment_method_id: string | null; total_amount?: number; net_fee?: number; gross_amount?: number }>
-  ) => {
+  const addAmt = (rows: Array<{ payment_method: string; [k: string]: unknown }>, amtKey: string) => {
     for (const row of rows) {
-      if (!row.payment_method_id) continue
-      const amount = row.total_amount ?? row.net_fee ?? row.gross_amount ?? 0
-      pmMap.set(row.payment_method_id, (pmMap.get(row.payment_method_id) ?? 0) + amount)
+      if (!row.payment_method) continue
+      const amt = (row[amtKey] as number) ?? 0
+      pmMap.set(row.payment_method, (pmMap.get(row.payment_method) ?? 0) + amt)
     }
   }
-
-  addPayments(visits.map((v) => ({ payment_method_id: v.payment_method_id, net_fee: v.net_fee })))
-  addPayments(pharmSales as Array<{ payment_method_id: string | null; total_amount: number }>)
-  addPayments(labLogs as Array<{ payment_method_id: string | null; total_amount: number }>)
-  addPayments(xrayRevenue as Array<{ payment_method_id: string | null; gross_amount: number }>)
+  addAmt(visits as unknown as Array<{ payment_method: string; fee_paisas: number }>, 'fee_paisas')
+  addAmt(pharmSales as unknown as Array<{ payment_method: string; total_paisas: number }>, 'total_paisas')
+  addAmt(labLogs as unknown as Array<{ payment_method: string; price_paisas: number }>, 'price_paisas')
+  addAmt(xrayRevenue as unknown as Array<{ payment_method: string; amount_paisas: number }>, 'amount_paisas')
 
   const paymentTotals: PaymentTotal[] = paymentMethods.map((pm) => ({
-    id: pm.id as string,
-    name: pm.name as string,
-    slug: pm.slug as string,
-    icon_name: pm.icon_name as string | null,
-    total: pmMap.get(pm.id as string) ?? 0,
+    method: pm.method as string,
+    label: pm.label as string,
+    total: pmMap.get(pm.method as string) ?? 0,
   }))
 
-  // ── Recent visits (last 5)
+  // Recent visits (last 5)
   const recentVisits: RecentVisit[] = visits.slice(0, 5).map((v) => ({
     id: v.id,
     visit_date: v.visit_date,
-    visit_time: v.visit_time,
-    patient_name: v.cp_patients?.full_name ?? 'Unknown',
-    patient_no: v.cp_patients?.patient_no ?? '—',
-    doctor_name: v.cp_doctors?.full_name ?? null,
-    net_fee: v.net_fee,
-    payment_status: v.payment_status,
+    patient_name: v.cp_patients?.name ?? 'Unknown',
+    doctor_name: v.cp_doctors?.name ?? null,
+    fee_paisas: v.fee_paisas,
   }))
 
-  // ── Upcoming service
+  // Upcoming service
   const upcomingService: UpcomingService[] = machineryRaw.map((m) => {
-    const nextDate = m.next_maintenance_date as string
+    const nextDate = m.next_service as string
     const daysUntil = Math.ceil(
       (new Date(nextDate).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)
     )
     return {
       id: m.id as string,
-      machine_name: m.machine_name as string,
-      model_no: m.model_no as string | null,
-      next_maintenance_date: nextDate,
+      name: m.name as string,
+      model: m.model as string | null,
+      next_service: nextDate,
       days_until: daysUntil,
     }
   })

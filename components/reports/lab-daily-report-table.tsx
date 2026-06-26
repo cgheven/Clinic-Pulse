@@ -4,7 +4,7 @@ import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyPaisas } from '@/lib/utils'
-import { FlaskConical, TestTube, DollarSign, CreditCard } from 'lucide-react'
+import { FlaskConical, DollarSign, CreditCard } from 'lucide-react'
 import type { LabDailyReport } from '@/app/actions/reports'
 
 interface LabDailyReportTableProps {
@@ -48,21 +48,6 @@ export function LabDailyReportTable({ data }: LabDailyReportTableProps) {
               {formatCurrencyPaisas(data.total_revenue)}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">Before discounts</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Total Discounts</p>
-              <div className="rounded-lg p-1.5 bg-warning/10">
-                <TestTube className="h-3.5 w-3.5 text-warning" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">
-              {formatCurrencyPaisas(data.total_discount)}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Discounts applied</p>
           </CardContent>
         </Card>
 
@@ -162,7 +147,7 @@ export function LabDailyReportTable({ data }: LabDailyReportTableProps) {
                   <tr key={e.id} className="hover:bg-muted/10 transition-colors">
                     <td className="py-3 pl-4 pr-3">
                       <p className="font-medium text-foreground">
-                        {e.test?.test_name ?? '—'}
+                        {e.test?.name ?? '—'}
                       </p>
                       {e.test?.test_code && (
                         <p className="text-xs text-muted-foreground">{e.test.test_code}</p>
@@ -171,7 +156,7 @@ export function LabDailyReportTable({ data }: LabDailyReportTableProps) {
                     <td className="px-3 py-3">
                       {e.patient ? (
                         <>
-                          <p className="font-medium text-foreground">{e.patient.full_name}</p>
+                          <p className="font-medium text-foreground">{e.patient.name}</p>
                           <p className="text-xs text-muted-foreground">{e.patient.patient_no}</p>
                         </>
                       ) : (
@@ -179,43 +164,24 @@ export function LabDailyReportTable({ data }: LabDailyReportTableProps) {
                       )}
                     </td>
                     <td className="px-3 py-3">
-                      {e.result_value ? (
-                        <div>
-                          <p
-                            className={
-                              e.is_abnormal
-                                ? 'font-semibold text-destructive'
-                                : 'text-foreground'
-                            }
-                          >
-                            {e.result_value}
-                            {e.result_unit ? ` ${e.result_unit}` : ''}
-                          </p>
-                          {e.is_abnormal && (
-                            <p className="text-[10px] text-destructive">Abnormal</p>
-                          )}
-                        </div>
+                      {e.result ? (
+                        <span className="text-foreground">{e.result}</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-right">
                       <p className="font-medium text-foreground">
-                        {formatCurrencyPaisas(e.total_amount)}
+                        {formatCurrencyPaisas(e.price_paisas)}
                       </p>
-                      {e.discount_amount > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          -{formatCurrencyPaisas(e.discount_amount)} disc.
-                        </p>
-                      )}
                     </td>
                     <td className="px-3 py-3 text-muted-foreground">
-                      {e.payment_method?.name ?? '—'}
+                      {({ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' } as Record<string, string>)[e.payment_method ?? ''] ?? e.payment_method ?? '—'}
                     </td>
                     <td className="py-3 pl-3 pr-4">
                       <Badge
                         variant="secondary"
-                        className={`text-xs ${STATUS_STYLES[e.payment_status] ?? 'bg-secondary text-secondary-foreground'}`}
+                        className={`text-xs ${(STATUS_STYLES as Record<string, string>)[e.payment_status ?? ''] ?? 'bg-secondary text-secondary-foreground'}`}
                       >
                         {e.payment_status}
                       </Badge>

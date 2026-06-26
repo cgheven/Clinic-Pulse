@@ -37,13 +37,6 @@ const XRAY_SERVICE_TYPES = [
   'Other',
 ] as const
 
-const PAYMENT_STATUSES = [
-  { value: 'completed', label: 'Completed' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'refunded', label: 'Refunded' },
-] as const
-
 // =============================================================================
 // Form schema (client-side validation)
 // =============================================================================
@@ -65,8 +58,7 @@ const clientSchema = z.object({
       (v) => !isNaN(parseInt(v, 10)) && parseInt(v, 10) >= 1,
       'Must be at least 1'
     ),
-  payment_method_id: z.string().nullable().optional(),
-  payment_status: z.enum(['pending', 'completed', 'cancelled', 'refunded']),
+  payment_method: z.string().nullable().optional(),
   notes: z.string().optional(),
 })
 
@@ -76,8 +68,7 @@ type FormValues = {
   patient_name: string
   gross_amount_pkr: string
   patient_count: string
-  payment_method_id: string
-  payment_status: 'pending' | 'completed' | 'cancelled' | 'refunded'
+  payment_method: string
   notes: string
 }
 
@@ -109,8 +100,7 @@ export function RevenueForm({ paymentMethods, defaultDate, onSuccess }: RevenueF
     patient_name: '',
     gross_amount_pkr: '',
     patient_count: '1',
-    payment_method_id: '',
-    payment_status: 'completed',
+    payment_method: '',
     notes: '',
   })
 
@@ -148,9 +138,7 @@ export function RevenueForm({ paymentMethods, defaultDate, onSuccess }: RevenueF
         service_type: form.service_type,
         patient_name: form.patient_name || undefined,
         gross_amount_pkr: form.gross_amount_pkr,
-        patient_count: parseInt(form.patient_count, 10),
-        payment_method_id: form.payment_method_id || null,
-        payment_status: form.payment_status,
+        payment_method: form.payment_method || null,
         notes: form.notes || null,
       })
 
@@ -288,58 +276,29 @@ export function RevenueForm({ paymentMethods, defaultDate, onSuccess }: RevenueF
         </div>
       </div>
 
-      {/* Row: Payment Method + Payment Status */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="payment_method_id" className="text-xs text-muted-foreground">
-            Payment Method
-          </Label>
-          <Select
-            value={form.payment_method_id}
-            onValueChange={(v) => setField('payment_method_id', v)}
-            disabled={isPending}
-          >
-            <SelectTrigger id="payment_method_id">
-              <SelectValue placeholder="Select method…" />
-            </SelectTrigger>
-            <SelectContent>
-              {paymentMethods
-                .filter((m) => m.is_active)
-                .map((method) => (
-                  <SelectItem key={method.id} value={method.id}>
-                    {method.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="payment_status" className="text-xs text-muted-foreground">
-            Payment Status
-          </Label>
-          <Select
-            value={form.payment_status}
-            onValueChange={(v) =>
-              setField(
-                'payment_status',
-                v as 'pending' | 'completed' | 'cancelled' | 'refunded'
-              )
-            }
-            disabled={isPending}
-          >
-            <SelectTrigger id="payment_status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAYMENT_STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
+      {/* Payment Method */}
+      <div className="space-y-1.5">
+        <Label htmlFor="payment_method" className="text-xs text-muted-foreground">
+          Payment Method
+        </Label>
+        <Select
+          value={form.payment_method}
+          onValueChange={(v) => setField('payment_method', v)}
+          disabled={isPending}
+        >
+          <SelectTrigger id="payment_method">
+            <SelectValue placeholder="Select method…" />
+          </SelectTrigger>
+          <SelectContent>
+            {paymentMethods
+              .filter((m) => m.is_enabled)
+              .map((method) => (
+                <SelectItem key={method.method} value={method.method}>
+                  {method.label}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Notes */}

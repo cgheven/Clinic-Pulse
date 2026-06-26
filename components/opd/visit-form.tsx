@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, User, Stethoscope, Banknote, ChevronDown, Loader2, Plus } from 'lucide-react'
-import { cn, getTodayPKT } from '@/lib/utils'
+import { CalendarDays, User, Stethoscope, Banknote, Loader2, Plus } from 'lucide-react'
+import { getTodayPKT } from '@/lib/utils'
 import { recordVisit, getActivePaymentMethods, getActiveDoctors } from '@/app/actions/opd'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,13 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { CpDoctor, CpPaymentMethod, CpPatient } from '@/types/index'
+import type { CpDoctor, CpPatient } from '@/types/index'
 
 interface VisitFormProps {
   // Pre-selected patient (when navigating from patient detail page)
-  patient?: Pick<CpPatient, 'id' | 'full_name' | 'patient_no'>
+  patient?: Pick<CpPatient, 'id' | 'name' | 'patient_no'>
   // Available patients to select (when no pre-selected patient)
-  patients?: Pick<CpPatient, 'id' | 'full_name' | 'patient_no' | 'phone'>[]
+  patients?: Pick<CpPatient, 'id' | 'name' | 'patient_no' | 'phone'>[]
   onSuccess?: (visitId: string) => void
 }
 
@@ -32,35 +32,28 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
   const [error, setError] = useState<string | null>(null)
 
   const [doctors, setDoctors] = useState<CpDoctor[]>([])
-  const [paymentMethods, setPaymentMethods] = useState<CpPaymentMethod[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ method: string; label: string }>>([])
   const [loadingDeps, setLoadingDeps] = useState(true)
 
   // Form fields
   const [patientId, setPatientId] = useState(patient?.id ?? '')
   const [doctorId, setDoctorId] = useState('')
   const [visitDate, setVisitDate] = useState(getTodayPKT())
-  const [chiefComplaint, setChiefComplaint] = useState('')
   const [diagnosis, setDiagnosis] = useState('')
   const [prescription, setPrescription] = useState('')
   const [fee, setFee] = useState('')
-  const [discount, setDiscount] = useState('0')
-  const [paymentMethodId, setPaymentMethodId] = useState('')
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'completed'>('completed')
-  const [followUpDate, setFollowUpDate] = useState('')
-  const [isFollowUp, setIsFollowUp] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState('')
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
     async function loadDeps() {
       const [docRes, pmRes] = await Promise.all([getActiveDoctors(), getActivePaymentMethods()])
-      if (docRes.success) setDoctors(docRes.data)
+      if (docRes.success) setDoctors(docRes.data as unknown as CpDoctor[])
       if (pmRes.success) setPaymentMethods(pmRes.data)
       setLoadingDeps(false)
     }
     void loadDeps()
   }, [])
-
-  const netFee = Math.max(0, (parseInt(fee) || 0) * 100 - (parseInt(discount) || 0) * 100)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,28 +63,26 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
       setError('Please select a patient')
       return
     }
-    if (!fee || parseInt(fee) < 0) {
+    if (!fee || parseFloat(fee) < 0) {
       setError('Please enter a valid consultation fee')
       return
     }
+    if (!paymentMethod) {
+      setError('Please select a payment method')
+      return
+    }
 
-    const feeInPaisas = Math.round(parseFloat(fee) * 100)
-    const discountInPaisas = Math.round(parseFloat(discount || '0') * 100)
+    const feePaisas = Math.round(parseFloat(fee) * 100)
 
     startTransition(async () => {
       const result = await recordVisit({
         patient_id: patientId,
-        doctor_id: doctorId || null,
+        doctor_id: doctorId && doctorId !== 'none' ? doctorId : null,
         visit_date: visitDate,
-        chief_complaint: chiefComplaint || null,
+        fee_paisas: feePaisas,
+        payment_method: paymentMethod,
         diagnosis: diagnosis || null,
         prescription: prescription || null,
-        consultation_fee: feeInPaisas,
-        discount_amount: discountInPaisas,
-        payment_method_id: paymentMethodId || null,
-        payment_status: paymentStatus,
-        follow_up_date: followUpDate || null,
-        is_follow_up: isFollowUp,
         notes: notes || null,
       })
 
@@ -126,7 +117,7 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
 
         {patient ? (
           <div className="rounded-lg border border-border bg-background/50 p-3">
-            <p className="text-sm font-medium text-foreground">{patient.full_name}</p>
+            <p className="text-sm font-medium text-foreground">{patient.name}</p>
             <p className="text-xs text-muted-foreground">{patient.patient_no}</p>
           </div>
         ) : (
@@ -145,7 +136,7 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
                 <SelectContent>
                   {(patients ?? []).map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.full_name} — {p.patient_no}
+                      {p.name} — {p.patient_no}
                       {p.phone ? ` (${p.phone})` : ''}
                     </SelectItem>
                   ))}
@@ -179,8 +170,8 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
                   <SelectItem value="none">— No doctor —</SelectItem>
                   {doctors.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
-                      {d.full_name}
-                      {d.specialty ? ` (${d.specialty})` : ''}
+                      {d.name}
+                      {d.specialization ? ` (${d.specialization})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -203,49 +194,12 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
             </div>
           </div>
         </div>
-
-        <div className="mt-4 flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="is_follow_up"
-            checked={isFollowUp}
-            onChange={(e) => setIsFollowUp(e.target.checked)}
-            className="h-4 w-4 rounded border-border accent-primary"
-          />
-          <Label htmlFor="is_follow_up" className="cursor-pointer text-sm font-normal">
-            This is a follow-up visit
-          </Label>
-        </div>
-
-        {isFollowUp && (
-          <div className="mt-3 space-y-1.5">
-            <Label htmlFor="follow_up_date">Follow-up Date</Label>
-            <Input
-              id="follow_up_date"
-              type="date"
-              value={followUpDate}
-              onChange={(e) => setFollowUpDate(e.target.value)}
-              min={visitDate}
-            />
-          </div>
-        )}
       </div>
 
       {/* Clinical Notes */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="mb-4 text-sm font-semibold text-foreground">Clinical Notes</h3>
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="chief_complaint">Chief Complaint</Label>
-            <Textarea
-              id="chief_complaint"
-              value={chiefComplaint}
-              onChange={(e) => setChiefComplaint(e.target.value)}
-              placeholder="Patient's primary complaint..."
-              rows={2}
-            />
-          </div>
-
           <div className="space-y-1.5">
             <Label htmlFor="diagnosis">Diagnosis</Label>
             <Textarea
@@ -288,7 +242,7 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
           Payment
         </h3>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="fee">Consultation Fee (PKR) *</Label>
             <Input
@@ -304,63 +258,25 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="discount">Discount (PKR)</Label>
-            <Input
-              id="discount"
-              type="number"
-              min="0"
-              step="1"
-              value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
-              placeholder="0"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Net Fee</Label>
-            <div className="flex h-10 items-center rounded-lg border border-border bg-background/50 px-3 text-sm font-semibold text-primary">
-              Rs. {(netFee / 100).toFixed(0)}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="payment_method">Payment Method</Label>
+            <Label htmlFor="payment_method">Payment Method *</Label>
             {loadingDeps ? (
               <div className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             ) : (
-              <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger id="payment_method">
                   <SelectValue placeholder="Select method..." />
                 </SelectTrigger>
                 <SelectContent>
                   {paymentMethods.map((pm) => (
-                    <SelectItem key={pm.id} value={pm.id}>
-                      {pm.name}
+                    <SelectItem key={pm.method} value={pm.method}>
+                      {pm.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="payment_status">Payment Status</Label>
-            <Select
-              value={paymentStatus}
-              onValueChange={(v) => setPaymentStatus(v as 'pending' | 'completed')}
-            >
-              <SelectTrigger id="payment_status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </div>

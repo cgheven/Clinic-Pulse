@@ -12,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LowStockAlert } from '@/components/pharmacy/low-stock-alert'
-import { RevenueSplitDisplay } from '@/components/pharmacy/revenue-split-display'
 import { getDailySales, getLowStockItems } from '@/app/actions/pharmacy'
 
 // =============================================================================
@@ -97,7 +96,7 @@ export default async function PharmacyDashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">
-              {formatPKR(salesData?.total_amount ?? 0)}
+              {formatPKR(salesData?.total_paisas ?? 0)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {salesData?.sale_count ?? 0} transaction
@@ -137,22 +136,23 @@ export default async function PharmacyDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Revenue Split Preview */}
+        {/* Avg per sale */}
         <Card className="border-border bg-card sm:col-span-2 lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Today&apos;s Revenue Split
+              Avg per Sale
             </CardTitle>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
               <TrendingUp className="h-4 w-4 text-blue-400" />
             </div>
           </CardHeader>
           <CardContent>
-            {salesData ? (
-              <RevenueSplitDisplay split={salesData.revenue_split} compact />
-            ) : (
-              <p className="text-sm text-muted-foreground">No sales today</p>
-            )}
+            <p className="text-2xl font-bold text-foreground">
+              {salesData && salesData.sale_count > 0
+                ? formatPKR(Math.round(salesData.total_paisas / salesData.sale_count))
+                : formatPKR(0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">per transaction today</p>
           </CardContent>
         </Card>
       </div>
@@ -191,19 +191,21 @@ export default async function PharmacyDashboardPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">
-                        {sale.inventory_item?.medicine_name ?? 'Unknown'}
+                        {sale.items.length === 1
+                          ? (sale.items[0]?.inventory?.name ?? 'Unknown')
+                          : `${sale.items.length} items`}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Qty: {sale.quantity_sold} {sale.inventory_item?.unit}
-                        {sale.patient && ` · ${sale.patient.full_name}`}
+                        {sale.items.reduce((s, i) => s + i.qty, 0)} unit(s)
+                        {sale.patient && ` · ${sale.patient.name}`}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-semibold text-foreground">
-                        {formatPKR(sale.total_amount)}
+                        {formatPKR(sale.total_paisas)}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {sale.payment_method?.name ?? 'Cash'}
+                      <p className="text-xs capitalize text-muted-foreground">
+                        {sale.payment_method ?? 'cash'}
                       </p>
                     </div>
                   </div>

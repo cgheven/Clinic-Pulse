@@ -205,7 +205,7 @@ export function TestLogTable({ result, date, showAddButton = true }: TestLogTabl
                       <td className="py-3 pl-4 pr-3">
                         <div>
                           <p className="font-medium text-foreground">
-                            {entry.test?.test_name ?? '—'}
+                            {entry.test?.name ?? '—'}
                           </p>
                           {entry.test?.category && (
                             <p className="text-[10px] text-muted-foreground">
@@ -220,7 +220,7 @@ export function TestLogTable({ result, date, showAddButton = true }: TestLogTabl
                         {entry.patient ? (
                           <div>
                             <p className="text-sm text-foreground">
-                              {entry.patient.full_name}
+                              {entry.patient.name}
                             </p>
                             <p className="text-[10px] text-muted-foreground">
                               {entry.patient.patient_no}
@@ -233,27 +233,10 @@ export function TestLogTable({ result, date, showAddButton = true }: TestLogTabl
 
                       {/* Result */}
                       <td className="px-3 py-3">
-                        {entry.result_value ? (
-                          <div className="flex items-center gap-1">
-                            <span
-                              className={cn(
-                                'text-sm font-medium',
-                                entry.is_abnormal
-                                  ? 'text-destructive'
-                                  : 'text-foreground'
-                              )}
-                            >
-                              {entry.result_value}
-                              {entry.result_unit && (
-                                <span className="ml-0.5 text-[10px] text-muted-foreground">
-                                  {entry.result_unit}
-                                </span>
-                              )}
-                            </span>
-                            {entry.is_abnormal && (
-                              <AlertCircle className="h-3 w-3 text-destructive" />
-                            )}
-                          </div>
+                        {entry.result ? (
+                          <span className="text-sm font-medium text-foreground">
+                            {entry.result}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">Pending</span>
                         )}
@@ -262,25 +245,20 @@ export function TestLogTable({ result, date, showAddButton = true }: TestLogTabl
                       {/* Amount */}
                       <td className="px-3 py-3 text-right">
                         <span className="font-medium text-foreground">
-                          {formatCurrencyPaisas(entry.total_amount)}
+                          {formatCurrencyPaisas(entry.price_paisas)}
                         </span>
-                        {entry.discount_amount > 0 && (
-                          <p className="text-[10px] text-muted-foreground">
-                            -{formatCurrencyPaisas(entry.discount_amount)} disc.
-                          </p>
-                        )}
                       </td>
 
                       {/* Payment method */}
                       <td className="px-3 py-3">
-                        <span className="text-sm capitalize text-foreground">
-                          {entry.payment_method?.name ?? '—'}
+                        <span className="text-sm text-foreground">
+                          {({ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' } as Record<string, string>)[entry.payment_method ?? ''] ?? entry.payment_method ?? '—'}
                         </span>
                       </td>
 
                       {/* Status */}
                       <td className="py-3 pl-3 pr-4">
-                        <StatusBadge status={entry.payment_status} />
+                        <StatusBadge status={entry.payment_status ?? 'pending'} />
                       </td>
                     </tr>
                   ))}

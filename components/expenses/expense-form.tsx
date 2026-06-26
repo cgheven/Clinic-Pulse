@@ -27,7 +27,19 @@ import {
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import { createExpense } from '@/app/actions/expenses'
-import type { CpDepartment, CpExpenseHead, CpPaymentMethod } from '@/types/index'
+import type { CpExpenseHead, CpPaymentMethod } from '@/types/index'
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const DEPARTMENT_OPTIONS = [
+  { value: 'general', label: 'General / Admin' },
+  { value: 'opd', label: 'OPD' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'lab', label: 'Lab' },
+  { value: 'xray', label: 'X-Ray' },
+] as const
 
 // =============================================================================
 // Types
@@ -35,18 +47,18 @@ import type { CpDepartment, CpExpenseHead, CpPaymentMethod } from '@/types/index
 
 interface ExpenseFormState {
   expense_date: string
-  department_id: string
-  expense_head_id: string
-  custom_head: string
+  department: string
+  head_id: string
   amount_pkr: string
   description: string
-  payment_method_id: string
+  payment_method: string
 }
 
 type FormErrors = Partial<Record<keyof ExpenseFormState, string>>
 
 interface ExpenseFormProps {
-  departments: CpDepartment[]
+  /** Unused — kept for backward compat with existing callers that pass departments={[]} */
+  departments?: unknown[]
   expenseHeads: CpExpenseHead[]
   paymentMethods: CpPaymentMethod[]
   defaultDate: string
@@ -57,7 +69,6 @@ interface ExpenseFormProps {
 // =============================================================================
 
 export function ExpenseForm({
-  departments,
   expenseHeads,
   paymentMethods,
   defaultDate,
@@ -67,12 +78,11 @@ export function ExpenseForm({
 
   const [form, setForm] = useState<ExpenseFormState>({
     expense_date: defaultDate,
-    department_id: '',
-    expense_head_id: '',
-    custom_head: '',
+    department: '',
+    head_id: '',
     amount_pkr: '',
     description: '',
-    payment_method_id: '',
+    payment_method: '',
   })
 
   const [errors, setErrors] = useState<FormErrors>({})
@@ -99,9 +109,6 @@ export function ExpenseForm({
     if (!form.description.trim()) {
       errs.description = 'Description is required'
     }
-    if (!form.expense_head_id && !form.custom_head.trim()) {
-      errs.expense_head_id = 'Select a category or enter a custom one'
-    }
 
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -116,12 +123,11 @@ export function ExpenseForm({
     startTransition(async () => {
       const result = await createExpense({
         expense_date: form.expense_date,
-        department_id: form.department_id || null,
-        expense_head_id: form.expense_head_id || null,
-        custom_head: form.custom_head.trim() || null,
+        department: form.department || null,
+        head_id: form.head_id || null,
         amount_pkr: form.amount_pkr,
         description: form.description.trim(),
-        payment_method_id: form.payment_method_id || null,
+        payment_method: form.payment_method || null,
       })
 
       if (result.success) {
@@ -141,8 +147,6 @@ export function ExpenseForm({
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
-
-  const showCustomHead = !form.expense_head_id
 
   return (
     <Card className="border-border bg-card">
@@ -212,21 +216,19 @@ export function ExpenseForm({
               Department
             </Label>
             <Select
-              value={form.department_id}
-              onValueChange={(v) => setField('department_id', v)}
+              value={form.department}
+              onValueChange={(v) => setField('department', v)}
               disabled={isPending}
             >
               <SelectTrigger>
                 <SelectValue placeholder="General / Admin (no department)" />
               </SelectTrigger>
               <SelectContent>
-                {departments
-                  .filter((d) => d.is_active && !d.deleted_at)
-                  .map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
+                {DEPARTMENT_OPTIONS.map((dept) => (
+                  <SelectItem key={dept.value} value={dept.value}>
+                    {dept.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -235,15 +237,15 @@ export function ExpenseForm({
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Tag className="h-3.5 w-3.5" />
-              Category <span className="text-destructive">*</span>
+              Category
             </Label>
             <Select
-              value={form.expense_head_id}
-              onValueChange={(v) => setField('expense_head_id', v)}
+              value={form.head_id}
+              onValueChange={(v) => setField('head_id', v)}
               disabled={isPending}
             >
               <SelectTrigger
-                className={cn(errors.expense_head_id && 'border-destructive')}
+                className={cn(errors.head_id && 'border-destructive')}
               >
                 <SelectValue placeholder="Select category…" />
               </SelectTrigger>
@@ -257,28 +259,10 @@ export function ExpenseForm({
                   ))}
               </SelectContent>
             </Select>
-            {errors.expense_head_id && (
-              <p className="text-xs text-destructive">{errors.expense_head_id}</p>
+            {errors.head_id && (
+              <p className="text-xs text-destructive">{errors.head_id}</p>
             )}
           </div>
-
-          {/* Custom category — only shown when no standard category selected */}
-          {showCustomHead && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground">
-                Custom Category
-              </Label>
-              <Input
-                value={form.custom_head}
-                onChange={(e) => setField('custom_head', e.target.value)}
-                placeholder="e.g. Cleaning supplies"
-                disabled={isPending}
-              />
-              <p className="text-[11px] text-muted-foreground/70">
-                Use this when the standard categories don't apply.
-              </p>
-            </div>
-          )}
 
           {/* Row 4: Payment Method */}
           <div className="space-y-1.5">
@@ -287,8 +271,8 @@ export function ExpenseForm({
               Payment Method
             </Label>
             <Select
-              value={form.payment_method_id}
-              onValueChange={(v) => setField('payment_method_id', v)}
+              value={form.payment_method}
+              onValueChange={(v) => setField('payment_method', v)}
               disabled={isPending}
             >
               <SelectTrigger>
@@ -296,10 +280,10 @@ export function ExpenseForm({
               </SelectTrigger>
               <SelectContent>
                 {paymentMethods
-                  .filter((m) => m.is_active)
+                  .filter((m) => m.is_enabled)
                   .map((method) => (
-                    <SelectItem key={method.id} value={method.id}>
-                      {method.name}
+                    <SelectItem key={method.method} value={method.method}>
+                      {method.label}
                     </SelectItem>
                   ))}
               </SelectContent>

@@ -103,9 +103,8 @@ export default function LabCatalogPage() {
   // ─── Filtering ────────────────────────────────────────────────────────────
 
   const filtered = tests.filter((t) =>
-    t.test_name.toLowerCase().includes(search.toLowerCase()) ||
-    (t.category ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (t.test_code ?? '').toLowerCase().includes(search.toLowerCase())
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    (t.category ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   // Group by category
@@ -141,8 +140,7 @@ export default function LabCatalogPage() {
     setEditValues((prev) => ({
       ...prev,
       [t.id]: {
-        price: (t.price / 100).toFixed(2),
-        cost: (t.cost / 100).toFixed(2),
+        price: (t.price_paisas / 100).toFixed(2),
       },
     }))
     setTests((prev) => prev.map((r) => (r.id === t.id ? { ...r, isEditing: true } : r)))
@@ -161,7 +159,6 @@ export default function LabCatalogPage() {
     const vals = editValues[id]
     if (!vals) return
     const price = parseFloat(vals.price ?? '0')
-    const cost = parseFloat(vals.cost ?? '0')
     if (isNaN(price) || price < 0) {
       toast({ title: 'Invalid price', variant: 'destructive' })
       return
@@ -170,8 +167,7 @@ export default function LabCatalogPage() {
     setTests((prev) => prev.map((t) => (t.id === id ? { ...t, isSaving: true } : t)))
     startTransition(async () => {
       const res = await updateTest(id, {
-        price: Math.round(price * 100),
-        cost: Math.round((cost || 0) * 100),
+        price_paisas: Math.round(price * 100),
       })
       if (res.success) {
         setTests((prev) =>
@@ -179,8 +175,7 @@ export default function LabCatalogPage() {
             t.id === id
               ? {
                   ...t,
-                  price: Math.round(price * 100),
-                  cost: Math.round((cost || 0) * 100),
+                  price_paisas: Math.round(price * 100),
                   isEditing: false,
                   isSaving: false,
                 }
@@ -212,15 +207,9 @@ export default function LabCatalogPage() {
     setIsAdding(true)
     startTransition(async () => {
       const res = await createTest({
-        test_name: newForm.test_name.trim(),
-        test_code: newForm.test_code.trim() || undefined,
+        name: newForm.test_name.trim(),
         category: newForm.category.trim() || undefined,
-        price: Math.round(parseFloat(newForm.price) * 100),
-        cost: Math.round(parseFloat(newForm.cost || '0') * 100),
-        reference_range: newForm.reference_range.trim() || undefined,
-        unit: newForm.unit.trim() || undefined,
-        turnaround_time: newForm.turnaround_time.trim() || undefined,
-        notes: newForm.notes.trim() || undefined,
+        price_paisas: Math.round(parseFloat(newForm.price) * 100),
       })
       setIsAdding(false)
       if (res.success) {
@@ -228,7 +217,7 @@ export default function LabCatalogPage() {
           { ...res.data, isEditing: false, isSaving: false },
           ...prev,
         ])
-        toast({ title: 'Test added', description: `"${res.data.test_name}" added to catalog.` })
+        toast({ title: 'Test added', description: `"${res.data.name}" added to catalog.` })
         setShowAddDialog(false)
         setNewForm(DEFAULT_NEW)
       } else {
@@ -334,12 +323,7 @@ export default function LabCatalogPage() {
                           {/* Name */}
                           <td className="py-3 pl-4 pr-3">
                             <div>
-                              <p className="font-medium text-foreground">{t.test_name}</p>
-                              {t.turnaround_time && (
-                                <p className="text-[10px] text-muted-foreground">
-                                  TAT: {t.turnaround_time}
-                                </p>
-                              )}
+                              <p className="font-medium text-foreground">{t.name}</p>
                             </div>
                           </td>
 
@@ -380,7 +364,7 @@ export default function LabCatalogPage() {
                               />
                             ) : (
                               <span className="font-medium text-foreground">
-                                {formatCurrencyPaisas(t.price)}
+                                {formatCurrencyPaisas(t.price_paisas)}
                               </span>
                             )}
                           </td>
@@ -406,7 +390,7 @@ export default function LabCatalogPage() {
                               />
                             ) : (
                               <span className="text-muted-foreground">
-                                {formatCurrencyPaisas(t.cost)}
+                                {formatCurrencyPaisas(0)}
                               </span>
                             )}
                           </td>
@@ -417,7 +401,7 @@ export default function LabCatalogPage() {
                               checked={t.is_active}
                               onCheckedChange={(v) => handleToggleActive(t.id, v)}
                               disabled={t.isSaving || t.isEditing}
-                              aria-label={`Toggle ${t.test_name}`}
+                              aria-label={`Toggle ${t.name}`}
                             />
                           </td>
 

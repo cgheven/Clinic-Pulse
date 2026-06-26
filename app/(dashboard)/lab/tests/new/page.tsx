@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -24,26 +23,22 @@ import {
   getPaymentMethodsForLab,
   recordTest,
 } from '@/app/actions/lab'
-import type { CpLabTest, CpPaymentMethod } from '@/types/index'
+import type { CpLabTest } from '@/types/index'
 
 // =============================================================================
 // Form state
 // =============================================================================
 
 interface FormState {
-  log_date: string
+  test_date: string
   test_id: string
-  patient_no: string
-  quantity: string
-  unit_price: string // PKR
-  discount_amount: string // PKR
-  result_value: string
-  result_unit: string
-  is_abnormal: boolean
-  result_notes: string
-  payment_method_id: string
-  payment_status: 'pending' | 'completed' | 'cancelled' | 'refunded'
-  report_issued: boolean
+  patient_name: string
+  qty: string
+  unit_price: string // PKR display, converted to price_paisas on submit
+  result: string
+  notes: string
+  payment_method: string // PaymentMethodEnum value
+  payment_status: 'pending' | 'completed' | 'refunded'
 }
 
 type FormErrors = Partial<Record<keyof FormState, string>>
@@ -53,19 +48,15 @@ function todayISO(): string {
 }
 
 const DEFAULT_FORM: FormState = {
-  log_date: todayISO(),
+  test_date: todayISO(),
   test_id: '',
-  patient_no: '',
-  quantity: '1',
+  patient_name: '',
+  qty: '1',
   unit_price: '',
-  discount_amount: '0',
-  result_value: '',
-  result_unit: '',
-  is_abnormal: false,
-  result_notes: '',
-  payment_method_id: '',
+  result: '',
+  notes: '',
+  payment_method: '',
   payment_status: 'completed',
-  report_issued: false,
 }
 
 // =============================================================================
@@ -77,7 +68,7 @@ export default function NewTestPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [errors, setErrors] = useState<FormErrors>({})
   const [tests, setTests] = useState<CpLabTest[]>([])
-  const [paymentMethods, setPaymentMethods] = useState<CpPaymentMethod[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ method: string; label: string }>>([])
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [, startTransition] = useTransition()
@@ -90,7 +81,7 @@ export default function NewTestPage() {
         getPaymentMethodsForLab(),
       ])
       if (testsRes.success) setTests(testsRes.data)
-      if (pmRes.success) setPaymentMethods(pmRes.data as CpPaymentMethod[])
+      if (pmRes.success) setPaymentMethods(pmRes.data)
       setIsLoadingData(false)
     }
     void loadData()
@@ -102,8 +93,7 @@ export default function NewTestPage() {
     setForm((prev) => ({
       ...prev,
       test_id: testId,
-      unit_price: test ? (test.price / 100).toFixed(2) : '',
-      result_unit: test?.unit ?? '',
+      unit_price: test ? (test.price_paisas / 100).toFixed(2) : '',
     }))
     setErrors((prev) => ({ ...prev, test_id: undefined, unit_price: undefined }))
   }
@@ -116,10 +106,10 @@ export default function NewTestPage() {
   function validate(): boolean {
     const newErrors: FormErrors = {}
 
-    if (!form.log_date) newErrors.log_date = 'Date is required'
+    if (!form.test_date) newErrors.test_date = 'Date is required'
     if (!form.test_id) newErrors.test_id = 'Select a test'
-    if (!form.quantity || parseInt(form.quantity) < 1) {
-      newErrors.quantity = 'Quantity must be at least 1'
+    if (!form.qty || parseInt(form.qty) < 1) {
+      newErrors.qty = 'Quantity must be at least 1'
     }
     if (form.unit_price === '' || isNaN(parseFloat(form.unit_price))) {
       newErrors.unit_price = 'Enter a valid price'
@@ -135,25 +125,25 @@ export default function NewTestPage() {
   function handleSubmit() {
     if (!validate()) return
 
-    const unitPricePaisas = Math.round(parseFloat(form.unit_price) * 100)
-    const discountPaisas = Math.round(parseFloat(form.discount_amount || '0') * 100)
+    const pricePaisas = Math.round(parseFloat(form.unit_price) * 100)
 
     setIsSubmitting(true)
     startTransition(async () => {
       const result = await recordTest({
-        log_date: form.log_date,
+        test_date: form.test_date,
         test_id: form.test_id,
-        patient_no: form.patient_no || undefined,
-        quantity: parseInt(form.quantity),
-        unit_price: unitPricePaisas,
-        discount_amount: discountPaisas,
-        result_value: form.result_value || undefined,
-        result_unit: form.result_unit || undefined,
-        is_abnormal: form.is_abnormal,
-        result_notes: form.result_notes || undefined,
-        payment_method_id: form.payment_method_id || undefined,
+        patient_name: form.patient_name || undefined,
+        qty: parseInt(form.qty),
+        price_paisas: pricePaisas,
+        result: form.result || undefined,
+        notes: form.notes || undefined,
+        payment_method: (form.payment_method || undefined) as
+          | 'cash'
+          | 'jazzcash'
+          | 'easypaisa'
+          | 'bank_transfer'
+          | undefined,
         payment_status: form.payment_status,
-        report_issued: form.report_issued,
       })
 
       setIsSubmitting(false)
@@ -175,9 +165,7 @@ export default function NewTestPage() {
   }
 
   const selectedTest = tests.find((t) => t.id === form.test_id)
-  const totalAmount =
-    (parseFloat(form.quantity || '0') * parseFloat(form.unit_price || '0')) -
-    parseFloat(form.discount_amount || '0')
+  const totalAmount = parseFloat(form.qty || '0') * parseFloat(form.unit_price || '0')
 
   // Group tests by category
   const testsByCategory: Record<string, CpLabTest[]> = {}
@@ -225,19 +213,19 @@ export default function NewTestPage() {
               {/* Date + Test */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="log-date" className="text-xs text-muted-foreground">
+                  <Label htmlFor="test-date" className="text-xs text-muted-foreground">
                     Date *
                   </Label>
                   <Input
-                    id="log-date"
+                    id="test-date"
                     type="date"
-                    value={form.log_date}
+                    value={form.test_date}
                     max={todayISO()}
-                    onChange={(e) => setField('log_date', e.target.value)}
-                    className={cn(errors.log_date && 'border-destructive')}
+                    onChange={(e) => setField('test_date', e.target.value)}
+                    className={cn(errors.test_date && 'border-destructive')}
                   />
-                  {errors.log_date && (
-                    <p className="text-xs text-destructive">{errors.log_date}</p>
+                  {errors.test_date && (
+                    <p className="text-xs text-destructive">{errors.test_date}</p>
                   )}
                 </div>
 
@@ -263,12 +251,7 @@ export default function NewTestPage() {
                           </div>
                           {catTests.map((t) => (
                             <SelectItem key={t.id} value={t.id}>
-                              {t.test_name}
-                              {t.test_code && (
-                                <span className="ml-2 text-muted-foreground">
-                                  ({t.test_code})
-                                </span>
-                              )}
+                              {t.name}
                             </SelectItem>
                           ))}
                         </React.Fragment>
@@ -281,33 +264,27 @@ export default function NewTestPage() {
                 </div>
               </div>
 
-              {/* Reference range info */}
-              {selectedTest?.reference_range && (
+              {/* Duration info */}
+              {selectedTest?.duration_minutes && (
                 <div className="rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Reference range:</span>{' '}
-                  {selectedTest.reference_range}
-                  {selectedTest.turnaround_time && (
-                    <span className="ml-3">
-                      <span className="font-medium text-foreground">Turnaround:</span>{' '}
-                      {selectedTest.turnaround_time}
-                    </span>
-                  )}
+                  <span className="font-medium text-foreground">Duration:</span>{' '}
+                  {selectedTest.duration_minutes} min
                 </div>
               )}
 
-              {/* Patient no */}
+              {/* Patient name */}
               <div className="space-y-1.5">
-                <Label htmlFor="patient-no" className="text-xs text-muted-foreground">
-                  Patient No. (optional)
+                <Label htmlFor="patient-name" className="text-xs text-muted-foreground">
+                  Patient Name (optional)
                 </Label>
                 <Input
-                  id="patient-no"
-                  value={form.patient_no}
-                  onChange={(e) => setField('patient_no', e.target.value.toUpperCase())}
-                  placeholder="CP-00001"
+                  id="patient-name"
+                  value={form.patient_name}
+                  onChange={(e) => setField('patient_name', e.target.value)}
+                  placeholder="e.g. Ahmed Khan"
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  Enter the patient number to link this test to a patient record
+                  Enter the patient name for this test record
                 </p>
               </div>
             </CardContent>
@@ -321,21 +298,21 @@ export default function NewTestPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="quantity" className="text-xs text-muted-foreground">
+                  <Label htmlFor="qty" className="text-xs text-muted-foreground">
                     Quantity *
                   </Label>
                   <Input
-                    id="quantity"
+                    id="qty"
                     type="number"
                     min="1"
-                    value={form.quantity}
-                    onChange={(e) => setField('quantity', e.target.value)}
-                    className={cn(errors.quantity && 'border-destructive')}
+                    value={form.qty}
+                    onChange={(e) => setField('qty', e.target.value)}
+                    className={cn(errors.qty && 'border-destructive')}
                   />
-                  {errors.quantity && (
-                    <p className="text-xs text-destructive">{errors.quantity}</p>
+                  {errors.qty && (
+                    <p className="text-xs text-destructive">{errors.qty}</p>
                   )}
                 </div>
 
@@ -356,21 +333,6 @@ export default function NewTestPage() {
                   {errors.unit_price && (
                     <p className="text-xs text-destructive">{errors.unit_price}</p>
                   )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="discount" className="text-xs text-muted-foreground">
-                    Discount (Rs.)
-                  </Label>
-                  <Input
-                    id="discount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.discount_amount}
-                    onChange={(e) => setField('discount_amount', e.target.value)}
-                    placeholder="0.00"
-                  />
                 </div>
               </div>
 
@@ -393,16 +355,16 @@ export default function NewTestPage() {
                     Payment Method
                   </Label>
                   <Select
-                    value={form.payment_method_id}
-                    onValueChange={(v) => setField('payment_method_id', v)}
+                    value={form.payment_method}
+                    onValueChange={(v) => setField('payment_method', v)}
                   >
                     <SelectTrigger id="payment-method" className="bg-input">
                       <SelectValue placeholder="Select method" />
                     </SelectTrigger>
                     <SelectContent>
                       {paymentMethods.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
+                        <SelectItem key={m.method} value={m.method}>
+                          {m.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -428,7 +390,7 @@ export default function NewTestPage() {
                     <SelectContent>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="refunded">Refunded</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -444,72 +406,30 @@ export default function NewTestPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="result-value" className="text-xs text-muted-foreground">
-                    Result Value
-                  </Label>
-                  <Input
-                    id="result-value"
-                    value={form.result_value}
-                    onChange={(e) => setField('result_value', e.target.value)}
-                    placeholder="e.g. 12.5"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="result-unit" className="text-xs text-muted-foreground">
-                    Unit
-                  </Label>
-                  <Input
-                    id="result-unit"
-                    value={form.result_unit}
-                    onChange={(e) => setField('result_unit', e.target.value)}
-                    placeholder="e.g. mg/dL"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="result" className="text-xs text-muted-foreground">
+                  Result
+                </Label>
+                <Input
+                  id="result"
+                  value={form.result}
+                  onChange={(e) => setField('result', e.target.value)}
+                  placeholder="e.g. 12.5 mg/dL — Normal"
+                />
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="result-notes" className="text-xs text-muted-foreground">
-                  Result Notes
+                <Label htmlFor="notes" className="text-xs text-muted-foreground">
+                  Notes
                 </Label>
                 <Textarea
-                  id="result-notes"
-                  value={form.result_notes}
-                  onChange={(e) => setField('result_notes', e.target.value)}
+                  id="notes"
+                  value={form.notes}
+                  onChange={(e) => setField('notes', e.target.value)}
                   placeholder="Additional observations or comments…"
                   rows={2}
                   className="resize-none"
                 />
-              </div>
-
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="is-abnormal"
-                    checked={form.is_abnormal}
-                    onCheckedChange={(checked) =>
-                      setField('is_abnormal', checked === true)
-                    }
-                  />
-                  <Label htmlFor="is-abnormal" className="text-sm text-foreground cursor-pointer">
-                    Abnormal result
-                  </Label>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="report-issued"
-                    checked={form.report_issued}
-                    onCheckedChange={(checked) =>
-                      setField('report_issued', checked === true)
-                    }
-                  />
-                  <Label htmlFor="report-issued" className="text-sm text-foreground cursor-pointer">
-                    Report issued
-                  </Label>
-                </div>
               </div>
             </CardContent>
           </Card>

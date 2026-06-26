@@ -59,7 +59,7 @@ export default function LabEquipmentPage() {
     setMaintenanceDialog({
       open: true,
       machineryId: machineId,
-      machineryName: machine.machine_name,
+      machineryName: machine.name,
     })
   }
 

@@ -5,14 +5,6 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
-import type {
-  CpPatient,
-  CpDoctor,
-  CpPatientVisit,
-  CpBpLog,
-  CpPaymentMethod,
-  PaginatedResponse,
-} from '@/types/index'
 
 // =============================================================================
 // Return type
@@ -22,64 +14,111 @@ export type ActionResult<T = undefined> =
   | { success: true; data: T }
   | { success: false; error: string }
 
-// =============================================================================
-// Enriched types
-// =============================================================================
+// DB-aligned types (match actual Supabase columns)
+export type Patient = {
+  id: string
+  patient_no: number | null
+  name: string
+  phone: string | null
+  gender: 'male' | 'female' | 'other' | null
+  blood_group: string | null
+  date_of_birth: string | null
+  address: string | null
+  history: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
 
-export type PatientWithVisitCount = CpPatient & {
+export type Doctor = {
+  id: string
+  name: string
+  specialization: string | null
+  phone: string | null
+  email: string | null
+  earning_model: 'salaried' | 'commission'
+  monthly_salary: number | null
+  commission_pct: number | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export type Visit = {
+  id: string
+  patient_id: string
+  doctor_id: string | null
+  visit_date: string
+  fee_paisas: number
+  payment_method: 'cash' | 'jazzcash' | 'easypaisa' | 'bank_transfer'
+  diagnosis: string | null
+  prescription: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export type BpLog = {
+  id: string
+  patient_id: string
+  systolic: number
+  diastolic: number
+  pulse: number | null
+  notes: string | null
+  recorded_at: string
+  recorded_by: string | null
+}
+
+export type PatientWithVisitCount = Patient & {
   visit_count: number
   last_visit_date: string | null
 }
 
-export type DoctorWithTodayStats = CpDoctor & {
+export type DoctorWithTodayStats = Doctor & {
   today_visits: number
-  today_revenue: number // paisas
-  current_commission_pct: number | null // basis points
+  today_revenue: number
 }
 
-export type VisitWithRelations = CpPatientVisit & {
-  patient: Pick<CpPatient, 'id' | 'full_name' | 'patient_no' | 'phone'>
-  doctor: Pick<CpDoctor, 'id' | 'full_name' | 'specialty'> | null
-  payment_method: Pick<CpPaymentMethod, 'id' | 'name' | 'slug'> | null
+export type VisitWithRelations = Visit & {
+  patient: Pick<Patient, 'id' | 'name' | 'patient_no' | 'phone'> | null
+  doctor: Pick<Doctor, 'id' | 'name' | 'specialization'> | null
 }
 
-export type PatientDetail = CpPatient & {
+export type PatientDetail = Patient & {
   visits: VisitWithRelations[]
-  bp_logs: CpBpLog[]
+  bp_logs: BpLog[]
 }
 
-export type DoctorDetail = CpDoctor & {
-  current_commission_pct: number | null
+export type DoctorDetail = Doctor & {
   visits_this_month: number
-  revenue_this_month: number // paisas
-  earnings_this_month: number // paisas
+  revenue_this_month: number
+  earnings_this_month: number
 }
 
 export type OpdDashboardStats = {
   today_visits: number
-  today_revenue: number // paisas
+  today_revenue: number
   today_patients: number
   month_visits: number
-  month_revenue: number // paisas
-  doctor_stats: DoctorTodayStat[]
-}
-
-export type DoctorTodayStat = {
-  doctor_id: string
-  doctor_name: string
-  specialty: string | null
-  today_visits: number
-  today_revenue: number // paisas
+  month_revenue: number
+  doctor_stats: Array<{
+    doctor_id: string
+    doctor_name: string
+    specialization: string | null
+    today_visits: number
+    today_revenue: number
+  }>
 }
 
 export type DoctorEarningsResult = {
-  doctor: CpDoctor
-  month: string // 'YYYY-MM'
+  doctor: Doctor
+  month: string
   earning_model: 'salaried' | 'commission'
   total_visits: number
-  total_revenue: number // paisas
-  commission_pct: number | null // basis points
-  gross_earnings: number // paisas
+  total_revenue: number
+  commission_pct: number | null
+  gross_earnings: number
   working_days_in_month: number
   days_worked: number
 }
@@ -88,8 +127,15 @@ export type DailyVisitSummary = {
   date: string
   visits: VisitWithRelations[]
   total_visits: number
-  total_revenue: number // paisas
-  total_discount: number // paisas
+  total_revenue: number
+}
+
+export type PaginatedResponse<T> = {
+  data: T[]
+  count: number
+  page: number
+  pageSize: number
+  totalPages: number
 }
 
 // =============================================================================
@@ -97,42 +143,25 @@ export type DailyVisitSummary = {
 // =============================================================================
 
 const createPatientSchema = z.object({
-  full_name: z.string().min(2, 'Full name must be at least 2 characters').max(200),
-  father_name: z.string().max(200).nullable().optional(),
-  gender: z.enum(['male', 'female', 'other']),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(200),
+  gender: z.enum(['male', 'female', 'other']).nullable().optional(),
   date_of_birth: z.string().nullable().optional(),
-  age_years: z.number().int().min(0).max(150).nullable().optional(),
-  blood_group: z
-    .enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown'])
-    .default('unknown'),
-  cnic: z.string().max(20).nullable().optional(),
+  blood_group: z.string().max(10).nullable().optional(),
   phone: z.string().max(20).nullable().optional(),
   address: z.string().max(500).nullable().optional(),
-  city: z.string().max(100).nullable().optional(),
-  known_allergies: z.string().max(1000).nullable().optional(),
-  chronic_conditions: z.string().max(1000).nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
-  referred_by: z.string().max(200).nullable().optional(),
+  history: z.string().max(2000).nullable().optional(),
 })
 
 const updatePatientSchema = createPatientSchema.partial()
 
 const recordVisitSchema = z.object({
   patient_id: z.string().uuid('Invalid patient ID'),
-  doctor_id: z.string().uuid('Invalid doctor ID').nullable().optional(),
+  doctor_id: z.string().uuid().nullable().optional(),
   visit_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-  visit_time: z.string().optional(),
-  chief_complaint: z.string().max(1000).nullable().optional(),
+  fee_paisas: z.number().int().min(0, 'Fee cannot be negative'),
+  payment_method: z.enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer']),
   diagnosis: z.string().max(2000).nullable().optional(),
   prescription: z.string().max(5000).nullable().optional(),
-  consultation_fee: z.number().int().min(0, 'Fee cannot be negative'),
-  discount_amount: z.number().int().min(0, 'Discount cannot be negative').default(0),
-  payment_method_id: z.string().uuid().nullable().optional(),
-  payment_status: z
-    .enum(['pending', 'completed', 'cancelled', 'refunded'])
-    .default('completed'),
-  follow_up_date: z.string().nullable().optional(),
-  is_follow_up: z.boolean().default(false),
   notes: z.string().max(2000).nullable().optional(),
 })
 
@@ -140,16 +169,15 @@ const addBpLogSchema = z.object({
   systolic: z.number().int().min(50).max(300),
   diastolic: z.number().int().min(30).max(200),
   pulse: z.number().int().min(30).max(250).nullable().optional(),
-  visit_id: z.string().uuid().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
 })
 
 // =============================================================================
-// Internal helpers
+// Helpers
 // =============================================================================
 
 function todayISO(): string {
-  return new Date().toISOString().split('T')[0]!
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
 }
 
 function firstDayOfMonth(yearMonth: string): string {
@@ -172,33 +200,14 @@ async function getWorkingDaysConfig(
 ): Promise<number> {
   const { data } = await supabase
     .from('cp_settings')
-    .select('value')
-    .eq('setting_group', 'salary')
-    .eq('key', 'working_days')
+    .select('setting_value')
+    .eq('setting_key', 'salary.working_days')
     .single()
-
-  if (data?.value) {
-    const v = parseInt(data.value, 10)
-    if (!isNaN(v) && v > 0) return v
+  if (data?.setting_value) {
+    const v = (data.setting_value as { default_days?: number }).default_days
+    if (v && v > 0) return v
   }
-  // Fall back to clinic working_days array length
-  const { data: clinicData } = await supabase
-    .from('cp_settings')
-    .select('value')
-    .eq('setting_group', 'clinic')
-    .eq('key', 'working_days')
-    .single()
-
-  if (clinicData?.value) {
-    try {
-      const days = JSON.parse(clinicData.value) as string[]
-      // average: days-per-week * ~4.33 weeks
-      return Math.round(days.length * 4.33)
-    } catch {
-      // ignore
-    }
-  }
-  return 26 // default
+  return 26
 }
 
 // =============================================================================
@@ -212,47 +221,41 @@ export async function getOpdDashboard(): Promise<ActionResult<OpdDashboardStats>
     const today = todayISO()
     const monthStart = today.slice(0, 7) + '-01'
 
-    // Today's visits
-    const { data: todayVisits, error: tvErr } = await supabase
-      .from('cp_patient_visits')
-      .select('id, patient_id, doctor_id, net_fee')
-      .eq('visit_date', today)
-      .is('deleted_at', null)
+    const [todayVisitsRes, monthVisitsRes] = await Promise.all([
+      supabase
+        .from('cp_patient_visits')
+        .select('id, patient_id, doctor_id, fee_paisas')
+        .eq('visit_date', today),
+      supabase
+        .from('cp_patient_visits')
+        .select('id, fee_paisas')
+        .gte('visit_date', monthStart)
+        .lte('visit_date', today),
+    ])
 
-    if (tvErr) return { success: false, error: tvErr.message }
+    if (todayVisitsRes.error) return { success: false, error: todayVisitsRes.error.message }
+    if (monthVisitsRes.error) return { success: false, error: monthVisitsRes.error.message }
 
-    // Month visits
-    const { data: monthVisits, error: mvErr } = await supabase
-      .from('cp_patient_visits')
-      .select('id, net_fee')
-      .gte('visit_date', monthStart)
-      .lte('visit_date', today)
-      .is('deleted_at', null)
+    const todayVisits = todayVisitsRes.data ?? []
+    const monthVisits = monthVisitsRes.data ?? []
 
-    if (mvErr) return { success: false, error: mvErr.message }
+    // Doctor stats
+    const doctorIds = [...new Set(todayVisits.filter((v) => v.doctor_id).map((v) => v.doctor_id!))]
+    let doctorStats: OpdDashboardStats['doctor_stats'] = []
 
-    // Doctor stats for today
-    const doctorIds = [
-      ...new Set((todayVisits ?? []).filter((v) => v.doctor_id).map((v) => v.doctor_id!)),
-    ]
-
-    let doctorStats: DoctorTodayStat[] = []
     if (doctorIds.length > 0) {
       const { data: doctors } = await supabase
         .from('cp_doctors')
-        .select('id, full_name, specialty')
+        .select('id, name, specialization')
         .in('id', doctorIds)
 
       const doctorMap = new Map((doctors ?? []).map((d) => [d.id, d]))
-
       const statMap = new Map<string, { visits: number; revenue: number }>()
-      for (const v of todayVisits ?? []) {
+
+      for (const v of todayVisits) {
         if (v.doctor_id) {
           const cur = statMap.get(v.doctor_id) ?? { visits: 0, revenue: 0 }
-          statMap.set(v.doctor_id, {
-            visits: cur.visits + 1,
-            revenue: cur.revenue + (v.net_fee ?? 0),
-          })
+          statMap.set(v.doctor_id, { visits: cur.visits + 1, revenue: cur.revenue + (v.fee_paisas ?? 0) })
         }
       }
 
@@ -260,26 +263,22 @@ export async function getOpdDashboard(): Promise<ActionResult<OpdDashboardStats>
         const doc = doctorMap.get(did)
         return {
           doctor_id: did,
-          doctor_name: doc?.full_name ?? 'Unknown',
-          specialty: doc?.specialty ?? null,
+          doctor_name: (doc?.name as string) ?? 'Unknown',
+          specialization: (doc?.specialization as string | null) ?? null,
           today_visits: stat.visits,
           today_revenue: stat.revenue,
         }
       })
     }
 
-    const todayRevenue = (todayVisits ?? []).reduce((s, v) => s + (v.net_fee ?? 0), 0)
-    const todayPatients = new Set((todayVisits ?? []).map((v) => v.patient_id)).size
-    const monthRevenue = (monthVisits ?? []).reduce((s, v) => s + (v.net_fee ?? 0), 0)
-
     return {
       success: true,
       data: {
-        today_visits: (todayVisits ?? []).length,
-        today_revenue: todayRevenue,
-        today_patients: todayPatients,
-        month_visits: (monthVisits ?? []).length,
-        month_revenue: monthRevenue,
+        today_visits: todayVisits.length,
+        today_revenue: todayVisits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0),
+        today_patients: new Set(todayVisits.map((v) => v.patient_id)).size,
+        month_visits: monthVisits.length,
+        month_revenue: monthVisits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0),
         doctor_stats: doctorStats,
       },
     }
@@ -315,64 +314,42 @@ export async function getPatients(params: {
 
     if (params.search) {
       const term = params.search.trim()
-      query = query.or(
-        `full_name.ilike.%${term}%,phone.ilike.%${term}%,patient_no.ilike.%${term}%,cnic.ilike.%${term}%`
-      )
+      const orParts = [`name.ilike.%${term}%`, `phone.ilike.%${term}%`]
+      const termAsNum = parseInt(term, 10)
+      if (!isNaN(termAsNum)) {
+        orParts.push(`patient_no.eq.${termAsNum}`)
+      }
+      query = query.or(orParts.join(','))
     }
 
     const { data, error, count } = await query
-
     if (error) return { success: false, error: error.message }
 
-    const patients = (data ?? []) as CpPatient[]
-
-    // Fetch visit counts per patient
-    let enriched: PatientWithVisitCount[] = patients.map((p) => ({
-      ...p,
-      visit_count: 0,
-      last_visit_date: null,
-    }))
+    const patients = (data ?? []) as Patient[]
+    let enriched: PatientWithVisitCount[] = patients.map((p) => ({ ...p, visit_count: 0, last_visit_date: null }))
 
     if (patients.length > 0) {
-      const patientIds = patients.map((p) => p.id)
-
       const { data: visitData } = await supabase
         .from('cp_patient_visits')
         .select('patient_id, visit_date')
-        .in('patient_id', patientIds)
-        .is('deleted_at', null)
+        .in('patient_id', patients.map((p) => p.id))
         .order('visit_date', { ascending: false })
 
       const visitMap = new Map<string, { count: number; lastDate: string | null }>()
       for (const v of visitData ?? []) {
         const cur = visitMap.get(v.patient_id) ?? { count: 0, lastDate: null }
-        visitMap.set(v.patient_id, {
-          count: cur.count + 1,
-          lastDate: cur.lastDate ?? v.visit_date,
-        })
+        visitMap.set(v.patient_id, { count: cur.count + 1, lastDate: cur.lastDate ?? v.visit_date })
       }
 
       enriched = patients.map((p) => {
         const stat = visitMap.get(p.id)
-        return {
-          ...p,
-          visit_count: stat?.count ?? 0,
-          last_visit_date: stat?.lastDate ?? null,
-        }
+        return { ...p, visit_count: stat?.count ?? 0, last_visit_date: stat?.lastDate ?? null }
       })
     }
 
-    const totalCount = count ?? 0
-
     return {
       success: true,
-      data: {
-        data: enriched,
-        count: totalCount,
-        page,
-        pageSize: limit,
-        totalPages: Math.ceil(totalCount / limit),
-      },
+      data: { data: enriched, count: count ?? 0, page, pageSize: limit, totalPages: Math.ceil((count ?? 0) / limit) },
     }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
@@ -382,135 +359,81 @@ export async function getPatients(params: {
 export async function getPatient(id: string): Promise<ActionResult<PatientDetail>> {
   try {
     await requireAuth()
-
     const idParsed = z.string().uuid().safeParse(id)
     if (!idParsed.success) return { success: false, error: 'Invalid patient ID' }
 
     const supabase = await createClient()
 
-    const { data: patient, error: pErr } = await supabase
-      .from('cp_patients')
-      .select('*')
-      .eq('id', id)
-      .is('deleted_at', null)
-      .single()
+    const [patientRes, visitRes, bpRes] = await Promise.all([
+      supabase.from('cp_patients').select('*').eq('id', id).is('deleted_at', null).single(),
+      supabase
+        .from('cp_patient_visits')
+        .select('*, cp_doctors!doctor_id(id, name, specialization)')
+        .eq('patient_id', id)
+        .order('visit_date', { ascending: false }),
+      supabase.from('cp_bp_logs').select('*').eq('patient_id', id).order('recorded_at', { ascending: false }),
+    ])
 
-    if (pErr || !patient) return { success: false, error: pErr?.message ?? 'Patient not found' }
+    if (patientRes.error || !patientRes.data)
+      return { success: false, error: patientRes.error?.message ?? 'Patient not found' }
 
-    // Fetch visits with relations
-    const { data: visitRows, error: vErr } = await supabase
-      .from('cp_patient_visits')
-      .select(
-        `*,
-        cp_doctors(id, full_name, specialty),
-        cp_payment_methods(id, name, slug)`
-      )
-      .eq('patient_id', id)
-      .is('deleted_at', null)
-      .order('visit_date', { ascending: false })
-      .order('visit_time', { ascending: false })
-
-    if (vErr) return { success: false, error: vErr.message }
-
-    const visits: VisitWithRelations[] = (visitRows ?? []).map((v) => {
-      const { cp_doctors, cp_payment_methods, ...visit } = v as typeof v & {
-        cp_doctors: Pick<CpDoctor, 'id' | 'full_name' | 'specialty'> | null
-        cp_payment_methods: Pick<CpPaymentMethod, 'id' | 'name' | 'slug'> | null
-      }
-      return {
-        ...(visit as CpPatientVisit),
-        patient: {
-          id: patient.id,
-          full_name: patient.full_name,
-          patient_no: patient.patient_no,
-          phone: patient.phone,
-        },
-        doctor: cp_doctors ?? null,
-        payment_method: cp_payment_methods ?? null,
-      }
-    })
-
-    // Fetch BP logs
-    const { data: bpRows, error: bpErr } = await supabase
-      .from('cp_bp_logs')
-      .select('*')
-      .eq('patient_id', id)
-      .order('measured_at', { ascending: false })
-
-    if (bpErr) return { success: false, error: bpErr.message }
+    type VisitRow = Visit & { cp_doctors: Pick<Doctor, 'id' | 'name' | 'specialization'> | null }
+    const visits: VisitWithRelations[] = ((visitRes.data ?? []) as unknown as VisitRow[]).map((v) => ({
+      ...v,
+      patient: { id: patientRes.data.id, name: patientRes.data.name as string, patient_no: patientRes.data.patient_no as number | null, phone: patientRes.data.phone as string | null },
+      doctor: v.cp_doctors ?? null,
+    }))
 
     return {
       success: true,
-      data: {
-        ...(patient as CpPatient),
-        visits,
-        bp_logs: (bpRows ?? []) as CpBpLog[],
-      },
+      data: { ...(patientRes.data as unknown as Patient), visits, bp_logs: (bpRes.data ?? []) as BpLog[] },
     }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
 
-export async function createPatient(rawData: unknown): Promise<ActionResult<CpPatient>> {
+export async function createPatient(rawData: unknown): Promise<ActionResult<Patient>> {
   try {
-    const authUser = await requireAuth()
-
+    await requireAuth()
     const parsed = createPatientSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
 
     const supabase = await createClient()
-
-    const { data, error } = await supabase
-      .from('cp_patients')
-      .insert({
-        ...parsed.data,
-        patient_no: '', // will be auto-generated by trigger
-      })
-      .select()
-      .single()
-
+    const insertData = {
+      ...parsed.data,
+      gender: parsed.data.gender ?? undefined,
+    }
+    const { data, error } = await supabase.from('cp_patients').insert(insertData).select().single()
     if (error) return { success: false, error: error.message }
 
     revalidatePath('/opd/patients')
-    return { success: true, data: data as CpPatient }
+    return { success: true, data: data as unknown as Patient }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
 
-export async function updatePatient(
-  id: string,
-  rawData: unknown
-): Promise<ActionResult<CpPatient>> {
+export async function updatePatient(id: string, rawData: unknown): Promise<ActionResult<Patient>> {
   try {
     await requireAuth()
-
     const idParsed = z.string().uuid().safeParse(id)
     if (!idParsed.success) return { success: false, error: 'Invalid patient ID' }
 
     const parsed = updatePatientSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
 
     const supabase = await createClient()
-
-    const { data, error } = await supabase
-      .from('cp_patients')
-      .update(parsed.data)
-      .eq('id', id)
-      .is('deleted_at', null)
-      .select()
-      .single()
-
+    const updateData = {
+      ...parsed.data,
+      gender: parsed.data.gender ?? undefined,
+    }
+    const { data, error } = await supabase.from('cp_patients').update(updateData).eq('id', id).is('deleted_at', null).select().single()
     if (error) return { success: false, error: error.message }
 
     revalidatePath('/opd/patients')
     revalidatePath(`/opd/patients/${id}`)
-    return { success: true, data: data as CpPatient }
+    return { success: true, data: data as unknown as Patient }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
@@ -526,51 +449,24 @@ export async function getDoctors(): Promise<ActionResult<DoctorWithTodayStats[]>
     const supabase = await createClient()
     const today = todayISO()
 
-    const [doctorsRes, commissionsRes, visitsRes] = await Promise.all([
-      supabase
-        .from('cp_doctors')
-        .select('*')
-        .eq('is_active', true)
-        .is('deleted_at', null)
-        .order('full_name', { ascending: true }),
-      supabase
-        .from('cp_doctor_commissions')
-        .select('doctor_id, commission_pct')
-        .is('effective_to', null),
-      supabase
-        .from('cp_patient_visits')
-        .select('doctor_id, net_fee')
-        .eq('visit_date', today)
-        .is('deleted_at', null)
-        .not('doctor_id', 'is', null),
+    const [doctorsRes, visitsRes] = await Promise.all([
+      supabase.from('cp_doctors').select('*').eq('is_active', true).is('deleted_at', null).order('name', { ascending: true }),
+      supabase.from('cp_patient_visits').select('doctor_id, fee_paisas').eq('visit_date', today).not('doctor_id', 'is', null),
     ])
 
     if (doctorsRes.error) return { success: false, error: doctorsRes.error.message }
 
-    const commMap = new Map<string, number>()
-    for (const c of commissionsRes.data ?? []) {
-      commMap.set(c.doctor_id, c.commission_pct)
-    }
-
-    const visitStatMap = new Map<string, { visits: number; revenue: number }>()
+    const statMap = new Map<string, { visits: number; revenue: number }>()
     for (const v of visitsRes.data ?? []) {
       if (v.doctor_id) {
-        const cur = visitStatMap.get(v.doctor_id) ?? { visits: 0, revenue: 0 }
-        visitStatMap.set(v.doctor_id, {
-          visits: cur.visits + 1,
-          revenue: cur.revenue + (v.net_fee ?? 0),
-        })
+        const cur = statMap.get(v.doctor_id) ?? { visits: 0, revenue: 0 }
+        statMap.set(v.doctor_id, { visits: cur.visits + 1, revenue: cur.revenue + (v.fee_paisas ?? 0) })
       }
     }
 
-    const result: DoctorWithTodayStats[] = (doctorsRes.data as CpDoctor[]).map((d) => {
-      const stat = visitStatMap.get(d.id)
-      return {
-        ...d,
-        today_visits: stat?.visits ?? 0,
-        today_revenue: stat?.revenue ?? 0,
-        current_commission_pct: commMap.get(d.id) ?? null,
-      }
+    const result: DoctorWithTodayStats[] = (doctorsRes.data as unknown as Doctor[]).map((d) => {
+      const stat = statMap.get(d.id)
+      return { ...d, today_visits: stat?.visits ?? 0, today_revenue: stat?.revenue ?? 0 }
     })
 
     return { success: true, data: result }
@@ -582,54 +478,47 @@ export async function getDoctors(): Promise<ActionResult<DoctorWithTodayStats[]>
 export async function getDoctor(id: string): Promise<ActionResult<DoctorDetail>> {
   try {
     await requireAuth()
-
     const idParsed = z.string().uuid().safeParse(id)
     if (!idParsed.success) return { success: false, error: 'Invalid doctor ID' }
 
     const supabase = await createClient()
     const today = todayISO()
     const monthStart = today.slice(0, 7) + '-01'
-    const currentMonth = today.slice(0, 7)
 
-    const [docRes, commRes, monthVisitsRes] = await Promise.all([
+    const [docRes, monthVisitsRes] = await Promise.all([
       supabase.from('cp_doctors').select('*').eq('id', id).is('deleted_at', null).single(),
-      supabase
-        .from('cp_doctor_commissions')
-        .select('commission_pct')
-        .eq('doctor_id', id)
-        .is('effective_to', null)
-        .maybeSingle(),
-      supabase
-        .from('cp_patient_visits')
-        .select('id, net_fee')
-        .eq('doctor_id', id)
-        .gte('visit_date', monthStart)
-        .lte('visit_date', today)
-        .is('deleted_at', null),
+      supabase.from('cp_patient_visits').select('id, fee_paisas').eq('doctor_id', id).gte('visit_date', monthStart).lte('visit_date', today),
     ])
 
-    if (docRes.error || !docRes.data)
-      return { success: false, error: docRes.error?.message ?? 'Doctor not found' }
+    if (docRes.error || !docRes.data) return { success: false, error: docRes.error?.message ?? 'Doctor not found' }
 
-    const doctor = docRes.data as CpDoctor
-    const commPct = commRes.data?.commission_pct ?? null
-    const monthVisits = (monthVisitsRes.data ?? []).length
-    const monthRevenue = (monthVisitsRes.data ?? []).reduce((s, v) => s + (v.net_fee ?? 0), 0)
-
-    // Calculate earnings
-    const earningsResult = await getDoctorEarnings(id, currentMonth)
+    const doctor = docRes.data as unknown as Doctor
+    const monthRevenue = (monthVisitsRes.data ?? []).reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
+    const earningsResult = await getDoctorEarnings(id, today.slice(0, 7))
     const earnings = earningsResult.success ? earningsResult.data.gross_earnings : 0
 
     return {
       success: true,
-      data: {
-        ...doctor,
-        current_commission_pct: commPct,
-        visits_this_month: monthVisits,
-        revenue_this_month: monthRevenue,
-        earnings_this_month: earnings,
-      },
+      data: { ...doctor, visits_this_month: (monthVisitsRes.data ?? []).length, revenue_this_month: monthRevenue, earnings_this_month: earnings },
     }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+export async function getActiveDoctors(): Promise<ActionResult<Doctor[]>> {
+  try {
+    await requireAuth()
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('cp_doctors')
+      .select('id, name, specialization, earning_model, is_active')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .order('name', { ascending: true })
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: (data ?? []) as unknown as Doctor[] }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
@@ -639,48 +528,26 @@ export async function getDoctor(id: string): Promise<ActionResult<DoctorDetail>>
 // Visits
 // =============================================================================
 
-export async function recordVisit(rawData: unknown): Promise<ActionResult<CpPatientVisit>> {
+export async function recordVisit(rawData: unknown): Promise<ActionResult<Visit>> {
   try {
     const authUser = await requireAuth()
-
     const parsed = recordVisitSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
 
-    const { consultation_fee, discount_amount } = parsed.data
-    if (discount_amount > consultation_fee) {
-      return { success: false, error: 'Discount cannot exceed consultation fee' }
-    }
-
-    // SECURITY FIX (FINDING-006): Prevent backdating of visit/financial records
     const dateCheck = validateFinancialDate(parsed.data.visit_date)
-    if (!dateCheck.valid) {
-      return { success: false, error: dateCheck.error }
-    }
+    if (!dateCheck.valid) return { success: false, error: dateCheck.error }
 
     const supabase = await createClient()
-
-    const visitTime =
-      parsed.data.visit_time ??
-      new Date().toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Karachi' })
-
     const { data, error } = await supabase
       .from('cp_patient_visits')
       .insert({
         patient_id: parsed.data.patient_id,
         doctor_id: parsed.data.doctor_id ?? null,
         visit_date: parsed.data.visit_date,
-        visit_time: visitTime,
-        chief_complaint: parsed.data.chief_complaint ?? null,
+        fee_paisas: parsed.data.fee_paisas,
+        payment_method: parsed.data.payment_method,
         diagnosis: parsed.data.diagnosis ?? null,
         prescription: parsed.data.prescription ?? null,
-        consultation_fee: parsed.data.consultation_fee,
-        discount_amount: parsed.data.discount_amount,
-        payment_method_id: parsed.data.payment_method_id ?? null,
-        payment_status: parsed.data.payment_status,
-        follow_up_date: parsed.data.follow_up_date ?? null,
-        is_follow_up: parsed.data.is_follow_up,
         notes: parsed.data.notes ?? null,
         created_by: authUser.id,
       })
@@ -692,7 +559,7 @@ export async function recordVisit(rawData: unknown): Promise<ActionResult<CpPati
     revalidatePath('/opd')
     revalidatePath('/opd/visits')
     revalidatePath(`/opd/patients/${parsed.data.patient_id}`)
-    return { success: true, data: data as CpPatientVisit }
+    return { success: true, data: data as unknown as Visit }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
@@ -701,60 +568,32 @@ export async function recordVisit(rawData: unknown): Promise<ActionResult<CpPati
 export async function getDailyVisits(date: string): Promise<ActionResult<DailyVisitSummary>> {
   try {
     await requireAuth()
-
-    const dateParsed = z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .safeParse(date)
+    const dateParsed = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).safeParse(date)
     if (!dateParsed.success) return { success: false, error: 'Invalid date format' }
 
     const supabase = await createClient()
-
-    const { data: visitRows, error } = await supabase
+    const { data, error } = await supabase
       .from('cp_patient_visits')
-      .select(
-        `*,
-        cp_patients(id, full_name, patient_no, phone),
-        cp_doctors(id, full_name, specialty),
-        cp_payment_methods(id, name, slug)`
-      )
+      .select('*, cp_patients!patient_id(id, name, patient_no, phone), cp_doctors!doctor_id(id, name, specialization)')
       .eq('visit_date', date)
-      .is('deleted_at', null)
-      .order('visit_time', { ascending: true })
+      .order('created_at', { ascending: false })
 
     if (error) return { success: false, error: error.message }
 
-    const visits: VisitWithRelations[] = (visitRows ?? []).map((v) => {
-      const { cp_patients, cp_doctors, cp_payment_methods, ...visit } = v as typeof v & {
-        cp_patients: Pick<CpPatient, 'id' | 'full_name' | 'patient_no' | 'phone'> | null
-        cp_doctors: Pick<CpDoctor, 'id' | 'full_name' | 'specialty'> | null
-        cp_payment_methods: Pick<CpPaymentMethod, 'id' | 'name' | 'slug'> | null
-      }
-      return {
-        ...(visit as CpPatientVisit),
-        patient: cp_patients ?? {
-          id: visit.patient_id,
-          full_name: 'Unknown',
-          patient_no: '',
-          phone: null,
-        },
-        doctor: cp_doctors ?? null,
-        payment_method: cp_payment_methods ?? null,
-      }
-    })
+    type Row = Visit & {
+      cp_patients: Pick<Patient, 'id' | 'name' | 'patient_no' | 'phone'> | null
+      cp_doctors: Pick<Doctor, 'id' | 'name' | 'specialization'> | null
+    }
 
-    const totalRevenue = visits.reduce((s, v) => s + v.net_fee, 0)
-    const totalDiscount = visits.reduce((s, v) => s + v.discount_amount, 0)
+    const visits: VisitWithRelations[] = ((data ?? []) as unknown as Row[]).map((v) => ({
+      ...v,
+      patient: v.cp_patients ?? null,
+      doctor: v.cp_doctors ?? null,
+    }))
 
     return {
       success: true,
-      data: {
-        date,
-        visits,
-        total_visits: visits.length,
-        total_revenue: totalRevenue,
-        total_discount: totalDiscount,
-      },
+      data: { date, visits, total_visits: visits.length, total_revenue: visits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0) },
     }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
@@ -765,32 +604,23 @@ export async function getDailyVisits(date: string): Promise<ActionResult<DailyVi
 // BP Logs
 // =============================================================================
 
-export async function addBpLog(
-  patientId: string,
-  rawData: unknown
-): Promise<ActionResult<CpBpLog>> {
+export async function addBpLog(patientId: string, rawData: unknown): Promise<ActionResult<BpLog>> {
   try {
     const authUser = await requireAuth()
-
     const idParsed = z.string().uuid().safeParse(patientId)
     if (!idParsed.success) return { success: false, error: 'Invalid patient ID' }
 
     const parsed = addBpLogSchema.safeParse(rawData)
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
-    }
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
 
     const supabase = await createClient()
-
     const { data, error } = await supabase
       .from('cp_bp_logs')
       .insert({
         patient_id: patientId,
-        visit_id: parsed.data.visit_id ?? null,
         systolic: parsed.data.systolic,
         diastolic: parsed.data.diastolic,
         pulse: parsed.data.pulse ?? null,
-        measured_at: new Date().toISOString(),
         notes: parsed.data.notes ?? null,
         recorded_by: authUser.id,
       })
@@ -800,7 +630,7 @@ export async function addBpLog(
     if (error) return { success: false, error: error.message }
 
     revalidatePath(`/opd/patients/${patientId}`)
-    return { success: true, data: data as CpBpLog }
+    return { success: true, data: data as unknown as BpLog }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
@@ -810,71 +640,39 @@ export async function addBpLog(
 // Doctor Earnings (server-side only)
 // =============================================================================
 
-export async function getDoctorEarnings(
-  doctorId: string,
-  month: string // 'YYYY-MM'
-): Promise<ActionResult<DoctorEarningsResult>> {
+export async function getDoctorEarnings(doctorId: string, month: string): Promise<ActionResult<DoctorEarningsResult>> {
   try {
     await requireAuth()
-
     const idParsed = z.string().uuid().safeParse(doctorId)
     if (!idParsed.success) return { success: false, error: 'Invalid doctor ID' }
 
-    const monthParsed = z
-      .string()
-      .regex(/^\d{4}-\d{2}$/)
-      .safeParse(month)
+    const monthParsed = z.string().regex(/^\d{4}-\d{2}$/).safeParse(month)
     if (!monthParsed.success) return { success: false, error: 'Invalid month format (YYYY-MM)' }
 
     const supabase = await createClient()
-
     const from = firstDayOfMonth(month)
     const to = lastDayOfMonth(month)
 
-    const [docRes, commRes, visitsRes, workingDays] = await Promise.all([
+    const [docRes, visitsRes, workingDays] = await Promise.all([
       supabase.from('cp_doctors').select('*').eq('id', doctorId).is('deleted_at', null).single(),
-      supabase
-        .from('cp_doctor_commissions')
-        .select('commission_pct')
-        .eq('doctor_id', doctorId)
-        .lte('effective_from', to)
-        .or(`effective_to.is.null,effective_to.gte.${from}`)
-        .order('effective_from', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('cp_patient_visits')
-        .select('id, visit_date, net_fee')
-        .eq('doctor_id', doctorId)
-        .gte('visit_date', from)
-        .lte('visit_date', to)
-        .is('deleted_at', null),
+      supabase.from('cp_patient_visits').select('id, visit_date, fee_paisas').eq('doctor_id', doctorId).gte('visit_date', from).lte('visit_date', to),
       getWorkingDaysConfig(supabase),
     ])
 
-    if (docRes.error || !docRes.data)
-      return { success: false, error: docRes.error?.message ?? 'Doctor not found' }
+    if (docRes.error || !docRes.data) return { success: false, error: docRes.error?.message ?? 'Doctor not found' }
 
-    const doctor = docRes.data as CpDoctor
+    const doctor = docRes.data as unknown as Doctor
     const visits = visitsRes.data ?? []
-    const totalRevenue = visits.reduce((s, v) => s + (v.net_fee ?? 0), 0)
-    const totalVisits = visits.length
-
-    // Days worked = unique visit dates
+    const totalRevenue = visits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
     const daysWorked = new Set(visits.map((v) => v.visit_date)).size
 
     let grossEarnings = 0
-    const totalDaysInMonth = daysInMonth(month)
-
     if (doctor.earning_model === 'salaried') {
-      const monthlySalary = doctor.monthly_salary ?? 0
-      // Pro-rate: salary / working_days_in_month * days_worked
-      grossEarnings =
-        workingDays > 0 ? Math.round((monthlySalary / workingDays) * daysWorked) : monthlySalary
+      const salary = doctor.monthly_salary ?? 0
+      grossEarnings = workingDays > 0 ? Math.round((salary / workingDays) * daysWorked) : salary
     } else {
-      // Commission model
-      const commPct = commRes.data?.commission_pct ?? 0
-      grossEarnings = Math.round((totalRevenue * commPct) / 10000)
+      const pct = Number(doctor.commission_pct ?? 0)
+      grossEarnings = Math.round((totalRevenue * pct) / 100)
     }
 
     return {
@@ -883,9 +681,9 @@ export async function getDoctorEarnings(
         doctor,
         month,
         earning_model: doctor.earning_model,
-        total_visits: totalVisits,
+        total_visits: visits.length,
         total_revenue: totalRevenue,
-        commission_pct: commRes.data?.commission_pct ?? null,
+        commission_pct: doctor.commission_pct,
         gross_earnings: grossEarnings,
         working_days_in_month: workingDays,
         days_worked: daysWorked,
@@ -900,40 +698,18 @@ export async function getDoctorEarnings(
 // Payment Methods (for forms)
 // =============================================================================
 
-export async function getActivePaymentMethods(): Promise<ActionResult<CpPaymentMethod[]>> {
+export async function getActivePaymentMethods(): Promise<ActionResult<Array<{ method: string; label: string }>>> {
   try {
     await requireAuth()
     const supabase = await createClient()
-
     const { data, error } = await supabase
       .from('cp_payment_methods')
-      .select('*')
-      .eq('is_active', true)
+      .select('method, label')
+      .eq('is_enabled', true)
       .order('sort_order', { ascending: true })
 
     if (error) return { success: false, error: error.message }
-
-    return { success: true, data: (data ?? []) as CpPaymentMethod[] }
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
-  }
-}
-
-export async function getActiveDoctors(): Promise<ActionResult<CpDoctor[]>> {
-  try {
-    await requireAuth()
-    const supabase = await createClient()
-
-    const { data, error } = await supabase
-      .from('cp_doctors')
-      .select('id, full_name, specialty, earning_model, is_active')
-      .eq('is_active', true)
-      .is('deleted_at', null)
-      .order('full_name', { ascending: true })
-
-    if (error) return { success: false, error: error.message }
-
-    return { success: true, data: (data ?? []) as CpDoctor[] }
+    return { success: true, data: (data ?? []) as Array<{ method: string; label: string }> }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }

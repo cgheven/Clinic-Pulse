@@ -22,7 +22,7 @@ export default async function NewXrayRevenuePage() {
   const { data: methodsData } = await supabase
     .from('cp_payment_methods')
     .select('*')
-    .eq('is_active', true)
+    .eq('is_enabled', true)
     .order('sort_order', { ascending: true })
 
   const paymentMethods = (methodsData ?? []) as CpPaymentMethod[]

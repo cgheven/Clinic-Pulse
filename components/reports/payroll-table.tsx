@@ -124,8 +124,8 @@ export function PayrollTable({ data }: PayrollTableProps) {
                 {data.entries.map((e) => (
                   <tr key={e.staff_id} className="hover:bg-muted/10 transition-colors">
                     <td className="py-3 pl-4 pr-3">
-                      <p className="font-medium text-foreground">{e.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{e.designation}</p>
+                      <p className="font-medium text-foreground">{e.name}</p>
+                      <p className="text-xs text-muted-foreground">{e.staff_type}</p>
                     </td>
                     <td className="px-3 py-3">
                       {e.department ? (

@@ -47,8 +47,8 @@ export function LowStockList({ items, loading = false }: LowStockListProps) {
   return (
     <div className="space-y-2">
       {items.map((item) => {
-        const pct = Math.round((item.quantity / Math.max(item.low_stock_threshold, 1)) * 100)
-        const isCritical = item.quantity === 0
+        const pct = Math.round((item.stock_qty / Math.max(item.reorder_level, 1)) * 100)
+        const isCritical = item.stock_qty === 0
 
         return (
           <div
@@ -68,12 +68,12 @@ export function LowStockList({ items, loading = false }: LowStockListProps) {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">
-                {item.medicine_name}
+                {item.name}
               </p>
               <p className="text-xs text-muted-foreground">
                 {isCritical
                   ? 'Out of stock'
-                  : `${item.quantity} ${item.unit} remaining · threshold ${item.low_stock_threshold} (${pct}%)`}
+                  : `${item.stock_qty} ${item.unit} remaining · reorder at ${item.reorder_level} (${pct}%)`}
               </p>
             </div>
           </div>
@@ -134,10 +134,10 @@ export function ServiceList({ items, loading = false }: ServiceListProps) {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">
-                {item.machine_name}
-                {item.model_no ? (
+                {item.name}
+                {item.model ? (
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    ({item.model_no})
+                    ({item.model})
                   </span>
                 ) : null}
               </p>
@@ -148,7 +148,7 @@ export function ServiceList({ items, loading = false }: ServiceListProps) {
                     ? 'Due today'
                     : `Due in ${item.days_until} day${item.days_until !== 1 ? 's' : ''}`}
                 {' · '}
-                {formatDate(item.next_maintenance_date)}
+                {formatDate(item.next_service)}
               </p>
             </div>
           </div>

@@ -30,8 +30,8 @@ function formatPKR(paisas: number): string {
 type StockStatus = 'critical' | 'low' | 'ok'
 
 function getStockStatus(item: CpPharmacyInventory): StockStatus {
-  if (item.quantity <= item.low_stock_threshold) return 'critical'
-  if (item.quantity <= Math.ceil(item.low_stock_threshold * 1.2)) return 'low'
+  if (item.stock_qty <= item.reorder_level) return 'critical'
+  if (item.stock_qty <= Math.ceil(item.reorder_level * 1.2)) return 'low'
   return 'ok'
 }
 
@@ -74,7 +74,7 @@ function StockBadge({ item }: { item: CpPharmacyInventory }) {
             status === 'ok' && 'bg-emerald-400'
           )}
         />
-        {item.quantity} {item.unit}
+        {item.stock_qty} {item.unit}
       </span>
       {status !== 'ok' && (
         <Badge variant={variants[status]} className="text-[10px]">
@@ -90,10 +90,10 @@ function StockBadge({ item }: { item: CpPharmacyInventory }) {
 // =============================================================================
 
 type SortField =
-  | 'medicine_name'
-  | 'quantity'
-  | 'selling_price_per_unit'
-  | 'cost_price_per_unit'
+  | 'name'
+  | 'stock_qty'
+  | 'sale_price_paisas'
+  | 'cost_price_paisas'
   | 'expiry_date'
 
 type SortDir = 'asc' | 'desc'
@@ -128,7 +128,7 @@ export function InventoryTable({
   onPageChange,
   className,
 }: InventoryTableProps) {
-  const [sort, setSort] = useState<SortState>({ field: 'medicine_name', dir: 'asc' })
+  const [sort, setSort] = useState<SortState>({ field: 'name', dir: 'asc' })
 
   const sorted = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -136,21 +136,21 @@ export function InventoryTable({
       let bVal: string | number | null = null
 
       switch (sort.field) {
-        case 'medicine_name':
-          aVal = a.medicine_name.toLowerCase()
-          bVal = b.medicine_name.toLowerCase()
+        case 'name':
+          aVal = a.name.toLowerCase()
+          bVal = b.name.toLowerCase()
           break
-        case 'quantity':
-          aVal = a.quantity
-          bVal = b.quantity
+        case 'stock_qty':
+          aVal = a.stock_qty
+          bVal = b.stock_qty
           break
-        case 'selling_price_per_unit':
-          aVal = a.selling_price_per_unit
-          bVal = b.selling_price_per_unit
+        case 'sale_price_paisas':
+          aVal = a.sale_price_paisas
+          bVal = b.sale_price_paisas
           break
-        case 'cost_price_per_unit':
-          aVal = a.cost_price_per_unit
-          bVal = b.cost_price_per_unit
+        case 'cost_price_paisas':
+          aVal = a.cost_price_paisas
+          bVal = b.cost_price_paisas
           break
         case 'expiry_date':
           aVal = a.expiry_date ?? ''
@@ -210,10 +210,10 @@ export function InventoryTable({
               {/* Medicine Name */}
               <th className="whitespace-nowrap px-4 py-3 text-left">
                 <button
-                  onClick={() => toggleSort('medicine_name')}
+                  onClick={() => toggleSort('name')}
                   className="flex items-center gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Medicine <SortIcon field="medicine_name" />
+                  Medicine <SortIcon field="name" />
                 </button>
               </th>
 
@@ -225,30 +225,30 @@ export function InventoryTable({
               {/* Stock */}
               <th className="whitespace-nowrap px-4 py-3 text-left">
                 <button
-                  onClick={() => toggleSort('quantity')}
+                  onClick={() => toggleSort('stock_qty')}
                   className="flex items-center gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Stock <SortIcon field="quantity" />
+                  Stock <SortIcon field="stock_qty" />
                 </button>
               </th>
 
               {/* Cost Price */}
               <th className="hidden whitespace-nowrap px-4 py-3 text-right md:table-cell">
                 <button
-                  onClick={() => toggleSort('cost_price_per_unit')}
+                  onClick={() => toggleSort('cost_price_paisas')}
                   className="flex w-full items-center justify-end gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Cost <SortIcon field="cost_price_per_unit" />
+                  Cost <SortIcon field="cost_price_paisas" />
                 </button>
               </th>
 
               {/* Selling Price */}
               <th className="whitespace-nowrap px-4 py-3 text-right">
                 <button
-                  onClick={() => toggleSort('selling_price_per_unit')}
+                  onClick={() => toggleSort('sale_price_paisas')}
                   className="flex w-full items-center justify-end gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  Sale Price <SortIcon field="selling_price_per_unit" />
+                  Sale Price <SortIcon field="sale_price_paisas" />
                 </button>
               </th>
 
@@ -287,15 +287,10 @@ export function InventoryTable({
                   {/* Medicine name */}
                   <td className="px-4 py-3">
                     <div>
-                      <p className="font-medium text-foreground">{item.medicine_name}</p>
+                      <p className="font-medium text-foreground">{item.name}</p>
                       {item.generic_name && (
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {item.generic_name}
-                        </p>
-                      )}
-                      {item.manufacturer && (
-                        <p className="text-[11px] text-muted-foreground/60">
-                          {item.manufacturer}
                         </p>
                       )}
                     </div>
@@ -304,28 +299,25 @@ export function InventoryTable({
                   {/* Unit */}
                   <td className="px-4 py-3 text-muted-foreground">
                     <span className="capitalize">{item.unit}</span>
-                    {item.pack_size > 1 && (
-                      <span className="ml-1 text-xs">×{item.pack_size}</span>
-                    )}
                   </td>
 
                   {/* Stock badge */}
                   <td className="px-4 py-3">
                     <StockBadge item={item} />
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
-                      Min: {item.low_stock_threshold}
+                      Min: {item.reorder_level}
                     </p>
                   </td>
 
                   {/* Cost price */}
                   <td className="hidden px-4 py-3 text-right text-muted-foreground md:table-cell">
-                    {formatPKR(item.cost_price_per_unit)}
+                    {formatPKR(item.cost_price_paisas)}
                   </td>
 
                   {/* Selling price */}
                   <td className="px-4 py-3 text-right">
                     <span className="font-semibold text-foreground">
-                      {formatPKR(item.selling_price_per_unit)}
+                      {formatPKR(item.sale_price_paisas)}
                     </span>
                   </td>
 

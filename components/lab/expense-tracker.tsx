@@ -128,7 +128,7 @@ export function ExpenseTracker({
           expenseHeads.find((h) => h.id === form.expense_head_id)?.name ??
           (form.custom_head || 'Other')
         const pmName =
-          paymentMethods.find((m) => m.id === form.payment_method_id)?.name ?? null
+          paymentMethods.find((m) => m.id === form.payment_method_id)?.label ?? null
 
         const newEntry: LabExpenseEntry = {
           id: crypto.randomUUID(),
@@ -202,7 +202,7 @@ export function ExpenseTracker({
                     {head}
                   </span>
                   <span className="text-xs font-medium text-foreground">
-                    {formatCurrencyPaisas(amount)}
+                    {formatCurrencyPaisas(Number(amount))}
                   </span>
                 </div>
               ))
@@ -243,7 +243,7 @@ export function ExpenseTracker({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {result.entries.map((e) => (
+                    {result.entries.map((e: LabExpenseEntry) => (
                       <tr key={e.id} className="hover:bg-muted/10 transition-colors">
                         <td className="py-3 pl-4 pr-3 text-xs text-muted-foreground">
                           {formatDate(e.expense_date)}
@@ -392,7 +392,7 @@ export function ExpenseTracker({
                   <SelectContent>
                     {paymentMethods.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
-                        {m.name}
+                        {m.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

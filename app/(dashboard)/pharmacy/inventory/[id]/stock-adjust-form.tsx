@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import { adjustStock } from '@/app/actions/pharmacy'
-import type { StockAdjustType } from '@/app/actions/pharmacy'
 
 interface StockAdjustFormProps {
   medicineId: string
@@ -22,7 +21,7 @@ export function StockAdjustForm({ medicineId, medicineName }: StockAdjustFormPro
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const [type, setType] = useState<StockAdjustType>('in')
+  const [type, setType] = useState<'in' | 'out'>('in')
   const [qty, setQty] = useState('1')
   const [notes, setNotes] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -42,7 +41,7 @@ export function StockAdjustForm({ medicineId, medicineName }: StockAdjustFormPro
       if (result.success) {
         toast({
           title: `Stock ${type === 'in' ? 'added' : 'removed'}`,
-          description: `${medicineName}: New quantity is ${result.data.new_quantity}.`,
+          description: `${medicineName}: New quantity is ${result.data.new_qty}.`,
         })
         setQty('1')
         setNotes('')

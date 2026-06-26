@@ -63,8 +63,8 @@ function PaymentSkeleton() {
 // =============================================================================
 
 function PaymentMethodCard({ item }: { item: PaymentTotal }) {
-  const Icon = getIcon(item.slug)
-  const colors = getColors(item.slug)
+  const Icon = getIcon(item.method)
+  const colors = getColors(item.method)
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -72,7 +72,7 @@ function PaymentMethodCard({ item }: { item: PaymentTotal }) {
         <Icon className={cn('h-4 w-4', colors.icon)} />
       </div>
       <div>
-        <p className="text-xs font-medium text-muted-foreground truncate">{item.name}</p>
+        <p className="text-xs font-medium text-muted-foreground truncate">{item.label}</p>
         <p className="mt-0.5 text-base font-semibold text-foreground">
           {formatCurrencyPaisas(item.total)}
         </p>
@@ -104,7 +104,7 @@ export function PaymentSummary({ data, loading = false }: PaymentSummaryProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {data.map((item) => (
-        <PaymentMethodCard key={item.id} item={item} />
+        <PaymentMethodCard key={item.method} item={item} />
       ))}
     </div>
   )

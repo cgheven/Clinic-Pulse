@@ -141,7 +141,7 @@ export function ExpenseSummaryChart({ data }: ExpenseSummaryChartProps) {
 
       {/* Department breakdown table */}
       {data.by_department.map((dept) => (
-        <Card key={dept.dept_id ?? dept.dept_name} className="border-border bg-card">
+        <Card key={dept.department ?? dept.dept_name} className="border-border bg-card">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-semibold text-foreground">

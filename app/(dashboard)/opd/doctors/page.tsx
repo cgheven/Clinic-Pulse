@@ -45,18 +45,18 @@ async function DoctorList() {
           {/* Doctor header */}
           <div className="flex items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-              {doctor.full_name
+              {doctor.name
                 .split(' ')
                 .slice(0, 2)
-                .map((n) => n[0]?.toUpperCase())
+                .map((n: string) => n[0]?.toUpperCase())
                 .join('')}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-                Dr. {doctor.full_name}
+                Dr. {doctor.name}
               </p>
-              {doctor.specialty && (
-                <p className="truncate text-xs text-muted-foreground">{doctor.specialty}</p>
+              {doctor.specialization && (
+                <p className="truncate text-xs text-muted-foreground">{doctor.specialization}</p>
               )}
             </div>
             <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/30 group-hover:text-primary/60 transition-colors" />
@@ -74,9 +74,9 @@ async function DoctorList() {
             >
               {doctor.earning_model}
             </span>
-            {doctor.earning_model === 'commission' && doctor.current_commission_pct !== null && (
+            {doctor.earning_model === 'commission' && doctor.commission_pct !== null && (
               <span className="text-[10px] text-muted-foreground">
-                {formatBasisPoints(doctor.current_commission_pct)} commission
+                {formatBasisPoints(doctor.commission_pct)} commission
               </span>
             )}
           </div>

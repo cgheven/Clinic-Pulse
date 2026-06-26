@@ -13,9 +13,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { RevenueSplitDisplay } from '@/components/pharmacy/revenue-split-display'
 import { getDailySales } from '@/app/actions/pharmacy'
 import type { DailySalesResult } from '@/app/actions/pharmacy'
 
@@ -146,93 +144,99 @@ export default function PharmacySalesPage() {
       )}
 
       {!isPending && (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Sales table — left 2/3 */}
-          <div className="space-y-4 lg:col-span-2">
-            {/* Summary stats */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Card className="border-border bg-card">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Total Revenue</p>
-                  <p className="mt-0.5 text-xl font-bold text-primary">
-                    {formatPKR(salesData?.total_amount ?? 0)}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border bg-card">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Transactions</p>
-                  <p className="mt-0.5 text-xl font-bold text-foreground">
-                    {salesData?.sale_count ?? 0}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="hidden border-border bg-card sm:block">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Avg per Sale</p>
-                  <p className="mt-0.5 text-xl font-bold text-foreground">
-                    {formatPKR(
-                      salesData && salesData.sale_count > 0
-                        ? Math.round(salesData.total_amount / salesData.sale_count)
-                        : 0
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Sales list */}
+        <div className="space-y-4">
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Sale Items</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {!salesData || salesData.sales.length === 0 ? (
-                  <div className="py-14 text-center">
-                    <ShoppingCart className="mx-auto h-10 w-10 text-muted-foreground/20" />
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      No sales recorded for this date
-                    </p>
-                    {isToday && (
-                      <Link
-                        href="/pharmacy/sales/new"
-                        className="mt-2 inline-block text-xs text-primary hover:underline"
-                      >
-                        Record a sale now
-                      </Link>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    {/* Column headers */}
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 border-b border-border bg-muted/20 px-5 py-2.5 text-xs font-semibold text-muted-foreground">
-                      <span>Medicine</span>
-                      <span className="text-right">Qty</span>
-                      <span className="hidden text-right sm:block">Unit Price</span>
-                      <span className="text-right">Total</span>
-                    </div>
+              <CardContent className="pt-4 pb-3">
+                <p className="text-xs text-muted-foreground">Total Revenue</p>
+                <p className="mt-0.5 text-xl font-bold text-primary">
+                  {formatPKR(salesData?.total_paisas ?? 0)}
+                </p>
+              </CardContent>
+            </Card>
 
-                    <div className="divide-y divide-border">
-                      {salesData.sales.map((sale) => (
+            <Card className="border-border bg-card">
+              <CardContent className="pt-4 pb-3">
+                <p className="text-xs text-muted-foreground">Transactions</p>
+                <p className="mt-0.5 text-xl font-bold text-foreground">
+                  {salesData?.sale_count ?? 0}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="hidden border-border bg-card sm:block">
+              <CardContent className="pt-4 pb-3">
+                <p className="text-xs text-muted-foreground">Avg per Sale</p>
+                <p className="mt-0.5 text-xl font-bold text-foreground">
+                  {formatPKR(
+                    salesData && salesData.sale_count > 0
+                      ? Math.round(salesData.total_paisas / salesData.sale_count)
+                      : 0
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sales list */}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Sale Items</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {!salesData || salesData.sales.length === 0 ? (
+                <div className="py-14 text-center">
+                  <ShoppingCart className="mx-auto h-10 w-10 text-muted-foreground/20" />
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    No sales recorded for this date
+                  </p>
+                  {isToday && (
+                    <Link
+                      href="/pharmacy/sales/new"
+                      className="mt-2 inline-block text-xs text-primary hover:underline"
+                    >
+                      Record a sale now
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Column headers */}
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 border-b border-border bg-muted/20 px-5 py-2.5 text-xs font-semibold text-muted-foreground">
+                    <span>Medicine</span>
+                    <span className="text-right">Qty</span>
+                    <span className="hidden text-right sm:block">Unit Price</span>
+                    <span className="text-right">Total</span>
+                  </div>
+
+                  <div className="divide-y divide-border">
+                    {salesData.sales.map((sale) => {
+                      const firstItem = sale.items[0]
+                      const medicineName =
+                        sale.items.length === 1
+                          ? (firstItem?.inventory?.name ?? 'Unknown')
+                          : `${sale.items.length} items`
+                      const totalQty = sale.items.reduce((s, i) => s + i.qty, 0)
+
+                      return (
                         <div
                           key={sale.id}
                           className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-5 py-3.5"
                         >
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium text-foreground">
-                              {sale.inventory_item?.medicine_name ?? 'Unknown'}
+                              {medicineName}
                             </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-2">
                               {sale.patient && (
                                 <p className="text-xs text-muted-foreground">
-                                  {sale.patient.full_name}
+                                  {sale.patient.name}
                                 </p>
                               )}
                               {sale.payment_method && (
-                                <span className="rounded-sm bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                  {sale.payment_method.name}
+                                <span className="rounded-sm bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">
+                                  {sale.payment_method}
                                 </span>
                               )}
                               {sale.notes && (
@@ -244,63 +248,44 @@ export default function PharmacySalesPage() {
                           </div>
 
                           <p className="text-right text-sm text-muted-foreground">
-                            {sale.quantity_sold}&nbsp;
-                            <span className="text-xs">{sale.inventory_item?.unit}</span>
+                            {totalQty}&nbsp;
+                            <span className="text-xs">
+                              {firstItem?.inventory?.unit ?? ''}
+                            </span>
                           </p>
 
                           <p className="hidden text-right text-sm text-muted-foreground sm:block">
-                            {formatPKR(sale.unit_price)}
+                            {firstItem ? formatPKR(firstItem.unit_price_paisas) : '—'}
                           </p>
 
                           <div className="text-right">
                             <p className="text-sm font-semibold text-foreground">
-                              {formatPKR(sale.total_amount)}
+                              {formatPKR(sale.total_paisas)}
                             </p>
-                            {sale.discount_amount > 0 && (
+                            {sale.discount_paisas > 0 && (
                               <p className="text-[11px] text-amber-400">
-                                -{formatPKR(sale.discount_amount)} disc.
+                                -{formatPKR(sale.discount_paisas)} disc.
                               </p>
                             )}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    })}
+                  </div>
 
-                    {/* Footer total */}
-                    <div className="flex items-center justify-between border-t border-border bg-muted/20 px-5 py-3">
-                      <p className="text-sm font-semibold text-muted-foreground">
-                        Total ({salesData.sale_count} items)
-                      </p>
-                      <p className="text-base font-bold text-primary">
-                        {formatPKR(salesData.total_amount)}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Revenue split — right 1/3 */}
-          <div>
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Revenue Split</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  How today&apos;s revenue is distributed
-                </p>
-              </CardHeader>
-              <CardContent>
-                {salesData ? (
-                  <RevenueSplitDisplay split={salesData.revenue_split} />
-                ) : (
-                  <p className="py-4 text-center text-sm text-muted-foreground">
-                    No sales to split
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  {/* Footer total */}
+                  <div className="flex items-center justify-between border-t border-border bg-muted/20 px-5 py-3">
+                    <p className="text-sm font-semibold text-muted-foreground">
+                      Total ({salesData.sale_count} sale{salesData.sale_count !== 1 ? 's' : ''})
+                    </p>
+                    <p className="text-base font-bold text-primary">
+                      {formatPKR(salesData.total_paisas)}
+                    </p>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

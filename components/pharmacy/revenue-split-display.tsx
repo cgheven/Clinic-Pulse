@@ -3,30 +3,14 @@
 import React from 'react'
 import { Building2, Stethoscope, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { RevenueSplitResult } from '@/app/actions/pharmacy'
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatPKR(paisas: number): string {
-  const rupees = paisas / 100
-  return `Rs. ${rupees.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-function bpToPercent(bp: number): string {
-  return (bp / 100).toFixed(1)
-}
+import type { RevenueSplitData } from '@/app/actions/pharmacy'
 
 // =============================================================================
 // Props
 // =============================================================================
 
 interface RevenueSplitDisplayProps {
-  split: RevenueSplitResult
+  split: RevenueSplitData
   className?: string
   compact?: boolean
 }
@@ -46,7 +30,6 @@ export function RevenueSplitDisplay({
       label: 'Clinic',
       icon: Building2,
       pct: split.clinic_pct,
-      share: split.clinic_share,
       color: 'bg-amber-500',
       textColor: 'text-amber-400',
       bgColor: 'bg-amber-500/10',
@@ -56,7 +39,6 @@ export function RevenueSplitDisplay({
       label: 'Doctor',
       icon: Stethoscope,
       pct: split.doctor_pct,
-      share: split.doctor_share,
       color: 'bg-blue-500',
       textColor: 'text-blue-400',
       bgColor: 'bg-blue-500/10',
@@ -66,7 +48,6 @@ export function RevenueSplitDisplay({
       label: 'Staff',
       icon: Users,
       pct: split.staff_pct,
-      share: split.staff_share,
       color: 'bg-emerald-500',
       textColor: 'text-emerald-400',
       bgColor: 'bg-emerald-500/10',
@@ -82,7 +63,7 @@ export function RevenueSplitDisplay({
             <div
               key={p.key}
               className={cn('h-full transition-all', p.color)}
-              style={{ width: `${bpToPercent(p.pct)}%` }}
+              style={{ width: `${p.pct}%` }}
             />
           ))}
         </div>
@@ -103,9 +84,8 @@ export function RevenueSplitDisplay({
                 </div>
                 <p className="text-[10px] font-medium text-muted-foreground">{p.label}</p>
                 <p className={cn('text-xs font-semibold', p.textColor)}>
-                  {bpToPercent(p.pct)}%
+                  {p.pct.toFixed(1)}%
                 </p>
-                <p className="text-[10px] text-muted-foreground">{formatPKR(p.share)}</p>
               </div>
             )
           })}
@@ -116,19 +96,6 @@ export function RevenueSplitDisplay({
 
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Total header */}
-      <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Total Sales Revenue
-        </p>
-        <p className="mt-1 text-2xl font-bold text-foreground">
-          {formatPKR(split.total_sales)}
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Split config effective from {split.effective_from}
-        </p>
-      </div>
-
       {/* Stacked bar */}
       <div className="space-y-1.5">
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
@@ -136,7 +103,7 @@ export function RevenueSplitDisplay({
             <div
               key={p.key}
               className={cn('h-full transition-all duration-500', p.color)}
-              style={{ width: `${bpToPercent(p.pct)}%` }}
+              style={{ width: `${p.pct}%` }}
             />
           ))}
         </div>
@@ -171,13 +138,10 @@ export function RevenueSplitDisplay({
                 <div>
                   <p className="text-xs text-muted-foreground">{p.label}</p>
                   <p className={cn('text-sm font-semibold', p.textColor)}>
-                    {bpToPercent(p.pct)}%
+                    {p.pct.toFixed(1)}%
                   </p>
                 </div>
               </div>
-              <p className="mt-2 text-base font-bold text-foreground">
-                {formatPKR(p.share)}
-              </p>
             </div>
           )
         })}

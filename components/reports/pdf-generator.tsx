@@ -210,7 +210,7 @@ async function generateDoctorsPdf(data: DoctorEarningsReport): Promise<void> {
     body: [
       ...data.entries.map((e) => [
         e.doctor_name,
-        e.specialty ?? '—',
+        e.specialization ?? '—',
         e.earning_model === 'salaried' ? 'Salaried' : 'Commission',
         e.total_visits.toString(),
         pks(e.total_revenue),
@@ -286,16 +286,14 @@ async function generatePartnersPdf(data: PartnerPayoutReport): Promise<void> {
 
   autoTable(doc, {
     startY: afterSummary,
-    head: [['Partner', 'Type', 'Entries', 'Split %', 'Payout Amount']],
+    head: [['Partner', 'Split %', 'Payout Amount']],
     body: [
       ...data.entries.map((e) => [
         e.partner_name,
-        e.partner_type || 'Partner',
-        e.revenue_entries.toString(),
-        bps(e.split_pct_display),
+        bps(e.split_pct),
         pks(e.payout_amount),
       ]),
-      ['Clinic Share', 'Retained', '—',
+      ['Clinic Share',
         data.total_xray_revenue > 0
           ? `${((data.clinic_share / data.total_xray_revenue) * 100).toFixed(1)}%`
           : '—',
@@ -307,9 +305,8 @@ async function generatePartnersPdf(data: PartnerPayoutReport): Promise<void> {
     bodyStyles: { fontSize: 9, textColor: [40, 40, 50] },
     alternateRowStyles: { fillColor: [250, 250, 252] },
     columnStyles: {
-      2: { halign: 'center' },
-      3: { halign: 'center' },
-      4: { halign: 'right', fontStyle: 'bold' },
+      1: { halign: 'center' },
+      2: { halign: 'right', fontStyle: 'bold' },
     },
     margin: { left: 14, right: 14 },
   })
@@ -407,8 +404,8 @@ async function generatePayrollPdf(data: PayrollReport): Promise<void> {
     head: [['Employee', 'Designation', 'Department', 'Base Salary', 'Present/WD', 'Earned', 'Deductions', 'Net Pay']],
     body: [
       ...data.entries.map((e) => [
-        e.full_name,
-        e.designation,
+        e.name,
+        e.staff_type,
         e.department ?? '—',
         pks(e.monthly_salary),
         `${e.present_days} / ${e.working_days}`,
@@ -466,17 +463,16 @@ async function generateLabPdf(data: LabDailyReport): Promise<void> {
   // Summary row
   autoTable(doc, {
     startY,
-    head: [['Total Tests', 'Total Revenue', 'Total Discount', 'Net Revenue']],
+    head: [['Total Tests', 'Total Revenue', 'Net Revenue']],
     body: [[
       data.total_tests.toString(),
       pks(data.total_revenue),
-      pks(data.total_discount),
       pks(data.net_revenue),
     ]],
     theme: 'plain',
     headStyles: { fillColor: [245, 158, 11], textColor: [10, 10, 15], fontStyle: 'bold', fontSize: 9 },
     bodyStyles: { fontSize: 9.5, textColor: [40, 40, 50], fontStyle: 'bold' },
-    columnStyles: { 0: { halign: 'center' }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+    columnStyles: { 0: { halign: 'center' }, 1: { halign: 'right' }, 2: { halign: 'right' } },
     margin: { left: 14, right: 14 },
   })
 
@@ -487,13 +483,11 @@ async function generateLabPdf(data: LabDailyReport): Promise<void> {
     startY: afterSummary,
     head: [['Test', 'Patient', 'Result', 'Price', 'Payment', 'Status']],
     body: data.entries.map((e) => [
-      e.test?.test_name ?? '—',
-      e.patient?.full_name ?? 'Walk-in',
-      e.result_value
-        ? `${e.result_value}${e.result_unit ? ' ' + e.result_unit : ''}`
-        : '—',
-      pks(e.total_amount),
-      e.payment_method?.name ?? '—',
+      e.test?.name ?? '—',
+      e.patient?.name ?? 'Walk-in',
+      e.result ?? '—',
+      pks(e.price_paisas),
+      ({ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' } as Record<string, string>)[e.payment_method ?? ''] ?? '—',
       e.payment_status,
     ]),
     theme: 'grid',

@@ -55,13 +55,13 @@ export function PaymentMethodsManager({ initialMethods }: PaymentMethodsManagerP
       if (result.success) {
         setMethods((prev) =>
           prev.map((m) =>
-            m.id === id ? { ...m, is_active: enabled, isToggling: false } : m
+            m.id === id ? { ...m, is_enabled: enabled, isToggling: false } : m
           )
         )
         const method = methods.find((m) => m.id === id)
         toast({
           title: enabled ? 'Payment method enabled' : 'Payment method disabled',
-          description: `${method?.name ?? 'Method'} has been ${enabled ? 'enabled' : 'disabled'}.`,
+          description: `${method?.label ?? 'Method'} has been ${enabled ? 'enabled' : 'disabled'}.`,
         })
       } else {
         setMethods((prev) =>
@@ -76,7 +76,7 @@ export function PaymentMethodsManager({ initialMethods }: PaymentMethodsManagerP
     })
   }
 
-  const activeCount = methods.filter((m) => m.is_active).length
+  const activeCount = methods.filter((m) => m.is_enabled).length
 
   return (
     <div className="space-y-4">
@@ -106,7 +106,7 @@ export function PaymentMethodsManager({ initialMethods }: PaymentMethodsManagerP
               key={method.id}
               className={cn(
                 'group relative flex items-center gap-4 rounded-xl border p-4 transition-all',
-                method.is_active
+                method.is_enabled
                   ? 'border-primary/30 bg-primary/5 shadow-sm shadow-primary/10'
                   : 'border-border bg-card opacity-60'
               )}
@@ -115,12 +115,12 @@ export function PaymentMethodsManager({ initialMethods }: PaymentMethodsManagerP
               <div
                 className={cn(
                   'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors',
-                  method.is_active
+                  method.is_enabled
                     ? 'bg-primary/20 text-primary'
                     : 'bg-muted text-muted-foreground'
                 )}
               >
-                <PaymentIcon iconName={method.icon_name} />
+                <PaymentIcon iconName={null} />
               </div>
 
               {/* Info */}
@@ -128,13 +128,13 @@ export function PaymentMethodsManager({ initialMethods }: PaymentMethodsManagerP
                 <p
                   className={cn(
                     'text-sm font-semibold',
-                    method.is_active ? 'text-foreground' : 'text-muted-foreground'
+                    method.is_enabled ? 'text-foreground' : 'text-muted-foreground'
                   )}
                 >
-                  {method.name}
+                  {method.label}
                 </p>
                 <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">
-                  {method.slug.replace(/_/g, ' ')}
+                  {method.method.replace(/_/g, ' ')}
                 </p>
               </div>
 
@@ -144,15 +144,15 @@ export function PaymentMethodsManager({ initialMethods }: PaymentMethodsManagerP
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                 )}
                 <Switch
-                  checked={method.is_active}
+                  checked={method.is_enabled}
                   onCheckedChange={(checked) => handleToggle(method.id, checked)}
                   disabled={method.isToggling}
-                  aria-label={`${method.is_active ? 'Disable' : 'Enable'} ${method.name}`}
+                  aria-label={`${method.is_enabled ? 'Disable' : 'Enable'} ${method.label}`}
                 />
               </div>
 
               {/* Active indicator dot */}
-              {method.is_active && (
+              {method.is_enabled && (
                 <div className="pointer-events-none absolute right-3 top-3 h-1.5 w-1.5 rounded-full bg-success" />
               )}
             </div>

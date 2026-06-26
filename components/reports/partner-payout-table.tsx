@@ -157,14 +157,14 @@ export function PartnerPayoutTable({ data }: PartnerPayoutTableProps) {
                     </td>
                     <td className="px-3 py-3">
                       <Badge variant="secondary" className="bg-secondary text-secondary-foreground text-xs">
-                        {e.partner_type || 'Partner'}
+                        Partner
                       </Badge>
                     </td>
                     <td className="px-3 py-3 text-right text-muted-foreground">
-                      {e.revenue_entries}
+                      —
                     </td>
                     <td className="px-3 py-3 text-right text-muted-foreground">
-                      {formatBasisPoints(e.split_pct_display)}
+                      {formatBasisPoints(e.split_pct)}
                     </td>
                     <td className="py-3 pl-3 pr-4 text-right font-bold text-primary">
                       {formatCurrencyPaisas(e.payout_amount)}

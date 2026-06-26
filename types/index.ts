@@ -1,6 +1,6 @@
 // =============================================================================
 // ClinicPulse — TypeScript Types
-// Mirrors the Supabase PostgreSQL schema
+// Mirrors the Supabase PostgreSQL schema exactly
 // All monetary values are BIGINT in DB (paisas) — typed as number here
 // All timestamps are TIMESTAMPTZ in DB — typed as string (ISO 8601)
 // =============================================================================
@@ -24,527 +24,362 @@ export type BloodGroupType =
 
 export type DoctorEarningModel = "salaried" | "commission";
 
-export type DepartmentType =
-  | "opd"
-  | "pharmacy"
-  | "laboratory"
-  | "xray"
-  | "general";
+/** Matches the department enum used in cp_expense_heads and cp_expenses */
+export type DepartmentType = "opd" | "pharmacy" | "lab" | "xray" | "general";
 
-export type PaymentStatus =
-  | "pending"
-  | "completed"
-  | "cancelled"
-  | "refunded";
-
-export type AuditAction = "INSERT" | "UPDATE" | "DELETE";
-
-export type SalaryStatus = "paid" | "pending" | "partial";
-
-export type PaymentMethodSlug =
+export type PaymentMethodEnum =
   | "cash"
   | "jazzcash"
   | "easypaisa"
   | "bank_transfer";
 
-// ─── Core Entities ────────────────────────────────────────────────────────────
+export type StaffType = "full_time" | "part_time" | "shift_based";
+
+export type LabPaymentStatus = "pending" | "completed" | "refunded";
+
+export type ExpenseStatus = "active" | "void";
+
+export type AuditAction = "INSERT" | "UPDATE" | "DELETE";
+
+// ─── cp_users ─────────────────────────────────────────────────────────────────
 
 export interface CpUser {
   id: string;
   email: string;
   full_name: string;
   role: UserRole;
-  avatar_url: string | null;
-  phone: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  deleted_at: string | null;
 }
+
+// ─── cp_settings ──────────────────────────────────────────────────────────────
 
 export interface CpSetting {
   id: string;
-  setting_group: string;
-  key: string;
-  value: string;
-  label: string | null;
+  setting_key: string;
+  setting_value: Record<string, unknown>;
   description: string | null;
-  created_at: string;
+  updated_by: string | null;
   updated_at: string;
 }
 
-export interface CpDepartment {
-  id: string;
-  name: string;
-  slug: string;
-  dept_type: DepartmentType;
-  is_active: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
+// ─── cp_payment_methods ───────────────────────────────────────────────────────
 
 export interface CpPaymentMethod {
   id: string;
-  name: string;
-  slug: PaymentMethodSlug;
-  icon_name: string | null;
-  is_active: boolean;
+  method: PaymentMethodEnum;
+  label: string;
+  is_enabled: boolean;
   sort_order: number;
   created_at: string;
-  updated_at: string;
 }
+
+// ─── cp_expense_heads ─────────────────────────────────────────────────────────
 
 export interface CpExpenseHead {
   id: string;
   name: string;
-  slug: string;
-  department_id: string | null;
+  department: DepartmentType;
   is_active: boolean;
   is_system: boolean;
   sort_order: number;
   created_at: string;
-  updated_at: string;
   deleted_at: string | null;
 }
 
-// ─── Doctors ─────────────────────────────────────────────────────────────────
+// ─── cp_doctors ───────────────────────────────────────────────────────────────
 
 export interface CpDoctor {
   id: string;
-  full_name: string;
-  specialty: string | null;
+  name: string;
+  specialization: string | null;
   phone: string | null;
   email: string | null;
-  cnic: string | null;
   earning_model: DoctorEarningModel;
-  monthly_salary: number | null; // paisas
+  monthly_salary: number | null; // paisas (bigint)
+  commission_pct: number | null; // numeric
   is_active: boolean;
-  notes: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
 
-export interface CpDoctorCommission {
+// ─── cp_staff ─────────────────────────────────────────────────────────────────
+
+export interface CpStaff {
   id: string;
-  doctor_id: string;
-  commission_pct: number; // basis points
-  effective_from: string; // date
-  effective_to: string | null; // date, null = current
-  notes: string | null;
-  created_by: string | null;
+  name: string;
+  phone: string | null;
+  staff_type: StaffType;
+  department: string | null;
+  doctor_id: string | null;
+  monthly_salary: number; // bigint
+  join_date: string | null; // date
+  is_active: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
-// ─── Patients ─────────────────────────────────────────────────────────────────
+// ─── cp_patients ──────────────────────────────────────────────────────────────
 
 export interface CpPatient {
   id: string;
-  patient_no: string;
-  full_name: string;
-  father_name: string | null;
-  gender: GenderType;
-  date_of_birth: string | null; // date
-  age_years: number | null;
-  blood_group: BloodGroupType;
-  cnic: string | null;
+  patient_no: number; // serial added via migration
+  name: string;
   phone: string | null;
+  gender: GenderType;
+  blood_group: BloodGroupType | null;
+  date_of_birth: string | null; // date
   address: string | null;
-  city: string | null;
-  known_allergies: string | null;
-  chronic_conditions: string | null;
-  notes: string | null;
-  referred_by: string | null;
+  history: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
+
+// ─── cp_bp_logs ───────────────────────────────────────────────────────────────
+
+export interface CpBpLog {
+  id: string;
+  patient_id: string;
+  systolic: number;
+  diastolic: number;
+  pulse: number | null;
+  notes: string | null;
+  recorded_at: string;
+  recorded_by: string | null;
+}
+
+// ─── cp_patient_visits ────────────────────────────────────────────────────────
 
 export interface CpPatientVisit {
   id: string;
   patient_id: string;
   doctor_id: string | null;
   visit_date: string; // date
-  visit_time: string; // timetz
-  chief_complaint: string | null;
+  fee_paisas: number; // bigint
+  payment_method: PaymentMethodEnum | null;
   diagnosis: string | null;
   prescription: string | null;
-  consultation_fee: number; // paisas
-  discount_amount: number; // paisas
-  net_fee: number; // paisas — generated column
-  payment_method_id: string | null;
-  payment_status: PaymentStatus;
-  follow_up_date: string | null; // date
-  is_follow_up: boolean;
   notes: string | null;
   created_by: string | null;
   created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
 }
 
-export interface CpBpLog {
-  id: string;
-  patient_id: string;
-  visit_id: string | null;
-  systolic: number;
-  diastolic: number;
-  pulse: number | null;
-  measured_at: string;
-  notes: string | null;
-  recorded_by: string | null;
-  created_at: string;
-}
-
-// ─── Pharmacy ─────────────────────────────────────────────────────────────────
+// ─── cp_pharmacy_inventory ────────────────────────────────────────────────────
 
 export interface CpPharmacyInventory {
   id: string;
-  medicine_name: string;
+  name: string;
   generic_name: string | null;
-  manufacturer: string | null;
-  batch_no: string | null;
-  barcode: string | null;
+  category: string | null;
   unit: string;
-  pack_size: number;
-  cost_price_per_unit: number; // paisas
-  selling_price_per_unit: number; // paisas
-  quantity: number;
-  low_stock_threshold: number;
+  stock_qty: number; // integer
+  reorder_level: number; // integer
+  cost_price_paisas: number; // bigint
+  sale_price_paisas: number; // bigint
   expiry_date: string | null; // date
-  location: string | null;
+  batch_number: string | null;
   is_active: boolean;
-  notes: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
+
+// ─── cp_pharmacy_sales (HEADER) ───────────────────────────────────────────────
 
 export interface CpPharmacySale {
   id: string;
   sale_date: string; // date
   patient_id: string | null;
-  visit_id: string | null;
-  inventory_item_id: string;
-  quantity_sold: number;
-  unit_price: number; // paisas
-  discount_amount: number; // paisas
-  total_amount: number; // paisas — generated column
-  payment_method_id: string | null;
-  payment_status: PaymentStatus;
-  notes: string | null;
-  sold_by: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
-
-export interface CpPharmacyRevenueSplit {
-  id: string;
-  clinic_pct: number; // basis points
-  doctor_pct: number; // basis points
-  staff_pct: number; // basis points
-  effective_from: string; // date
+  doctor_id: string | null;
+  total_paisas: number; // bigint
+  payment_method: PaymentMethodEnum | null;
+  discount_paisas: number; // bigint
   notes: string | null;
   created_by: string | null;
   created_at: string;
-  updated_at: string;
 }
 
-// ─── Laboratory ───────────────────────────────────────────────────────────────
+// ─── cp_pharmacy_sale_items (LINE ITEMS) ──────────────────────────────────────
+
+export interface CpPharmacySaleItem {
+  id: string;
+  sale_id: string;
+  inventory_id: string;
+  qty: number; // integer
+  unit_price_paisas: number; // bigint
+  total_paisas: number; // bigint
+}
+
+// ─── cp_lab_tests ─────────────────────────────────────────────────────────────
 
 export interface CpLabTest {
   id: string;
-  test_name: string;
+  name: string;
   test_code: string | null;
   category: string | null;
-  price: number; // paisas
-  cost: number; // paisas
+  price_paisas: number; // bigint
   reference_range: string | null;
-  unit: string | null;
-  turnaround_time: string | null;
+  duration_minutes: number | null;
   is_active: boolean;
-  notes: string | null;
-  created_by: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
+
+// ─── cp_lab_test_logs ─────────────────────────────────────────────────────────
 
 export interface CpLabTestLog {
   id: string;
-  log_date: string; // date
+  test_date: string; // date
   patient_id: string | null;
-  visit_id: string | null;
+  patient_name: string | null;
   test_id: string;
-  quantity: number;
-  unit_price: number; // paisas
-  discount_amount: number; // paisas
-  total_amount: number; // paisas — generated column
-  result_value: string | null;
-  result_unit: string | null;
-  is_abnormal: boolean;
-  result_notes: string | null;
-  payment_method_id: string | null;
-  payment_status: PaymentStatus;
-  report_issued: boolean;
-  report_issued_at: string | null;
-  performed_by: string | null;
+  test_name: string;
+  price_paisas: number; // bigint
+  payment_method: PaymentMethodEnum | null;
+  doctor_id: string | null;
+  result: string | null;
+  notes: string | null;
+  created_by: string | null;
   created_at: string;
-  updated_at: string;
+  // Added via migration:
+  payment_status: LabPaymentStatus | null;
+  qty: number | null; // integer
   deleted_at: string | null;
 }
+
+// ─── cp_lab_chemicals ─────────────────────────────────────────────────────────
 
 export interface CpLabChemical {
   id: string;
-  chemical_name: string;
-  manufacturer: string | null;
-  batch_no: string | null;
+  name: string;
+  quantity: number; // numeric
   unit: string;
-  quantity_in_stock: number;
-  low_stock_threshold: number;
-  cost_per_unit: number; // paisas
+  reorder_level: number; // numeric
+  cost_price_paisas: number;
+  supplier: string | null;
+  last_restocked: string | null; // date or timestamptz
   expiry_date: string | null; // date
-  location: string | null;
   is_active: boolean;
-  notes: string | null;
-  created_by: string | null;
   created_at: string;
   updated_at: string;
-  deleted_at: string | null;
+  deleted_at: string | null; // added via migration
 }
+
+// ─── cp_lab_machinery ─────────────────────────────────────────────────────────
 
 export interface CpLabMachinery {
   id: string;
-  machine_name: string;
-  model_no: string | null;
-  serial_no: string | null;
-  manufacturer: string | null;
+  name: string;
+  model: string | null;
+  serial_number: string | null;
   purchase_date: string | null; // date
-  purchase_cost: number | null; // paisas
-  warranty_expiry: string | null; // date
-  last_maintenance_date: string | null; // date
-  next_maintenance_date: string | null; // date
-  maintenance_interval_days: number | null;
-  is_active: boolean;
-  location: string | null;
+  last_service: string | null; // date
+  next_service: string | null; // date
+  status: string; // text (free-form)
   notes: string | null;
-  created_by: string | null;
   created_at: string;
   updated_at: string;
-  deleted_at: string | null;
+  deleted_at: string | null; // added via migration
 }
 
-export interface CpLabMachineryMaintenance {
-  id: string;
-  machine_id: string;
-  maintenance_date: string; // date
-  maintenance_type: string;
-  cost: number; // paisas
-  performed_by: string | null;
-  notes: string | null;
-  next_due_date: string | null; // date
-  created_by: string | null;
-  created_at: string;
-}
+// ─── cp_lab_maintenance ───────────────────────────────────────────────────────
 
-export interface CpLabExpense {
+export interface CpLabMaintenance {
   id: string;
-  expense_date: string; // date
-  expense_head_id: string | null;
-  custom_head: string | null;
-  amount: number; // paisas
+  machinery_id: string;
+  service_date: string; // date
   description: string | null;
-  receipt_url: string | null;
-  payment_method_id: string | null;
+  cost_paisas: number; // bigint
+  technician: string | null;
+  next_service: string | null; // date
   created_by: string | null;
   created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
 }
 
-export interface CpLabStaff {
-  id: string;
-  full_name: string;
-  designation: string;
-  phone: string | null;
-  cnic: string | null;
-  monthly_salary: number; // paisas
-  join_date: string | null; // date
-  is_active: boolean;
-  notes: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
-
-// ─── X-Ray ────────────────────────────────────────────────────────────────────
+// ─── cp_xray_partners ─────────────────────────────────────────────────────────
 
 export interface CpXrayPartner {
   id: string;
-  partner_name: string;
-  partner_type: string;
+  name: string;
   phone: string | null;
-  bank_account: string | null;
+  split_pct: number; // numeric
   is_active: boolean;
-  notes: string | null;
-  created_by: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
+
+// ─── cp_xray_revenue ──────────────────────────────────────────────────────────
 
 export interface CpXrayRevenue {
   id: string;
   revenue_date: string; // date
-  gross_amount: number; // paisas
-  description: string | null;
-  patient_count: number;
-  payment_method_id: string | null;
-  payment_status: PaymentStatus;
+  patient_name: string | null;
+  patient_id: string | null;
+  service_type: string | null;
+  amount_paisas: number; // bigint
+  payment_method: PaymentMethodEnum | null;
   notes: string | null;
   created_by: string | null;
   created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
 }
 
-export interface CpXrayPartnerSplit {
-  id: string;
-  revenue_id: string;
-  partner_id: string;
-  split_pct: number; // basis points
-  split_amount: number | null; // paisas
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
-
-export interface CpXrayExpense {
-  id: string;
-  expense_date: string; // date
-  revenue_id: string | null;
-  expense_head_id: string | null;
-  custom_head: string | null;
-  amount: number; // paisas
-  description: string | null;
-  receipt_url: string | null;
-  payment_method_id: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
-
-// ─── Finance ──────────────────────────────────────────────────────────────────
+// ─── cp_expenses ──────────────────────────────────────────────────────────────
 
 export interface CpExpense {
   id: string;
   expense_date: string; // date
-  department_id: string | null;
-  expense_head_id: string | null;
-  custom_head: string | null;
-  amount: number; // paisas
-  description: string;
-  receipt_url: string | null;
-  payment_method_id: string | null;
+  head_id: string | null;
+  head_name: string;
+  department: DepartmentType;
+  amount_paisas: number; // bigint
+  payment_method: PaymentMethodEnum | null;
+  description: string | null;
+  status: ExpenseStatus;
   created_by: string | null;
   created_at: string;
   updated_at: string;
-  deleted_at: string | null;
 }
 
-export interface CpPayment {
-  id: string;
-  payment_date: string; // date
-  department_id: string;
-  payment_method_id: string;
-  amount: number; // paisas
-  reference_no: string | null;
-  source_type: string;
-  source_id: string | null;
-  is_reconciled: boolean;
-  reconciled_at: string | null;
-  reconciled_by: string | null;
-  notes: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
+// ─── cp_salary_records ────────────────────────────────────────────────────────
 
-// ─── Staff & Payroll ──────────────────────────────────────────────────────────
-
-export interface CpStaff {
-  id: string;
-  full_name: string;
-  designation: string;
-  department_id: string | null;
-  phone: string | null;
-  cnic: string | null;
-  email: string | null;
-  join_date: string | null; // date
-  monthly_salary: number; // paisas
-  is_active: boolean;
-  notes: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
-
-export interface CpStaffSalary {
+export interface CpSalaryRecord {
   id: string;
   staff_id: string;
-  salary_month: string; // date (first of month)
-  base_salary: number; // paisas
-  bonus: number; // paisas
-  deductions: number; // paisas
-  net_salary: number; // paisas — generated column
-  payment_method_id: string | null;
-  status: SalaryStatus;
+  month: string; // date (first of month)
+  base_salary_paisas: number;
+  working_days: number;
+  present_days: number;
+  earned_paisas: number; // generated column
+  deductions_paisas: number;
+  net_paisas: number;
+  payment_method: PaymentMethodEnum | null;
   paid_at: string | null;
-  paid_by: string | null;
   notes: string | null;
   created_by: string | null;
   created_at: string;
-  updated_at: string;
 }
 
-// ─── Audit ────────────────────────────────────────────────────────────────────
+// ─── cp_audit_logs ────────────────────────────────────────────────────────────
 
 export interface CpAuditLog {
-  id: number;
+  id: string;
+  user_id: string | null;
+  user_email: string | null;
+  action: AuditAction;
   table_name: string;
   record_id: string | null;
-  action: AuditAction;
-  old_data: Record<string, unknown> | null;
-  new_data: Record<string, unknown> | null;
-  performed_by: string | null;
-  performed_at: string;
-}
-
-// ─── View Types ───────────────────────────────────────────────────────────────
-
-export interface DailyRevenueSummary {
-  summary_date: string;
-  department: string;
-  revenue_paisas: number;
-}
-
-export interface LowStockAlert {
-  source: "pharmacy" | "laboratory";
-  id: string;
-  item_name: string;
-  current_stock: number;
-  low_stock_threshold: number;
-  expiry_date: string | null;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
 }
 
 // ─── Joined / Enriched types (for UI) ────────────────────────────────────────
@@ -552,28 +387,34 @@ export interface LowStockAlert {
 export interface PatientVisitWithRelations extends CpPatientVisit {
   patient?: CpPatient;
   doctor?: CpDoctor;
-  payment_method?: CpPaymentMethod;
   created_by_user?: Pick<CpUser, "id" | "full_name">;
 }
 
 export interface PharmacySaleWithRelations extends CpPharmacySale {
-  inventory_item?: CpPharmacyInventory;
+  items?: (CpPharmacySaleItem & { inventory?: CpPharmacyInventory })[];
   patient?: CpPatient;
-  payment_method?: CpPaymentMethod;
+  doctor?: CpDoctor;
 }
 
 export interface LabTestLogWithRelations extends CpLabTestLog {
   test?: CpLabTest;
   patient?: CpPatient;
-  payment_method?: CpPaymentMethod;
+  doctor?: CpDoctor;
 }
 
-export interface XrayRevenueWithSplits extends CpXrayRevenue {
-  splits?: (CpXrayPartnerSplit & { partner: CpXrayPartner })[];
-  payment_method?: CpPaymentMethod;
+export interface LabMaintenanceWithRelations extends CpLabMaintenance {
+  machinery?: CpLabMachinery;
 }
 
-// ─── UI / Form types ──────────────────────────────────────────────────────────
+export interface XrayRevenueWithRelations extends CpXrayRevenue {
+  patient?: CpPatient;
+}
+
+export interface SalaryRecordWithRelations extends CpSalaryRecord {
+  staff?: CpStaff;
+}
+
+// ─── Utility / UI types ───────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -592,7 +433,6 @@ export interface DashboardStats {
   totalPatients: number;
   todayVisits: number;
   todayRevenue: number; // paisas
-  pendingPayments: number;
   lowStockCount: number;
   monthRevenue: number; // paisas
 }

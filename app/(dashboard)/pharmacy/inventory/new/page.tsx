@@ -7,7 +7,6 @@ import { ChevronLeft, Loader2, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -18,7 +17,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
-import { createMedicine } from '@/app/actions/pharmacy'
+import { createInventoryItem } from '@/app/actions/pharmacy'
 
 // =============================================================================
 // Constants
@@ -55,20 +54,14 @@ export default function AddMedicinePage() {
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [form, setForm] = useState({
-    medicine_name: '',
+    name: '',
     generic_name: '',
-    manufacturer: '',
-    batch_no: '',
-    barcode: '',
     unit: 'tablet',
-    pack_size: '1',
-    cost_price_per_unit: '',  // PKR input
-    selling_price_per_unit: '', // PKR input
-    quantity: '0',
-    low_stock_threshold: '10',
+    cost_price_paisas: '',
+    sale_price_paisas: '',
+    stock_qty: '0',
+    reorder_level: '10',
     expiry_date: '',
-    location: '',
-    notes: '',
   })
 
   function set(field: string, value: string) {
@@ -79,40 +72,32 @@ export default function AddMedicinePage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    // Basic validation
-    if (!form.medicine_name.trim()) {
+    if (!form.name.trim()) {
       toast({ title: 'Medicine name is required', variant: 'destructive' })
       return
     }
 
-    const costPaisas = Math.round(parseFloat(form.cost_price_per_unit || '0') * 100)
-    const sellingPaisas = Math.round(parseFloat(form.selling_price_per_unit || '0') * 100)
-    const packSize = parseInt(form.pack_size) || 1
-    const quantity = parseInt(form.quantity) || 0
-    const lowStockThreshold = parseInt(form.low_stock_threshold) || 10
+    const costPaisas = Math.round(parseFloat(form.cost_price_paisas || '0') * 100)
+    const salePaisas = Math.round(parseFloat(form.sale_price_paisas || '0') * 100)
+    const stockQty = parseInt(form.stock_qty) || 0
+    const reorderLevel = parseInt(form.reorder_level) || 0
 
     startTransition(async () => {
-      const result = await createMedicine({
-        medicine_name: form.medicine_name.trim(),
+      const result = await createInventoryItem({
+        name: form.name.trim(),
         generic_name: form.generic_name.trim() || null,
-        manufacturer: form.manufacturer.trim() || null,
-        batch_no: form.batch_no.trim() || null,
-        barcode: form.barcode.trim() || null,
         unit: form.unit,
-        pack_size: packSize,
-        cost_price_per_unit: costPaisas,
-        selling_price_per_unit: sellingPaisas,
-        quantity,
-        low_stock_threshold: lowStockThreshold,
+        cost_price_paisas: costPaisas,
+        sale_price_paisas: salePaisas,
+        stock_qty: stockQty,
+        reorder_level: reorderLevel,
         expiry_date: form.expiry_date || null,
-        location: form.location.trim() || null,
-        notes: form.notes.trim() || null,
       })
 
       if (result.success) {
         toast({
           title: 'Medicine added',
-          description: `${result.data.medicine_name} added to inventory.`,
+          description: `${result.data.name} added to inventory.`,
         })
         router.push('/pharmacy/inventory')
       } else {
@@ -160,13 +145,13 @@ export default function AddMedicinePage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="medicine_name">
+                    <Label htmlFor="name">
                       Medicine Name <span className="text-destructive">*</span>
                     </Label>
                     <Input
-                      id="medicine_name"
-                      value={form.medicine_name}
-                      onChange={(e) => set('medicine_name', e.target.value)}
+                      id="name"
+                      value={form.name}
+                      onChange={(e) => set('name', e.target.value)}
                       placeholder="e.g. Panadol 500mg"
                       disabled={isPending}
                       required
@@ -185,124 +170,38 @@ export default function AddMedicinePage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="manufacturer">Manufacturer</Label>
-                    <Input
-                      id="manufacturer"
-                      value={form.manufacturer}
-                      onChange={(e) => set('manufacturer', e.target.value)}
-                      placeholder="e.g. GSK Pakistan"
-                      disabled={isPending}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="batch_no">Batch No.</Label>
-                    <Input
-                      id="batch_no"
-                      value={form.batch_no}
-                      onChange={(e) => set('batch_no', e.target.value)}
-                      placeholder="e.g. BT-2024-001"
-                      disabled={isPending}
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="unit">
+                    Unit <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={form.unit}
+                    onValueChange={(v) => set('unit', v)}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger id="unit">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UNIT_OPTIONS.map((u) => (
+                        <SelectItem key={u} value={u} className="capitalize">
+                          {u}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="barcode">Barcode</Label>
-                    <Input
-                      id="barcode"
-                      value={form.barcode}
-                      onChange={(e) => set('barcode', e.target.value)}
-                      placeholder="Optional"
-                      disabled={isPending}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="location">Shelf / Location</Label>
-                    <Input
-                      id="location"
-                      value={form.location}
-                      onChange={(e) => set('location', e.target.value)}
-                      placeholder="e.g. Rack A, Shelf 2"
-                      disabled={isPending}
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="expiry_date">Expiry Date</Label>
+                  <Input
+                    id="expiry_date"
+                    type="date"
+                    value={form.expiry_date}
+                    onChange={(e) => set('expiry_date', e.target.value)}
+                    disabled={isPending}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Unit & Packaging */}
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">Unit &amp; Packaging</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="unit">
-                      Unit <span className="text-destructive">*</span>
-                    </Label>
-                    <Select
-                      value={form.unit}
-                      onValueChange={(v) => set('unit', v)}
-                      disabled={isPending}
-                    >
-                      <SelectTrigger id="unit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {UNIT_OPTIONS.map((u) => (
-                          <SelectItem key={u} value={u} className="capitalize">
-                            {u}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="pack_size">Pack Size</Label>
-                    <Input
-                      id="pack_size"
-                      type="number"
-                      min="1"
-                      value={form.pack_size}
-                      onChange={(e) => set('pack_size', e.target.value)}
-                      disabled={isPending}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="expiry_date">Expiry Date</Label>
-                    <Input
-                      id="expiry_date"
-                      type="date"
-                      value={form.expiry_date}
-                      onChange={(e) => set('expiry_date', e.target.value)}
-                      disabled={isPending}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Notes */}
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={form.notes}
-                  onChange={(e) => set('notes', e.target.value)}
-                  placeholder="Additional information about this medicine…"
-                  rows={3}
-                  disabled={isPending}
-                />
               </CardContent>
             </Card>
           </div>
@@ -316,9 +215,7 @@ export default function AddMedicinePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="cost_price">
-                    Cost Price / Unit <span className="text-destructive">*</span>
-                  </Label>
+                  <Label htmlFor="cost_price">Cost Price / Unit</Label>
                   <div className="relative">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                       Rs.
@@ -328,8 +225,8 @@ export default function AddMedicinePage() {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={form.cost_price_per_unit}
-                      onChange={(e) => set('cost_price_per_unit', e.target.value)}
+                      value={form.cost_price_paisas}
+                      onChange={(e) => set('cost_price_paisas', e.target.value)}
                       placeholder="0.00"
                       className="pl-10"
                       disabled={isPending}
@@ -339,7 +236,7 @@ export default function AddMedicinePage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="selling_price">
-                    Selling Price / Unit <span className="text-destructive">*</span>
+                    Sale Price / Unit <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -350,8 +247,8 @@ export default function AddMedicinePage() {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={form.selling_price_per_unit}
-                      onChange={(e) => set('selling_price_per_unit', e.target.value)}
+                      value={form.sale_price_paisas}
+                      onChange={(e) => set('sale_price_paisas', e.target.value)}
                       placeholder="0.00"
                       className="pl-10"
                       disabled={isPending}
@@ -360,14 +257,14 @@ export default function AddMedicinePage() {
                 </div>
 
                 {/* Margin preview */}
-                {form.cost_price_per_unit && form.selling_price_per_unit && (
+                {form.cost_price_paisas && form.sale_price_paisas && (
                   <>
                     <Separator className="bg-border" />
                     <div className="rounded-lg bg-muted/30 px-3 py-2.5">
                       <p className="text-xs text-muted-foreground">Gross Margin</p>
                       {(() => {
-                        const cost = parseFloat(form.cost_price_per_unit) || 0
-                        const selling = parseFloat(form.selling_price_per_unit) || 0
+                        const cost = parseFloat(form.cost_price_paisas) || 0
+                        const selling = parseFloat(form.sale_price_paisas) || 0
                         const margin = selling - cost
                         const marginPct = cost > 0 ? ((margin / cost) * 100).toFixed(1) : '—'
                         return (
@@ -390,15 +287,15 @@ export default function AddMedicinePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="quantity">
+                  <Label htmlFor="stock_qty">
                     Opening Stock <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    id="quantity"
+                    id="stock_qty"
                     type="number"
                     min="0"
-                    value={form.quantity}
-                    onChange={(e) => set('quantity', e.target.value)}
+                    value={form.stock_qty}
+                    onChange={(e) => set('stock_qty', e.target.value)}
                     disabled={isPending}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -407,15 +304,15 @@ export default function AddMedicinePage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="low_stock_threshold">
+                  <Label htmlFor="reorder_level">
                     Reorder Level <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    id="low_stock_threshold"
+                    id="reorder_level"
                     type="number"
                     min="0"
-                    value={form.low_stock_threshold}
-                    onChange={(e) => set('low_stock_threshold', e.target.value)}
+                    value={form.reorder_level}
+                    onChange={(e) => set('reorder_level', e.target.value)}
                     disabled={isPending}
                   />
                   <p className="text-xs text-muted-foreground">

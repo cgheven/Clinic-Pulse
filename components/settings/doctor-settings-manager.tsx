@@ -149,7 +149,7 @@ export function DoctorSettingsManager({ initialDoctors }: DoctorSettingsManagerP
         )
         toast({
           title: 'Doctor settings saved',
-          description: `${doctor.full_name} updated successfully.`,
+          description: `${doctor.name} updated successfully.`,
         })
       } else {
         setDoctors((prev) =>
@@ -195,9 +195,9 @@ export function DoctorSettingsManager({ initialDoctors }: DoctorSettingsManagerP
             {/* Doctor header */}
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">{doctor.full_name}</p>
-                {doctor.specialty && (
-                  <p className="text-xs text-muted-foreground">{doctor.specialty}</p>
+                <p className="text-sm font-semibold text-foreground">{doctor.name}</p>
+                {doctor.specialization && (
+                  <p className="text-xs text-muted-foreground">{doctor.specialization}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">

@@ -17,7 +17,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import { recordSale } from '@/app/actions/pharmacy'
-import type { CpPharmacyInventory, CpPaymentMethod } from '@/types/index'
+import type { CpPharmacyInventory } from '@/types/index'
 
 // =============================================================================
 // Types
@@ -25,7 +25,7 @@ import type { CpPharmacyInventory, CpPaymentMethod } from '@/types/index'
 
 type InventoryOption = Pick<
   CpPharmacyInventory,
-  'id' | 'medicine_name' | 'generic_name' | 'unit' | 'selling_price_per_unit' | 'quantity'
+  'id' | 'name' | 'generic_name' | 'unit' | 'sale_price_paisas' | 'stock_qty'
 >
 
 interface SaleLineItem {
@@ -41,7 +41,7 @@ interface SaleLineItem {
 
 interface SaleFormProps {
   inventory: InventoryOption[]
-  paymentMethods: CpPaymentMethod[]
+  paymentMethods: Array<{ method: string; label: string }>
 }
 
 // =============================================================================
@@ -86,10 +86,9 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
   const [isPending, startTransition] = useTransition()
 
   const [lines, setLines] = useState<SaleLineItem[]>([emptyLine()])
-  const [paymentMethodId, setPaymentMethodId] = useState<string>(
-    paymentMethods[0]?.id ?? ''
+  const [paymentMethod, setPaymentMethod] = useState<string>(
+    paymentMethods[0]?.method ?? ''
   )
-  const [patientSearch, setPatientSearch] = useState('')
   const [notes, setNotes] = useState('')
 
   // Running total
@@ -118,10 +117,10 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
 
     updateLine(lineId, {
       inventory_item_id: inv.id,
-      medicine_name: inv.medicine_name,
+      medicine_name: inv.name,
       unit: inv.unit,
-      available_qty: inv.quantity,
-      unit_price: inv.selling_price_per_unit,
+      available_qty: inv.stock_qty,
+      unit_price: inv.sale_price_paisas,
       quantity_sold: 1,
       discount_amount: 0,
     })
@@ -132,7 +131,7 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!paymentMethodId) {
+    if (!paymentMethod) {
       toast({ title: 'Select a payment method', variant: 'destructive' })
       return
     }
@@ -147,21 +146,22 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
     }
 
     startTransition(async () => {
+      const totalDiscountPaisas = lines.reduce((s, l) => s + l.discount_amount, 0)
+
       const result = await recordSale({
         items: lines.map((l) => ({
-          inventory_item_id: l.inventory_item_id,
-          quantity_sold: l.quantity_sold,
-          unit_price: l.unit_price,
-          discount_amount: l.discount_amount,
+          inventory_id: l.inventory_item_id,
+          qty: l.quantity_sold,
         })),
-        payment_method_id: paymentMethodId,
+        payment_method: paymentMethod as 'cash' | 'jazzcash' | 'easypaisa' | 'bank_transfer',
+        discount_paisas: totalDiscountPaisas,
         notes: notes.trim() || null,
       })
 
       if (result.success) {
         toast({
           title: 'Sale recorded',
-          description: `Total: ${formatPKR(result.data.total_amount)} — ${result.data.sale_ids.length} item(s).`,
+          description: `Total: ${formatPKR(result.data.total_paisas)}.`,
         })
         router.push('/pharmacy/sales')
       } else {
@@ -236,7 +236,7 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
             <p className="text-xs text-muted-foreground">{lines.length} item(s)</p>
             <p className="text-xs text-muted-foreground">
               Discount:{' '}
-              {formatPKR(lines.reduce((s, l) => s + l.discount_amount * l.quantity_sold, 0))}
+              {formatPKR(lines.reduce((s, l) => s + l.discount_amount, 0))}
             </p>
           </div>
         </div>
@@ -249,14 +249,14 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
           <Label htmlFor="payment_method" className="text-sm">
             Payment Method <span className="text-destructive">*</span>
           </Label>
-          <Select value={paymentMethodId} onValueChange={setPaymentMethodId} disabled={isPending}>
+          <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={isPending}>
             <SelectTrigger id="payment_method">
               <SelectValue placeholder="Select payment method" />
             </SelectTrigger>
             <SelectContent>
               {paymentMethods.map((pm) => (
-                <SelectItem key={pm.id} value={pm.id}>
-                  {pm.name}
+                <SelectItem key={pm.method} value={pm.method}>
+                  {pm.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -291,7 +291,7 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
 
         <Button
           type="submit"
-          disabled={isPending || !hasValidLines || !paymentMethodId || grandTotal === 0}
+          disabled={isPending || !hasValidLines || !paymentMethod || grandTotal === 0}
           className="gap-2"
         >
           {isPending ? (
@@ -364,9 +364,9 @@ function LineItemRow({
                 <SelectItem key={inv.id} value={inv.id}>
                   <div className="flex items-center gap-2">
                     <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span>{inv.medicine_name}</span>
+                    <span>{inv.name}</span>
                     <span className="text-muted-foreground">
-                      ({inv.quantity} {inv.unit})
+                      ({inv.stock_qty} {inv.unit})
                     </span>
                   </div>
                 </SelectItem>

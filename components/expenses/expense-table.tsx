@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -25,7 +25,19 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { cn, formatCurrencyPaisas, formatDate } from '@/lib/utils'
 import type { ExpenseWithRelations } from '@/app/actions/expenses'
-import type { CpDepartment, CpExpenseHead, CpPaymentMethod } from '@/types/index'
+import type { CpExpenseHead, CpPaymentMethod } from '@/types/index'
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const DEPARTMENT_OPTIONS = [
+  { value: 'general', label: 'General / Admin' },
+  { value: 'opd', label: 'OPD' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'lab', label: 'Lab' },
+  { value: 'xray', label: 'X-Ray' },
+] as const
 
 // =============================================================================
 // Types
@@ -33,7 +45,7 @@ import type { CpDepartment, CpExpenseHead, CpPaymentMethod } from '@/types/index
 
 interface ExpenseTableProps {
   expenses: ExpenseWithRelations[]
-  departments: CpDepartment[]
+  departments?: unknown[]
   expenseHeads: CpExpenseHead[]
   paymentMethods: CpPaymentMethod[]
   /** Active filter values (from URL params) */
@@ -52,7 +64,6 @@ interface ExpenseTableProps {
 
 export function ExpenseTable({
   expenses,
-  departments,
   expenseHeads,
   paymentMethods,
   filters,
@@ -115,13 +126,11 @@ export function ExpenseTable({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">All Departments</SelectItem>
-                  {departments
-                    .filter((d) => d.is_active && !d.deleted_at)
-                    .map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
+                  {DEPARTMENT_OPTIONS.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -166,10 +175,10 @@ export function ExpenseTable({
                 <SelectContent>
                   <SelectItem value="__all__">All Methods</SelectItem>
                   {paymentMethods
-                    .filter((m) => m.is_active)
+                    .filter((m) => m.is_enabled)
                     .map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
+                      <SelectItem key={m.method} value={m.method}>
+                        {m.label}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -293,7 +302,7 @@ export function ExpenseTable({
 
 function ExpenseRow({ expense }: { expense: ExpenseWithRelations }) {
   const categoryLabel =
-    expense.expense_head_name ?? expense.custom_head ?? '—'
+    expense.expense_head_name ?? expense.head_name ?? '—'
 
   return (
     <tr className="group transition-colors hover:bg-muted/20">
@@ -335,7 +344,7 @@ function ExpenseRow({ expense }: { expense: ExpenseWithRelations }) {
       {/* Amount */}
       <td className="py-3 pl-3 pr-4 text-right">
         <span className="text-sm font-semibold text-foreground">
-          {formatCurrencyPaisas(expense.amount)}
+          {formatCurrencyPaisas(expense.amount_paisas)}
         </span>
       </td>
 

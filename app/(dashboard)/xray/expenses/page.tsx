@@ -44,7 +44,7 @@ export default async function XrayExpensesPage({ searchParams }: PageProps) {
     supabase
       .from('cp_payment_methods')
       .select('*')
-      .eq('is_active', true)
+      .eq('is_enabled', true)
       .order('sort_order', { ascending: true }),
     supabase
       .from('cp_expense_heads')

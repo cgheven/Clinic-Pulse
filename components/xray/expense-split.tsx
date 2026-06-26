@@ -137,15 +137,15 @@ export function ExpenseSplit({
           ...result.data,
           expense_head_name: headName,
           payment_method_name:
-            paymentMethods.find((m) => m.id === form.payment_method_id)?.name ?? null,
+            paymentMethods.find((m) => m.id === form.payment_method_id)?.label ?? null,
           per_partner_amount:
             data.active_partner_count > 0
-              ? Math.floor(result.data.amount / data.active_partner_count)
+              ? Math.floor(result.data.amount_paisas / data.active_partner_count)
               : 0,
         }
 
         setData((prev) => {
-          const newTotal = prev.total_amount + result.data.amount
+          const newTotal = prev.total_amount + result.data.amount_paisas
           const newPerPartner =
             prev.active_partner_count > 0
               ? Math.floor(newTotal / prev.active_partner_count)
@@ -402,10 +402,10 @@ export function ExpenseSplit({
                 </SelectTrigger>
                 <SelectContent>
                   {paymentMethods
-                    .filter((m) => m.is_active)
+                    .filter((m) => m.is_enabled)
                     .map((method) => (
                       <SelectItem key={method.id} value={method.id}>
-                        {method.name}
+                        {method.label}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -471,7 +471,7 @@ function ExpenseRow({
   showPerPartner: boolean
 }) {
   const categoryLabel =
-    expense.expense_head_name ?? expense.custom_head ?? '—'
+    expense.expense_head_name ?? expense.head_name ?? '—'
 
   return (
     <tr className="transition-colors hover:bg-muted/20">
@@ -491,7 +491,7 @@ function ExpenseRow({
         )}
       </td>
       <td className="px-3 py-3 text-right text-sm font-medium text-foreground">
-        {formatCurrencyPaisas(expense.amount)}
+        {formatCurrencyPaisas(expense.amount_paisas)}
       </td>
       {showPerPartner && (
         <td className="py-3 pl-3 pr-4 text-right text-sm font-medium text-muted-foreground">

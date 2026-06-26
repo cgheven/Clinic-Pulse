@@ -126,3 +126,16 @@ export function getInitials(name: string): string {
     .map((n) => n[0]?.toUpperCase() ?? "")
     .join("");
 }
+
+/**
+ * Map a payment method slug to a human-readable label.
+ */
+export function formatPaymentMethod(method: string): string {
+  const map: Record<string, string> = {
+    cash: "Cash",
+    jazzcash: "JazzCash",
+    easypaisa: "Easypaisa",
+    bank_transfer: "Bank Transfer",
+  };
+  return map[method] ?? method;
+}

@@ -25,7 +25,7 @@ export type ActionResult<T = undefined> =
 // =============================================================================
 
 export type PaymentBreakdownItem = {
-  method_id: string | null
+  method_id: string | null  // enum value e.g. 'cash'
   method_name: string
   amount: number // paisas
   count: number
@@ -59,11 +59,11 @@ export type DailyRevenueReport = {
 export type DoctorEarningEntry = {
   doctor_id: string
   doctor_name: string
-  specialty: string | null
+  specialization: string | null
   earning_model: 'salaried' | 'commission'
   total_visits: number
   total_revenue: number // paisas
-  commission_pct: number | null // basis points
+  commission_pct: number | null // percentage (0-100)
   monthly_salary: number | null // paisas
   gross_earnings: number // paisas
   days_worked: number
@@ -85,10 +85,8 @@ export type DoctorEarningsReport = {
 export type PartnerPayoutEntry = {
   partner_id: string
   partner_name: string
-  partner_type: string
-  revenue_entries: number
   payout_amount: number // paisas (sum of split_amount)
-  split_pct_display: number // basis points (last known pct)
+  split_pct: number // percentage
 }
 
 export type PartnerPayoutReport = {
@@ -112,7 +110,7 @@ export type ExpenseHeadRow = {
 }
 
 export type DeptExpenseRow = {
-  dept_id: string | null
+  department: string | null
   dept_name: string
   total_amount: number // paisas
   by_head: ExpenseHeadRow[]
@@ -132,8 +130,8 @@ export type ExpenseReport = {
 
 export type PayrollEntry = {
   staff_id: string
-  full_name: string
-  designation: string
+  name: string
+  staff_type: string
   department: string | null
   monthly_salary: number // paisas
   working_days: number
@@ -164,7 +162,6 @@ export type LabDailyReport = {
   entries: LabTestLogWithRelations[]
   total_tests: number
   total_revenue: number // paisas
-  total_discount: number // paisas
   net_revenue: number // paisas
   payment_breakdown: PaymentBreakdownItem[]
 }
@@ -183,49 +180,45 @@ function lastDayOfMonth(yearMonth: string): string {
   return `${yearMonth}-${String(last.getDate()).padStart(2, '0')}`
 }
 
-function daysInMonth(yearMonth: string): number {
-  const [year, month] = yearMonth.split('-').map(Number)
-  return new Date(year!, month!, 0).getDate()
-}
-
 async function getClinicName(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<string> {
   const { data } = await supabase
     .from('cp_settings')
-    .select('value')
-    .eq('setting_group', 'clinic')
-    .eq('key', 'name')
+    .select('setting_value')
+    .eq('setting_key', 'clinic.clinic_name')
     .maybeSingle()
-  return data?.value ?? 'ClinicPulse'
+  const val = data?.setting_value
+  return (typeof val === 'string' ? val : null) ?? 'ClinicPulse'
 }
 
 async function getWorkingDaysConfig(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<number> {
-  const { data } = await supabase
+  // Try salary-specific working days setting first
+  const { data: salaryData } = await supabase
     .from('cp_settings')
-    .select('value')
-    .eq('setting_group', 'salary')
-    .eq('key', 'working_days')
+    .select('setting_value')
+    .eq('setting_key', 'salary.working_days')
     .maybeSingle()
-  if (data?.value) {
-    const v = parseInt(data.value, 10)
+  if (salaryData?.setting_value) {
+    const v =
+      typeof salaryData.setting_value === 'number'
+        ? salaryData.setting_value
+        : parseInt(String(salaryData.setting_value), 10)
     if (!isNaN(v) && v > 0) return v
   }
+
+  // Fall back to clinic working days array
   const { data: clinicData } = await supabase
     .from('cp_settings')
-    .select('value')
-    .eq('setting_group', 'clinic')
-    .eq('key', 'working_days')
+    .select('setting_value')
+    .eq('setting_key', 'clinic.working_days')
     .maybeSingle()
-  if (clinicData?.value) {
-    try {
-      const days = JSON.parse(clinicData.value) as string[]
-      return Math.round(days.length * 4.33)
-    } catch {
-      // ignore
-    }
+  if (clinicData?.setting_value) {
+    const val = clinicData.setting_value
+    const days = Array.isArray(val) ? val : (() => { try { return JSON.parse(val as string) } catch { return null } })()
+    if (Array.isArray(days)) return Math.round(days.length * 4.33)
   }
   return 26
 }
@@ -270,79 +263,81 @@ export async function getDailyRevenue(
     const supabase = await createClient()
     const [clinicName, pmRes, opdRes, pharmRes, labRes, xrayRes] = await Promise.all([
       getClinicName(supabase),
+      // Fetch payment methods for label lookup (method → label)
       supabase
         .from('cp_payment_methods')
-        .select('id, name')
-        .eq('is_active', true),
+        .select('method, label')
+        .eq('is_enabled', true),
       // OPD
       supabase
         .from('cp_patient_visits')
-        .select('net_fee, payment_method_id')
-        .eq('visit_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('fee_paisas, payment_method')
+        .eq('visit_date', date),
       // Pharmacy
       supabase
         .from('cp_pharmacy_sales')
-        .select('total_amount, payment_method_id')
-        .eq('sale_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('total_paisas, payment_method')
+        .eq('sale_date', date),
       // Lab
       supabase
         .from('cp_lab_test_logs')
-        .select('total_amount, payment_method_id')
-        .eq('log_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('price_paisas, payment_method')
+        .eq('test_date', date),
       // X-Ray
       supabase
         .from('cp_xray_revenue')
-        .select('gross_amount, payment_method_id')
-        .eq('revenue_date', date)
-        .eq('payment_status', 'completed')
-        .is('deleted_at', null),
+        .select('amount_paisas, payment_method')
+        .eq('revenue_date', date),
     ])
 
+    // Build method enum → label map
     const pmMap = new Map<string, string>()
     for (const pm of pmRes.data ?? []) {
-      pmMap.set(pm.id, pm.name)
+      pmMap.set(pm.method as string, pm.label as string)
     }
 
     function buildDept(
-      rows: Array<{ amount: number; payment_method_id: string | null }> | null
+      rows: Array<{ amount: number; payment_method: string | null }> | null
     ): DeptRevenueData {
       const safe = rows ?? []
       const total = safe.reduce((s, r) => s + (r.amount ?? 0), 0)
       const breakdown = buildPaymentBreakdown(
         safe.map((r) => ({
           amount: r.amount ?? 0,
-          method_id: r.payment_method_id,
-          method_name: r.payment_method_id ? (pmMap.get(r.payment_method_id) ?? null) : null,
+          method_id: r.payment_method,
+          method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
         }))
       )
       return { total, count: safe.length, payment_breakdown: breakdown }
     }
 
+    type OpdRow = { fee_paisas: number; payment_method: string | null }
+    type PharmRow = { total_paisas: number; payment_method: string | null }
+    type LabRow = { price_paisas: number; payment_method: string | null }
+    type XrayRow = { amount_paisas: number; payment_method: string | null }
+
     const opd = buildDept(
-      (opdRes.data ?? []).map((r) => ({ amount: r.net_fee, payment_method_id: r.payment_method_id }))
+      ((opdRes.data ?? []) as unknown as OpdRow[]).map((r) => ({
+        amount: r.fee_paisas,
+        payment_method: r.payment_method,
+      }))
     )
     const pharmacy = buildDept(
-      (pharmRes.data ?? []).map((r) => ({
-        amount: r.total_amount,
-        payment_method_id: r.payment_method_id,
+      ((pharmRes.data ?? []) as unknown as PharmRow[]).map((r) => ({
+        amount: r.total_paisas,
+        payment_method: r.payment_method,
       }))
     )
     const lab = buildDept(
-      (labRes.data ?? []).map((r) => ({
-        amount: r.total_amount,
-        payment_method_id: r.payment_method_id,
+      ((labRes.data ?? []) as unknown as LabRow[]).map((r) => ({
+        amount: r.price_paisas,
+        payment_method: r.payment_method,
       }))
     )
     const xray = buildDept(
-      (xrayRes.data ?? []).map((r) => ({
-        amount: r.gross_amount,
-        payment_method_id: r.payment_method_id,
+      ((xrayRes.data ?? []) as unknown as XrayRow[]).map((r) => ({
+        amount: r.amount_paisas,
+        payment_method: r.payment_method,
       }))
     )
 
@@ -350,25 +345,25 @@ export async function getDailyRevenue(
 
     // Aggregate all payment totals
     const allRows = [
-      ...(opdRes.data ?? []).map((r) => ({
-        amount: r.net_fee,
-        method_id: r.payment_method_id,
-        method_name: r.payment_method_id ? (pmMap.get(r.payment_method_id) ?? null) : null,
+      ...((opdRes.data ?? []) as unknown as OpdRow[]).map((r) => ({
+        amount: r.fee_paisas,
+        method_id: r.payment_method,
+        method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
       })),
-      ...(pharmRes.data ?? []).map((r) => ({
-        amount: r.total_amount,
-        method_id: r.payment_method_id,
-        method_name: r.payment_method_id ? (pmMap.get(r.payment_method_id) ?? null) : null,
+      ...((pharmRes.data ?? []) as unknown as PharmRow[]).map((r) => ({
+        amount: r.total_paisas,
+        method_id: r.payment_method,
+        method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
       })),
-      ...(labRes.data ?? []).map((r) => ({
-        amount: r.total_amount,
-        method_id: r.payment_method_id,
-        method_name: r.payment_method_id ? (pmMap.get(r.payment_method_id) ?? null) : null,
+      ...((labRes.data ?? []) as unknown as LabRow[]).map((r) => ({
+        amount: r.price_paisas,
+        method_id: r.payment_method,
+        method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
       })),
-      ...(xrayRes.data ?? []).map((r) => ({
-        amount: r.gross_amount,
-        method_id: r.payment_method_id,
-        method_name: r.payment_method_id ? (pmMap.get(r.payment_method_id) ?? null) : null,
+      ...((xrayRes.data ?? []) as unknown as XrayRow[]).map((r) => ({
+        amount: r.amount_paisas,
+        method_id: r.payment_method,
+        method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
       })),
     ]
     const payment_totals = buildPaymentBreakdown(allRows)
@@ -384,6 +379,8 @@ export async function getDailyRevenue(
 
 // =============================================================================
 // getDoctorEarningsReport
+// commission_pct is directly on cp_doctors (percentage 0-100)
+// earnings = sum(fee_paisas) * commission_pct / 100
 // =============================================================================
 
 export async function getDoctorEarningsReport(
@@ -401,24 +398,19 @@ export async function getDoctorEarningsReport(
     const from = firstDayOfMonth(month)
     const to = lastDayOfMonth(month)
 
-    const [clinicName, workingDays, doctorsRes, commissionsRes, visitsRes] = await Promise.all([
+    const [clinicName, workingDays, doctorsRes, visitsRes] = await Promise.all([
       getClinicName(supabase),
       getWorkingDaysConfig(supabase),
       supabase
         .from('cp_doctors')
         .select('*')
         .is('deleted_at', null)
-        .order('full_name', { ascending: true }),
-      supabase
-        .from('cp_doctor_commissions')
-        .select('doctor_id, commission_pct, effective_from, effective_to')
-        .lte('effective_from', to),
+        .order('name', { ascending: true }),
       supabase
         .from('cp_patient_visits')
-        .select('doctor_id, visit_date, net_fee')
+        .select('doctor_id, visit_date, fee_paisas')
         .gte('visit_date', from)
         .lte('visit_date', to)
-        .is('deleted_at', null)
         .not('doctor_id', 'is', null),
     ])
 
@@ -426,26 +418,23 @@ export async function getDoctorEarningsReport(
 
     const doctors = (doctorsRes.data ?? []) as CpDoctor[]
 
-    // Build commission map: doctor_id → active commission for this month
-    const commMap = new Map<string, number>()
-    for (const c of commissionsRes.data ?? []) {
-      // Pick the most recent commission that was effective during this month
-      const effectiveTo = c.effective_to
-      if (effectiveTo && effectiveTo < from) continue
-      if (!commMap.has(c.doctor_id)) {
-        commMap.set(c.doctor_id, c.commission_pct)
-      }
-    }
-
     // Build visit stats per doctor
-    const visitMap = new Map<string, { visits: CpDoctor['id'][]; revenue: number; dates: Set<string> }>()
+    const visitMap = new Map<
+      string,
+      { visits: string[]; revenue: number; dates: Set<string> }
+    >()
     for (const v of visitsRes.data ?? []) {
-      if (!v.doctor_id) continue
-      const cur = visitMap.get(v.doctor_id) ?? { visits: [], revenue: 0, dates: new Set<string>() }
-      cur.visits.push(v.doctor_id)
-      cur.revenue += v.net_fee ?? 0
-      cur.dates.add(v.visit_date)
-      visitMap.set(v.doctor_id, cur)
+      const row = v as { doctor_id: string; visit_date: string; fee_paisas: number }
+      if (!row.doctor_id) continue
+      const cur = visitMap.get(row.doctor_id) ?? {
+        visits: [],
+        revenue: 0,
+        dates: new Set<string>(),
+      }
+      cur.visits.push(row.doctor_id)
+      cur.revenue += row.fee_paisas ?? 0
+      cur.dates.add(row.visit_date)
+      visitMap.set(row.doctor_id, cur)
     }
 
     const entries: DoctorEarningEntry[] = doctors.map((d) => {
@@ -453,7 +442,8 @@ export async function getDoctorEarningsReport(
       const totalVisits = stat ? stat.visits.length : 0
       const totalRevenue = stat ? stat.revenue : 0
       const daysWorked = stat ? stat.dates.size : 0
-      const commPct = commMap.get(d.id) ?? null
+      const commPct =
+        (d as unknown as { commission_pct: number | null }).commission_pct ?? null
 
       let grossEarnings = 0
       if (d.earning_model === 'salaried') {
@@ -461,13 +451,14 @@ export async function getDoctorEarningsReport(
         grossEarnings =
           workingDays > 0 ? Math.round((salary / workingDays) * daysWorked) : salary
       } else {
-        grossEarnings = Math.round((totalRevenue * (commPct ?? 0)) / 10000)
+        // commission_pct is a percentage (0-100), not basis points
+        grossEarnings = Math.round((totalRevenue * (commPct ?? 0)) / 100)
       }
 
       return {
         doctor_id: d.id,
-        doctor_name: d.full_name,
-        specialty: d.specialty,
+        doctor_name: (d as unknown as { name: string }).name,
+        specialization: (d as unknown as { specialization: string | null }).specialization ?? null,
         earning_model: d.earning_model,
         total_visits: totalVisits,
         total_revenue: totalRevenue,
@@ -498,6 +489,7 @@ export async function getDoctorEarningsReport(
 
 // =============================================================================
 // getPartnerPayoutReport
+// split_pct on cp_xray_partners is a direct percentage (e.g. 50.00), not basis points
 // =============================================================================
 
 export async function getPartnerPayoutReport(
@@ -519,70 +511,32 @@ export async function getPartnerPayoutReport(
       getClinicName(supabase),
       supabase
         .from('cp_xray_revenue')
-        .select('id, gross_amount')
+        .select('id, amount_paisas')
         .gte('revenue_date', from)
-        .lte('revenue_date', to)
-        .is('deleted_at', null),
+        .lte('revenue_date', to),
       supabase
         .from('cp_xray_partners')
-        .select('id, partner_name, partner_type')
-        .is('deleted_at', null),
+        .select('id, name, split_pct')
+        .eq('is_active', true),
     ])
 
     if (revenueRes.error) return { success: false, error: revenueRes.error.message }
     if (partnersRes.error) return { success: false, error: partnersRes.error.message }
 
-    const revenueIds = (revenueRes.data ?? []).map((r) => r.id)
-    const total_xray_revenue = (revenueRes.data ?? []).reduce(
-      (s, r) => s + (r.gross_amount ?? 0),
+    type RevRow = { id: string; amount_paisas: number }
+    const total_xray_revenue = ((revenueRes.data ?? []) as unknown as RevRow[]).reduce(
+      (s, r) => s + (r.amount_paisas ?? 0),
       0
     )
 
-    let splitsRes: {
-      data: { partner_id: string; split_pct: number; split_amount: number | null; revenue_id: string }[] | null
-      error: { message: string } | null
-    } | null = null
-
-    if (revenueIds.length > 0) {
-      splitsRes = await supabase
-        .from('cp_xray_partner_splits')
-        .select('partner_id, split_pct, split_amount, revenue_id')
-        .in('revenue_id', revenueIds)
-        .is('deleted_at', null)
-    }
-
-    const partnerMap = new Map<string, { partner_name: string; partner_type: string }>()
-    for (const p of partnersRes.data ?? []) {
-      partnerMap.set(p.id, { partner_name: p.partner_name, partner_type: p.partner_type })
-    }
-
-    // Aggregate by partner
-    const payoutMap = new Map<
-      string,
-      { payout_amount: number; revenue_entries: number; last_pct: number }
-    >()
-
-    for (const s of splitsRes?.data ?? []) {
-      const cur = payoutMap.get(s.partner_id) ?? { payout_amount: 0, revenue_entries: 0, last_pct: 0 }
-      payoutMap.set(s.partner_id, {
-        payout_amount: cur.payout_amount + (s.split_amount ?? 0),
-        revenue_entries: cur.revenue_entries + 1,
-        last_pct: s.split_pct,
-      })
-    }
-
-    const entries: PartnerPayoutEntry[] = Array.from(payoutMap.entries())
-      .map(([pid, stat]) => {
-        const partner = partnerMap.get(pid)
-        return {
-          partner_id: pid,
-          partner_name: partner?.partner_name ?? 'Unknown Partner',
-          partner_type: partner?.partner_type ?? '',
-          revenue_entries: stat.revenue_entries,
-          payout_amount: stat.payout_amount,
-          split_pct_display: stat.last_pct,
-        }
-      })
+    type PartnerRow = { id: string; name: string; split_pct: number }
+    const entries: PartnerPayoutEntry[] = ((partnersRes.data ?? []) as unknown as PartnerRow[])
+      .map((p) => ({
+        partner_id: p.id,
+        partner_name: p.name,
+        payout_amount: Math.round((total_xray_revenue * (p.split_pct ?? 0)) / 100),
+        split_pct: p.split_pct ?? 0,
+      }))
       .sort((a, b) => b.payout_amount - a.payout_amount)
 
     const total_payout = entries.reduce((s, e) => s + e.payout_amount, 0)
@@ -622,19 +576,14 @@ export async function getExpenseReport(
     const from = firstDayOfMonth(month)
     const to = lastDayOfMonth(month)
 
-    const [clinicName, expensesRes, deptRes, headRes, labExpRes, xrayExpRes] = await Promise.all([
+    const [clinicName, expensesRes, headRes, labExpRes, xrayExpRes] = await Promise.all([
       getClinicName(supabase),
-      // General expenses (cp_expenses) with department and head
+      // General expenses: department is enum, head_id is FK
       supabase
         .from('cp_expenses')
-        .select('id, amount, department_id, expense_head_id, custom_head')
+        .select('id, amount_paisas, department, head_id')
         .gte('expense_date', from)
-        .lte('expense_date', to)
-        .is('deleted_at', null),
-      supabase
-        .from('cp_departments')
-        .select('id, name')
-        .eq('is_active', true),
+        .lte('expense_date', to),
       supabase
         .from('cp_expense_heads')
         .select('id, name')
@@ -643,64 +592,27 @@ export async function getExpenseReport(
       // Lab-specific expenses
       supabase
         .from('cp_lab_expenses')
-        .select('id, amount, expense_head_id, custom_head')
+        .select('id, amount, expense_head_id')
         .gte('expense_date', from)
-        .lte('expense_date', to)
-        .is('deleted_at', null),
+        .lte('expense_date', to),
       // X-Ray-specific expenses
       supabase
         .from('cp_xray_expenses')
-        .select('id, amount, expense_head_id, custom_head')
+        .select('id, amount, expense_head_id')
         .gte('expense_date', from)
-        .lte('expense_date', to)
-        .is('deleted_at', null),
+        .lte('expense_date', to),
     ])
 
     if (expensesRes.error) return { success: false, error: expensesRes.error.message }
 
-    const deptMap = new Map<string, string>()
-    for (const d of deptRes.data ?? []) deptMap.set(d.id, d.name)
-
     const headMap = new Map<string, string>()
     for (const h of headRes.data ?? []) headMap.set(h.id, h.name)
 
-    function resolveHead(head_id: string | null, custom: string | null): { id: string | null; name: string } {
+    function resolveHead(head_id: string | null): { id: string | null; name: string } {
       if (head_id && headMap.has(head_id)) return { id: head_id, name: headMap.get(head_id)! }
-      if (custom) return { id: null, name: custom }
       return { id: null, name: 'General' }
     }
 
-    // Group cp_expenses by department
-    const deptExpMap = new Map<
-      string | null,
-      Map<string | null, { name: string; total: number; count: number }>
-    >()
-
-    function addToDept(
-      dept_id: string | null,
-      dept_name: string,
-      head_id: string | null,
-      head_name: string,
-      amount: number
-    ) {
-      const key = dept_id
-      if (!deptExpMap.has(key)) deptExpMap.set(key, new Map())
-      const headMap2 = deptExpMap.get(key)!
-      const hKey = head_id ?? head_name
-      const existing = headMap2.get(hKey)
-      if (existing) {
-        existing.total += amount
-        existing.count += 1
-      } else {
-        headMap2.set(hKey, { name: head_name, total: amount, count: 1 })
-      }
-      // Store dept_name in parent map entry — tag onto key string
-      if (!deptExpMap.has(`__name__${key}`)) {
-        deptExpMap.set(`__name__${key}` as unknown as null, new Map([['__dept_name__', { name: dept_name, total: 0, count: 0 }]]))
-      }
-    }
-
-    // Simplified approach: use separate maps
     const deptDataMap = new Map<
       string | null,
       { dept_name: string; heads: Map<string, { name: string; total: number; count: number }> }
@@ -717,7 +629,7 @@ export async function getExpenseReport(
         deptDataMap.set(dept_id, { dept_name, heads: new Map() })
       }
       const entry = deptDataMap.get(dept_id)!
-      const hKey = head_id ?? `custom:${head_name}`
+      const hKey = head_id ?? `head:${head_name}`
       const existing = entry.heads.get(hKey)
       if (existing) {
         existing.total += amount
@@ -727,26 +639,34 @@ export async function getExpenseReport(
       }
     }
 
+    // General expenses — department is a direct enum value
     for (const e of expensesRes.data ?? []) {
-      const dept_name = e.department_id ? (deptMap.get(e.department_id) ?? 'Unknown Dept') : 'Cross-Department'
-      const head = resolveHead(e.expense_head_id, e.custom_head)
-      addExpense(e.department_id, dept_name, head.id, head.name, e.amount ?? 0)
+      const row = e as unknown as {
+        amount_paisas: number
+        department: string | null
+        head_id: string | null
+      }
+      const dept_name = row.department ?? 'Cross-Department'
+      const head = resolveHead(row.head_id)
+      addExpense(row.department, dept_name, head.id, head.name, row.amount_paisas ?? 0)
     }
 
-    // Lab expenses → Lab department
+    // Lab expenses
     for (const e of labExpRes.data ?? []) {
-      const head = resolveHead(e.expense_head_id, e.custom_head)
-      addExpense('lab', 'Laboratory', head.id, head.name, e.amount ?? 0)
+      const row = e as unknown as { amount: number; expense_head_id: string | null }
+      const head = resolveHead(row.expense_head_id)
+      addExpense('lab', 'Laboratory', head.id, head.name, row.amount ?? 0)
     }
 
-    // X-Ray expenses → X-Ray department
+    // X-Ray expenses
     for (const e of xrayExpRes.data ?? []) {
-      const head = resolveHead(e.expense_head_id, e.custom_head)
-      addExpense('xray', 'X-Ray', head.id, head.name, e.amount ?? 0)
+      const row = e as unknown as { amount: number; expense_head_id: string | null }
+      const head = resolveHead(row.expense_head_id)
+      addExpense('xray', 'X-Ray', head.id, head.name, row.amount ?? 0)
     }
 
-    const by_department: DeptExpenseRow[] = Array.from(deptDataMap.entries()).map(
-      ([dept_id, { dept_name, heads }]) => {
+    const by_department: DeptExpenseRow[] = Array.from(deptDataMap.entries())
+      .map(([dept_id, { dept_name, heads }]) => {
         const by_head: ExpenseHeadRow[] = Array.from(heads.values()).map((h) => ({
           head_id: null,
           head_name: h.name,
@@ -755,19 +675,19 @@ export async function getExpenseReport(
         }))
         const total_amount = by_head.reduce((s, h) => s + h.total_amount, 0)
         return {
-          dept_id: dept_id === 'lab' || dept_id === 'xray' ? null : dept_id,
+          department: dept_id,
           dept_name,
           total_amount,
           by_head,
         }
-      }
-    ).sort((a, b) => b.total_amount - a.total_amount)
+      })
+      .sort((a, b) => b.total_amount - a.total_amount)
 
     const grand_total = by_department.reduce((s, d) => s + d.total_amount, 0)
 
     const chart_data = by_department.map((d) => ({
       name: d.dept_name,
-      amount: Math.round(d.total_amount / 100 * 100) / 100, // PKR
+      amount: Math.round((d.total_amount / 100) * 100) / 100, // PKR
     }))
 
     return {
@@ -796,7 +716,7 @@ export async function getPayrollReport(
 
     const supabase = await createClient()
 
-    const [clinicName, workingDays, staffRes, deptRes] = await Promise.all([
+    const [clinicName, workingDays, staffRes] = await Promise.all([
       getClinicName(supabase),
       getWorkingDaysConfig(supabase),
       supabase
@@ -804,21 +724,13 @@ export async function getPayrollReport(
         .select('*')
         .eq('is_active', true)
         .is('deleted_at', null)
-        .order('full_name', { ascending: true }),
-      supabase
-        .from('cp_departments')
-        .select('id, name')
-        .eq('is_active', true),
+        .order('name', { ascending: true }),
     ])
 
     if (staffRes.error) return { success: false, error: staffRes.error.message }
 
-    const deptMap = new Map<string, string>()
-    for (const d of deptRes.data ?? []) deptMap.set(d.id, d.name)
-
     const entries: PayrollEntry[] = (staffRes.data as CpStaff[]).map((s) => {
       const monthly_salary = s.monthly_salary ?? 0
-      // Since we have no attendance data, report full-month salary
       const present_days = workingDays
       const earned_salary = monthly_salary
       const deductions = 0
@@ -826,9 +738,9 @@ export async function getPayrollReport(
 
       return {
         staff_id: s.id,
-        full_name: s.full_name,
-        designation: s.designation,
-        department: s.department_id ? (deptMap.get(s.department_id) ?? null) : null,
+        name: s.name,
+        staff_type: s.staff_type,
+        department: s.department ?? null,
         monthly_salary,
         working_days: workingDays,
         present_days,
@@ -884,44 +796,50 @@ export async function getLabDailyReport(
         .select(
           `*,
           cp_lab_tests(id, test_name, test_code, category, unit, reference_range),
-          cp_patients(id, full_name, patient_no, phone),
-          cp_payment_methods(id, name, slug)`
+          cp_patients(id, name, patient_no, phone)`
         )
-        .eq('log_date', date)
-        .is('deleted_at', null)
+        .eq('test_date', date)
         .order('created_at', { ascending: true }),
-      supabase.from('cp_payment_methods').select('id, name').eq('is_active', true),
+      supabase
+        .from('cp_payment_methods')
+        .select('method, label')
+        .eq('is_enabled', true),
     ])
 
     if (logsRes.error) return { success: false, error: logsRes.error.message }
 
+    // Build method → label map
     const pmMap = new Map<string, string>()
-    for (const pm of pmRes.data ?? []) pmMap.set(pm.id, pm.name)
+    for (const pm of pmRes.data ?? []) pmMap.set(pm.method as string, pm.label as string)
 
     const entries: LabTestLogWithRelations[] = (logsRes.data ?? []).map((row) => {
-      const { cp_lab_tests, cp_patients, cp_payment_methods, ...log } = row as typeof row & {
+      const { cp_lab_tests, cp_patients, ...log } = row as typeof row & {
         cp_lab_tests: CpLabTest | null
-        cp_patients: Pick<CpPatient, 'id' | 'full_name' | 'patient_no' | 'phone'> | null
-        cp_payment_methods: Pick<CpPaymentMethod, 'id' | 'name' | 'slug'> | null
+        cp_patients: Pick<CpPatient, 'id' | 'name' | 'patient_no' | 'phone'> | null
       }
       return {
         ...log,
         test: cp_lab_tests ?? undefined,
         patient: cp_patients ?? undefined,
-        payment_method: cp_payment_methods ?? undefined,
+        payment_method: undefined,
       } as unknown as LabTestLogWithRelations
     })
 
     const total_tests = entries.length
-    const total_revenue = entries.reduce((s, e) => s + (e.total_amount ?? 0), 0)
-    const total_discount = entries.reduce((s, e) => s + (e.discount_amount ?? 0), 0)
+    const total_revenue = entries.reduce(
+      (s, e) => s + ((e as unknown as { price_paisas: number }).price_paisas ?? 0),
+      0
+    )
     const net_revenue = total_revenue
 
-    const paymentRows = entries.map((e) => ({
-      amount: e.total_amount ?? 0,
-      method_id: e.payment_method_id,
-      method_name: e.payment_method_id ? (pmMap.get(e.payment_method_id) ?? null) : null,
-    }))
+    const paymentRows = entries.map((e) => {
+      const method = (e as unknown as { payment_method: string | null }).payment_method
+      return {
+        amount: (e as unknown as { price_paisas: number }).price_paisas ?? 0,
+        method_id: method ?? null,
+        method_name: method ? (pmMap.get(method) ?? method) : null,
+      }
+    })
     const payment_breakdown = buildPaymentBreakdown(paymentRows)
 
     return {
@@ -932,7 +850,6 @@ export async function getLabDailyReport(
         entries,
         total_tests,
         total_revenue,
-        total_discount,
         net_revenue,
         payment_breakdown,
       },
@@ -941,3 +858,4 @@ export async function getLabDailyReport(
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
+

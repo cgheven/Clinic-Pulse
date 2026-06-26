@@ -85,8 +85,8 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
     setDialog({
       open: true,
       chemicalId: c.id,
-      chemicalName: c.chemical_name,
-      currentQty: Number(c.quantity_in_stock),
+      chemicalName: c.name,
+      currentQty: Number(c.quantity),
       unit: c.unit,
       type,
     })
@@ -113,11 +113,11 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
         setChemicals((prev) =>
           prev.map((c) => {
             if (c.id !== dialog.chemicalId) return c
-            const newQty = Math.max(0, Number(c.quantity_in_stock) + delta)
+            const newQty = Math.max(0, Number(c.quantity) + delta)
             return {
               ...c,
-              quantity_in_stock: newQty,
-              isLowStock: newQty <= Number(c.low_stock_threshold),
+              quantity: newQty,
+              isLowStock: newQty <= Number(c.reorder_level),
             }
           })
         )
@@ -209,18 +209,8 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
                       <td className="py-3 pl-4 pr-3">
                         <div>
                           <p className="font-medium text-foreground">
-                            {c.chemical_name}
+                            {c.name}
                           </p>
-                          {c.manufacturer && (
-                            <p className="text-[10px] text-muted-foreground">
-                              {c.manufacturer}
-                            </p>
-                          )}
-                          {c.location && (
-                            <p className="text-[10px] text-muted-foreground">
-                              Loc: {c.location}
-                            </p>
-                          )}
                         </div>
                       </td>
 
@@ -232,7 +222,7 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
                             c.isLowStock ? 'text-destructive' : 'text-foreground'
                           )}
                         >
-                          {Number(c.quantity_in_stock).toFixed(2)}
+                          {Number(c.quantity).toFixed(2)}
                           <span className="ml-1 text-xs font-normal text-muted-foreground">
                             {c.unit}
                           </span>
@@ -241,7 +231,7 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
 
                       {/* Threshold */}
                       <td className="px-3 py-3 text-muted-foreground">
-                        {Number(c.low_stock_threshold).toFixed(2)} {c.unit}
+                        {Number(c.reorder_level).toFixed(2)} {c.unit}
                       </td>
 
                       {/* Expiry */}

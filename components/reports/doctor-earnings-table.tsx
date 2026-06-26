@@ -109,8 +109,8 @@ export function DoctorEarningsTable({ data }: DoctorEarningsTableProps) {
                   <tr key={e.doctor_id} className="hover:bg-muted/10 transition-colors">
                     <td className="py-3 pl-4 pr-3">
                       <p className="font-medium text-foreground">{e.doctor_name}</p>
-                      {e.specialty && (
-                        <p className="text-xs text-muted-foreground">{e.specialty}</p>
+                      {e.specialization && (
+                        <p className="text-xs text-muted-foreground">{e.specialization}</p>
                       )}
                     </td>
                     <td className="px-3 py-3">
