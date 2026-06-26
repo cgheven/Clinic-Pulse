@@ -45,7 +45,7 @@ export type XrayPartnerWithSplit = CpXrayPartner & {
 }
 
 export type DoctorWithCommission = CpDoctor & {
-  current_commission_pct: number | null // percentage; null when salaried
+  current_commission_pct: number | null // basis points (0-10000); null when salaried
 }
 
 // =============================================================================
@@ -750,6 +750,91 @@ export async function updateDoctorSettings(
       .eq('id', doctorId)
 
     if (doctorError) return { success: false, error: doctorError.message }
+
+    revalidatePath('/settings')
+    return { success: true, data: undefined }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+// =============================================================================
+// Doctors — Create / Deactivate
+// =============================================================================
+
+const createDoctorSchema = z
+  .object({
+    name: z.string().min(1, 'Name is required').max(200),
+    specialization: z.string().max(200).nullable().optional(),
+    phone: z.string().max(50).nullable().optional(),
+    earning_model: z.enum(['salaried', 'commission']),
+    commission_pct: z.number().min(0).max(100).optional(),
+    monthly_salary: z.number().int().min(0).optional(),
+  })
+  .refine(
+    (d) => d.earning_model !== 'commission' || d.commission_pct !== undefined,
+    { message: 'Commission % is required for commission-based doctors', path: ['commission_pct'] }
+  )
+
+export async function createDoctor(rawData: unknown): Promise<ActionResult<DoctorWithCommission>> {
+  try {
+    await requireAdmin()
+
+    const parsed = createDoctorSchema.safeParse(rawData)
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
+    }
+
+    const { name, specialization, phone, earning_model, commission_pct, monthly_salary } =
+      parsed.data
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('cp_doctors')
+      .insert({
+        name,
+        specialization: specialization ?? null,
+        phone: phone ?? null,
+        earning_model,
+        commission_pct: earning_model === 'commission' ? (commission_pct ?? null) : null,
+        monthly_salary: earning_model === 'salaried' ? (monthly_salary ?? null) : null,
+        is_active: true,
+      })
+      .select()
+      .single()
+
+    if (error) return { success: false, error: error.message }
+
+    const row = data as CpDoctor
+    const result: DoctorWithCommission = {
+      ...row,
+      current_commission_pct: row.commission_pct ?? null,
+    }
+
+    revalidatePath('/settings')
+    return { success: true, data: result }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+export async function deactivateDoctor(id: string): Promise<ActionResult<undefined>> {
+  try {
+    await requireAdmin()
+
+    const idParsed = z.string().uuid().safeParse(id)
+    if (!idParsed.success) return { success: false, error: 'Invalid doctor ID' }
+
+    const supabase = await createClient()
+
+    // Set both is_active=false AND deleted_at so getDoctorSettings (which filters
+    // on deleted_at IS NULL) excludes this doctor on every subsequent page load.
+    const { error } = await supabase
+      .from('cp_doctors')
+      .update({ is_active: false, deleted_at: new Date().toISOString() })
+      .eq('id', id)
+
+    if (error) return { success: false, error: error.message }
 
     revalidatePath('/settings')
     return { success: true, data: undefined }
