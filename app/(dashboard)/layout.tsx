@@ -38,5 +38,18 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return <DashboardShell user={profile}>{children}</DashboardShell>;
+  const settingResult = await supabase
+    .from("cp_settings")
+    .select("setting_value")
+    .eq("setting_key", "clinic.clinic_name")
+    .maybeSingle();
+
+  const clinicName =
+    (settingResult.data?.setting_value as string | null) ?? "ClinicPulse";
+
+  return (
+    <DashboardShell user={profile} clinicName={clinicName}>
+      {children}
+    </DashboardShell>
+  );
 }

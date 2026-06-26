@@ -153,15 +153,16 @@ export function Sidebar({ userRole, user, onClose, mobile }: SidebarProps) {
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2.5"
+          className="flex items-center gap-2.5 group"
           onClick={onClose}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-md shadow-primary/30">
-            <Activity className="h-4 w-4 text-primary-foreground" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 transition-all group-hover:bg-primary/15">
+            <Activity className="h-4 w-4 text-primary" />
           </div>
-          <span className="text-sm font-semibold text-foreground">
-            ClinicPulse
-          </span>
+          <div>
+            <p className="text-foreground font-bold text-sm tracking-tight leading-none">Pulse</p>
+            <p className="text-primary/70 text-[10px] mt-0.5 font-semibold tracking-[0.15em] uppercase">Pulse of Your Business</p>
+          </div>
         </Link>
 
         {mobile && onClose && (
@@ -200,17 +201,20 @@ export function Sidebar({ userRole, user, onClose, mobile }: SidebarProps) {
                         href={item.href}
                         onClick={onClose}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                          "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                           active
-                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                            ? "bg-primary/10 text-primary"
                             : "text-sidebar-foreground hover:bg-sidebar-border hover:text-foreground"
                         )}
                       >
+                        {active && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full bg-primary" />
+                        )}
                         <Icon
                           className={cn(
                             "h-4 w-4 shrink-0",
                             active
-                              ? "text-primary-foreground"
+                              ? "text-primary"
                               : "text-muted-foreground"
                           )}
                         />

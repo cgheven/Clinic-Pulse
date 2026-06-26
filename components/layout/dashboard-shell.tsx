@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Menu, Settings, User } from "lucide-react";
+import { Bell, Building2, LogOut, Menu, Settings, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,10 @@ import Link from "next/link";
 interface DashboardShellProps {
   user: CpUser;
   children: React.ReactNode;
+  clinicName?: string;
 }
 
-export function DashboardShell({ user, children }: DashboardShellProps) {
+export function DashboardShell({ user, children, clinicName }: DashboardShellProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -75,7 +76,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
         <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:px-6">
-          {/* Left: hamburger (mobile only) */}
+          {/* Left: hamburger (mobile only) + clinic name */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -84,6 +85,16 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             >
               <Menu className="h-5 w-5" />
             </button>
+            {clinicName && (
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 border border-primary/20 shrink-0">
+                  <Building2 className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <span className="font-semibold text-sm text-foreground truncate max-w-[200px]">
+                  {clinicName}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Right: actions */}

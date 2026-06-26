@@ -52,7 +52,7 @@
   --card-foreground:        #f0f0f5;
   --popover:                #111118;
   --popover-foreground:     #f0f0f5;
-  --primary:                #f59e0b;      /* amber-500 */
+  --primary:                #F5A623;      /* amber gold — matches Pulse brand */
   --primary-foreground:     #0a0a0f;
   --secondary:              #1c1c27;
   --secondary-foreground:   #c8c8d4;
@@ -64,10 +64,10 @@
   --destructive-foreground: #fef2f2;
   --border:                 #1e1e2d;
   --input:                  #1c1c27;
-  --ring:                   #f59e0b;
+  --ring:                   #F5A623;
   --success:                #22c55e;
   --success-foreground:     #f0fdf4;
-  --warning:                #f59e0b;
+  --warning:                #f97316;      /* orange — distinct from primary */
   --warning-foreground:     #0a0a0f;
   --info:                   #3b82f6;
   --info-foreground:        #eff6ff;
@@ -76,7 +76,7 @@
   --sidebar:                #0d0d14;
   --sidebar-foreground:     #c8c8d4;
   --sidebar-border:         #1a1a24;
-  --sidebar-accent:         #f59e0b;
+  --sidebar-accent:         #F5A623;
   --sidebar-accent-foreground: #0a0a0f;
 }
 
@@ -113,4 +113,12 @@ body {
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
