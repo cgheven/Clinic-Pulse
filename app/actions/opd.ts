@@ -334,6 +334,7 @@ export async function getPatients(params: {
         .select('patient_id, visit_date')
         .in('patient_id', patients.map((p) => p.id))
         .order('visit_date', { ascending: false })
+        .limit(patients.length * 50)
 
       const visitMap = new Map<string, { count: number; lastDate: string | null }>()
       for (const v of visitData ?? []) {

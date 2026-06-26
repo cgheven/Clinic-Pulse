@@ -19,21 +19,22 @@ import {
 import type { CpDoctor, CpPatient } from '@/types/index'
 
 interface VisitFormProps {
-  // Pre-selected patient (when navigating from patient detail page)
   patient?: Pick<CpPatient, 'id' | 'name' | 'patient_no'>
-  // Available patients to select (when no pre-selected patient)
   patients?: Pick<CpPatient, 'id' | 'name' | 'patient_no' | 'phone'>[]
+  // Pre-fetched server-side — eliminates client-side loading spinners
+  initialDoctors?: CpDoctor[]
+  initialPaymentMethods?: Array<{ method: string; label: string }>
   onSuccess?: (visitId: string) => void
 }
 
-export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
+export function VisitForm({ patient, patients, initialDoctors, initialPaymentMethods, onSuccess }: VisitFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const [doctors, setDoctors] = useState<CpDoctor[]>([])
-  const [paymentMethods, setPaymentMethods] = useState<Array<{ method: string; label: string }>>([])
-  const [loadingDeps, setLoadingDeps] = useState(true)
+  const [doctors, setDoctors] = useState<CpDoctor[]>(initialDoctors ?? [])
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ method: string; label: string }>>(initialPaymentMethods ?? [])
+  const [loadingDeps, setLoadingDeps] = useState(!initialDoctors)
 
   // Form fields
   const [patientId, setPatientId] = useState(patient?.id ?? '')
@@ -46,6 +47,8 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
+    // Skip if data was already provided server-side
+    if (initialDoctors) return
     async function loadDeps() {
       const [docRes, pmRes] = await Promise.all([getActiveDoctors(), getActivePaymentMethods()])
       if (docRes.success) setDoctors(docRes.data as unknown as CpDoctor[])
@@ -53,6 +56,7 @@ export function VisitForm({ patient, patients, onSuccess }: VisitFormProps) {
       setLoadingDeps(false)
     }
     void loadDeps()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleSubmit(e: React.FormEvent) {

@@ -1,8 +1,9 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { getPatients, getPatient } from '@/app/actions/opd'
+import { getPatients, getPatient, getActiveDoctors, getActivePaymentMethods } from '@/app/actions/opd'
 import { VisitForm } from '@/components/opd/visit-form'
+import type { CpDoctor } from '@/types/index'
 
 export const metadata = {
   title: 'Record Visit — OPD — ClinicPulse',
@@ -14,21 +15,38 @@ interface NewVisitPageProps {
 
 async function NewVisitForm({ patientId }: { patientId?: string }) {
   if (patientId) {
-    // Pre-selected patient
-    const result = await getPatient(patientId)
-    if (result.success) {
-      const patient = result.data
+    // Fetch patient + dropdown data in one parallel batch
+    const [patientRes, doctorsRes, pmRes] = await Promise.all([
+      getPatient(patientId),
+      getActiveDoctors(),
+      getActivePaymentMethods(),
+    ])
+
+    const doctors = doctorsRes.success ? (doctorsRes.data as unknown as CpDoctor[]) : []
+    const paymentMethods = pmRes.success ? pmRes.data : []
+
+    if (patientRes.success) {
+      const patient = patientRes.data
       return (
         <VisitForm
           patient={{ id: patient.id, name: patient.name, patient_no: patient.patient_no ?? 0 }}
+          initialDoctors={doctors}
+          initialPaymentMethods={paymentMethods}
         />
       )
     }
   }
 
-  // Load patient list for selection
-  const result = await getPatients({ limit: 100 })
-  const patients = result.success ? result.data.data : []
+  // No patient pre-selected — fetch patient list + dropdown data in parallel
+  const [patientsRes, doctorsRes, pmRes] = await Promise.all([
+    getPatients({ limit: 100 }),
+    getActiveDoctors(),
+    getActivePaymentMethods(),
+  ])
+
+  const patients = patientsRes.success ? patientsRes.data.data : []
+  const doctors = doctorsRes.success ? (doctorsRes.data as unknown as CpDoctor[]) : []
+  const paymentMethods = pmRes.success ? pmRes.data : []
 
   return (
     <VisitForm
@@ -38,6 +56,8 @@ async function NewVisitForm({ patientId }: { patientId?: string }) {
         patient_no: p.patient_no ?? 0,
         phone: p.phone,
       }))}
+      initialDoctors={doctors}
+      initialPaymentMethods={paymentMethods}
     />
   )
 }
@@ -48,7 +68,6 @@ export default async function NewVisitPage({ searchParams }: NewVisitPageProps) 
 
   return (
     <div className="space-y-6">
-      {/* Back */}
       <Link
         href="/opd/visits"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -57,12 +76,9 @@ export default async function NewVisitPage({ searchParams }: NewVisitPageProps) 
         Back to Visits
       </Link>
 
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Record New Visit</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Log a new OPD consultation
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Log a new OPD consultation</p>
       </div>
 
       <div className="max-w-2xl">
