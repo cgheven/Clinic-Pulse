@@ -104,8 +104,8 @@ export function getTodayPKT(): string {
  * Convert basis points (0–10000) to a percentage string.
  * e.g. 3000 → "30.00%"
  */
-export function formatBasisPoints(bp: number): string {
-  return `${(bp / 100).toFixed(2)}%`;
+export function formatBasisPoints(pct: number): string {
+  return `${pct.toFixed(2)}%`;
 }
 
 /**

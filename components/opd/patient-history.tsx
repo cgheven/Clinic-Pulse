@@ -1,8 +1,19 @@
 'use client'
 
-import { Clock, Stethoscope, FileText, CreditCard, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { Stethoscope, FileText, CreditCard, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react'
 import { cn, formatDate, formatCurrencyPaisas } from '@/lib/utils'
-import { useState } from 'react'
+import { deleteVisit } from '@/app/actions/opd'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { VisitWithRelations } from '@/app/actions/opd'
 
 interface PatientHistoryProps {
@@ -21,8 +32,25 @@ function formatPaymentMethod(method: string): string {
 }
 
 function VisitItem({ visit }: { visit: VisitWithRelations }) {
+  const router = useRouter()
   const [expanded, setExpanded] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const hasClinicalData = visit.diagnosis || visit.prescription || visit.notes
+
+  function handleDelete() {
+    setDeleteError(null)
+    startTransition(async () => {
+      const result = await deleteVisit(visit.id)
+      if (!result.success) {
+        setDeleteError(result.error)
+        return
+      }
+      setDeleteOpen(false)
+      router.refresh()
+    })
+  }
 
   return (
     <div className="relative pl-6">
@@ -58,11 +86,18 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
             </div>
           </div>
 
-          {/* Fee */}
-          <div className="shrink-0 text-right">
+          {/* Fee + delete */}
+          <div className="flex items-center gap-2 shrink-0">
             <p className="text-sm font-bold text-primary">
               {formatCurrencyPaisas(visit.fee_paisas)}
             </p>
+            <button
+              onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
+              className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all"
+              title="Delete visit"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
 
@@ -95,6 +130,37 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteOpen} onOpenChange={(o) => { if (!isPending) setDeleteOpen(o) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Visit Record</DialogTitle>
+            <DialogDescription>
+              Remove the visit on <span className="font-medium text-foreground">{formatDate(visit.visit_date)}</span>
+              {visit.fee_paisas > 0 && (
+                <> ({formatCurrencyPaisas(visit.fee_paisas)})</>
+              )}? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isPending}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Visit'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -113,7 +179,6 @@ function Field({ label, value }: { label: string; value: string }) {
 export function PatientHistory({ visits, className }: PatientHistoryProps) {
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Header */}
       <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <FileText className="h-4 w-4 text-primary" />
         Visit History
@@ -133,11 +198,8 @@ export function PatientHistory({ visits, className }: PatientHistoryProps) {
           </p>
         </div>
       ) : (
-        // Timeline
         <div className="relative space-y-3">
-          {/* Vertical line */}
           <div className="absolute left-[7px] top-3 bottom-3 w-px bg-border" aria-hidden="true" />
-
           {visits.map((visit) => (
             <VisitItem key={visit.id} visit={visit} />
           ))}

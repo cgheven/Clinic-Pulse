@@ -15,6 +15,7 @@ import {
 import { getPatient } from '@/app/actions/opd'
 import { PatientHistory } from '@/components/opd/patient-history'
 import { BpLog } from '@/components/opd/bp-log'
+import { DeletePatientButton } from '@/components/opd/delete-patient-button'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDate, cn } from '@/lib/utils'
@@ -103,12 +104,15 @@ async function PatientDetailContent({ id }: { id: string }) {
             </div>
           </div>
 
-          <Button asChild size="sm">
-            <Link href={`/opd/visits/new?patient_id=${patient.id}`}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Visit
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <DeletePatientButton patientId={patient.id} patientName={patient.name} />
+            <Button asChild size="sm">
+              <Link href={`/opd/visits/new?patient_id=${patient.id}`}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Visit
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Address */}

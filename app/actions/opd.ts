@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, requireAdmin } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
 
 // =============================================================================
@@ -698,6 +698,60 @@ export async function getDoctorEarnings(doctorId: string, month: string): Promis
 // =============================================================================
 // Payment Methods (for forms)
 // =============================================================================
+
+export async function deleteVisit(id: string): Promise<ActionResult<null>> {
+  try {
+    await requireAdmin()
+    if (!id || typeof id !== 'string') return { success: false, error: 'Invalid visit ID' }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('cp_patient_visits')
+      .delete()
+      .eq('id', id)
+
+    if (error) return { success: false, error: error.message }
+
+    // Visits affect revenue/commission across all OPD pages — clear the entire subtree
+    revalidatePath('/opd', 'layout')
+    return { success: true, data: null }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+export async function deletePatient(id: string): Promise<ActionResult<null>> {
+  try {
+    await requireAdmin()
+    if (!id || typeof id !== 'string') return { success: false, error: 'Invalid patient ID' }
+
+    const supabase = await createClient()
+
+    // Hard-delete all visits first — they are financial records with no deleted_at column,
+    // and leaving them would keep the revenue/commission on doctor profiles intact.
+    const { error: visitsError } = await supabase
+      .from('cp_patient_visits')
+      .delete()
+      .eq('patient_id', id)
+
+    if (visitsError) return { success: false, error: visitsError.message }
+
+    // Soft-delete the patient record
+    const { error } = await supabase
+      .from('cp_patients')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .is('deleted_at', null)
+
+    if (error) return { success: false, error: error.message }
+
+    // Visits affect revenue/commission across all OPD pages
+    revalidatePath('/opd', 'layout')
+    return { success: true, data: null }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
 
 export async function getActivePaymentMethods(): Promise<ActionResult<Array<{ method: string; label: string }>>> {
   try {
