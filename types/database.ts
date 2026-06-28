@@ -195,6 +195,7 @@ type CpLabMachineryRow = {
   last_service: string | null;
   next_service: string | null;
   status: string;
+  purchase_price_paisas: number | null; // bigint (paisas)
   notes: string | null;
   created_at: string;
   updated_at: string;

@@ -31,7 +31,7 @@ import {
   Plus,
 } from 'lucide-react'
 import type { ChemicalWithLowStock } from '@/app/actions/lab'
-import { adjustChemicalStock } from '@/app/actions/lab'
+import { adjustChemicalStock, createChemical } from '@/app/actions/lab'
 
 // =============================================================================
 // Props
@@ -67,6 +67,8 @@ const CLOSED_DIALOG: AdjustDialogState = {
 // ChemicalInventory
 // =============================================================================
 
+const EMPTY_ADD = { name: '', quantity: '', unit: '', reorder_level: '', cost_price: '', supplier: '', expiry_date: '' }
+
 export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) {
   const [chemicals, setChemicals] =
     useState<ChemicalWithLowStock[]>(initialChemicals)
@@ -75,7 +77,40 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
   const [, startTransition] = useTransition()
   const [isPending, setIsPending] = useState(false)
 
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState(EMPTY_ADD)
+  const [addError, setAddError] = useState<string | null>(null)
+  const [isAdding, startAdding] = useTransition()
+
   const lowStockCount = chemicals.filter((c) => c.isLowStock).length
+
+  function handleAdd() {
+    setAddError(null)
+    const qty = parseFloat(addForm.quantity)
+    const reorder = parseFloat(addForm.reorder_level)
+    const costPkr = parseFloat(addForm.cost_price || '0')
+    if (!addForm.name.trim()) { setAddError('Name is required'); return }
+    if (isNaN(qty) || qty < 0) { setAddError('Quantity must be 0 or more'); return }
+    if (!addForm.unit.trim()) { setAddError('Unit is required'); return }
+    if (isNaN(reorder) || reorder < 0) { setAddError('Reorder level must be 0 or more'); return }
+
+    startAdding(async () => {
+      const result = await createChemical({
+        name: addForm.name.trim(),
+        quantity: qty,
+        unit: addForm.unit.trim(),
+        reorder_level: reorder,
+        cost_price_paisas: Math.round(costPkr * 100),
+        supplier: addForm.supplier.trim() || null,
+        expiry_date: addForm.expiry_date || null,
+      })
+      if (!result.success) { setAddError(result.error); return }
+      setChemicals((prev) => [...prev, { ...result.data, isLowStock: qty <= reorder }].sort((a, b) => a.name.localeCompare(b.name)))
+      setShowAdd(false)
+      setAddForm(EMPTY_ADD)
+      toast({ title: 'Chemical added', description: `${result.data.name} added to inventory.` })
+    })
+  }
 
   function openDialog(
     c: ChemicalWithLowStock,
@@ -156,6 +191,10 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
             </div>
           )}
         </div>
+        <Button size="sm" onClick={() => { setAddError(null); setAddForm(EMPTY_ADD); setShowAdd(true) }}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Chemical
+        </Button>
       </div>
 
       {/* Table */}
@@ -303,6 +342,54 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
           )}
         </CardContent>
       </Card>
+
+      {/* Add Chemical dialog */}
+      <Dialog open={showAdd} onOpenChange={(o) => { if (!isAdding) setShowAdd(o) }}>
+        <DialogContent className="bg-card sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Add Chemical</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {addError && <p className="text-sm text-destructive">{addError}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Name *</Label>
+                <Input value={addForm.name} onChange={(e) => setAddForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Hydrochloric Acid" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Initial Quantity *</Label>
+                <Input type="number" min="0" step="0.01" value={addForm.quantity} onChange={(e) => setAddForm(f => ({ ...f, quantity: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Unit *</Label>
+                <Input value={addForm.unit} onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))} placeholder="ml, g, L, pcs" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Reorder Level *</Label>
+                <Input type="number" min="0" step="0.01" value={addForm.reorder_level} onChange={(e) => setAddForm(f => ({ ...f, reorder_level: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Cost Price (PKR)</Label>
+                <Input type="number" min="0" step="1" value={addForm.cost_price} onChange={(e) => setAddForm(f => ({ ...f, cost_price: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Supplier</Label>
+                <Input value={addForm.supplier} onChange={(e) => setAddForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Supplier name" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Expiry Date</Label>
+                <Input type="date" value={addForm.expiry_date} onChange={(e) => setAddForm(f => ({ ...f, expiry_date: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAdd(false)} disabled={isAdding}>Cancel</Button>
+            <Button onClick={handleAdd} disabled={isAdding}>
+              {isAdding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding…</> : <><Plus className="mr-2 h-4 w-4" />Add Chemical</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Adjust stock dialog */}
       <Dialog

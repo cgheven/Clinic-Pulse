@@ -282,6 +282,7 @@ export interface CpLabMachinery {
   last_service: string | null; // date
   next_service: string | null; // date
   status: string; // text (free-form)
+  purchase_price_paisas: number | null; // bigint (paisas)
   notes: string | null;
   created_at: string;
   updated_at: string;

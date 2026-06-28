@@ -1,18 +1,29 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useTransition } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn, formatCurrencyPaisas, formatDate } from '@/lib/utils'
 import {
   AlertTriangle,
   CalendarCheck,
   CalendarX,
   CheckCircle2,
+  Loader2,
   Microscope,
+  Trash2,
   Wrench,
 } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
+import { deleteEquipment } from '@/app/actions/lab'
 import type { MachineryWithStatus } from '@/app/actions/lab'
 
 // =============================================================================
@@ -22,6 +33,7 @@ import type { MachineryWithStatus } from '@/app/actions/lab'
 interface EquipmentCardProps {
   machine: MachineryWithStatus
   onAddMaintenance: (machineId: string) => void
+  onDeleted: (machineId: string) => void
 }
 
 // =============================================================================
@@ -50,166 +62,221 @@ const STATUS_CONFIG = {
 // EquipmentCard
 // =============================================================================
 
-export function EquipmentCard({ machine, onAddMaintenance }: EquipmentCardProps) {
+export function EquipmentCard({ machine, onAddMaintenance, onDeleted }: EquipmentCardProps) {
   const cfg = STATUS_CONFIG[machine.status]
   const StatusIcon = cfg.icon
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [isDeleting, startDeleting] = useTransition()
+
+  function handleDelete() {
+    startDeleting(async () => {
+      const result = await deleteEquipment(machine.id)
+      if (!result.success) {
+        toast({ title: 'Failed to delete', description: result.error, variant: 'destructive' })
+        return
+      }
+      toast({ title: 'Equipment removed', description: `${machine.name} has been removed.` })
+      onDeleted(machine.id)
+    })
+  }
 
   return (
-    <Card
-      className={cn(
-        'border-border bg-card transition-all',
-        machine.status === 'overdue' && 'border-destructive/30',
-        machine.status === 'maintenance_due' && 'border-warning/30'
-      )}
-    >
-      <CardHeader className="flex flex-row items-start justify-between pb-3">
-        <div className="flex items-start gap-3">
-          <div
-            className={cn(
-              'rounded-lg p-2',
-              machine.status === 'overdue'
-                ? 'bg-destructive/10'
-                : machine.status === 'maintenance_due'
-                  ? 'bg-warning/10'
-                  : 'bg-primary/10'
-            )}
-          >
-            <Microscope
+    <>
+      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!isDeleting) setConfirmOpen(o) }}>
+        <DialogContent className="bg-card sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Remove Equipment?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will permanently remove <span className="font-semibold text-foreground">{machine.name}</span> and all its maintenance records. This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={isDeleting}>Cancel</Button>
+            <Button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Removing…</> : 'Remove'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Card
+        className={cn(
+          'border-border bg-card transition-all',
+          machine.status === 'overdue' && 'border-destructive/30',
+          machine.status === 'maintenance_due' && 'border-warning/30'
+        )}
+      >
+        <CardHeader className="flex flex-row items-start justify-between pb-3">
+          <div className="flex items-start gap-3">
+            <div
               className={cn(
-                'h-4 w-4',
+                'rounded-lg p-2',
                 machine.status === 'overdue'
-                  ? 'text-destructive'
+                  ? 'bg-destructive/10'
                   : machine.status === 'maintenance_due'
-                    ? 'text-warning'
-                    : 'text-primary'
+                    ? 'bg-warning/10'
+                    : 'bg-primary/10'
               )}
-            />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-semibold text-foreground">{machine.name}</h3>
-            {machine.model && (
-              <p className="text-xs text-muted-foreground">Model: {machine.model}</p>
-            )}
-          </div>
-        </div>
-
-        <Badge
-          variant="secondary"
-          className={cn('shrink-0 flex items-center gap-1 text-[10px]', cfg.className)}
-        >
-          <StatusIcon className="h-2.5 w-2.5" />
-          {cfg.label}
-        </Badge>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Details grid */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          {machine.serial_number && (
-            <>
-              <span className="text-muted-foreground">Serial No.</span>
-              <span className="text-foreground">{machine.serial_number}</span>
-            </>
-          )}
-          {machine.purchase_date && (
-            <>
-              <span className="text-muted-foreground">Purchased</span>
-              <span className="text-foreground">
-                {formatDate(machine.purchase_date)}
-              </span>
-            </>
-          )}
-          {machine.last_service && (
-            <>
-              <span className="text-muted-foreground">Last Serviced</span>
-              <span className="text-foreground">
-                {formatDate(machine.last_service)}
-              </span>
-            </>
-          )}
-          {machine.next_service && (
-            <>
-              <span className="text-muted-foreground">Next Service</span>
-              <span
+            >
+              <Microscope
                 className={cn(
-                  'font-medium',
+                  'h-4 w-4',
                   machine.status === 'overdue'
                     ? 'text-destructive'
                     : machine.status === 'maintenance_due'
                       ? 'text-warning'
-                      : 'text-foreground'
+                      : 'text-primary'
                 )}
-              >
-                {formatDate(machine.next_service)}
-              </span>
-            </>
-          )}
-        </div>
-
-        {/* Maintenance history (last 3) */}
-        {machine.maintenanceRecords.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Recent Maintenance
-            </p>
-            <div className="space-y-1">
-              {machine.maintenanceRecords.slice(0, 3).map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between rounded-md bg-muted/20 px-2.5 py-1.5 text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="capitalize text-foreground">
-                      {r.description ?? 'Service'}
-                    </span>
-                    {r.technician && (
-                      <span className="text-muted-foreground">
-                        by {r.technician}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground">
-                      {formatDate(r.service_date)}
-                    </span>
-                    {r.cost_paisas > 0 && (
-                      <span className="text-primary">
-                        {formatCurrencyPaisas(r.cost_paisas)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+              />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-foreground">{machine.name}</h3>
+              {machine.model && (
+                <p className="text-xs text-muted-foreground">Model: {machine.model}</p>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-1">
-          {machine.status !== 'operational' && (
-            <div className="flex items-center gap-1.5 text-xs text-warning">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              <span>
-                {machine.status === 'overdue'
-                  ? 'Maintenance overdue'
-                  : 'Maintenance due within 7 days'}
-              </span>
-            </div>
-          )}
-          <div className="ml-auto">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onAddMaintenance(machine.id)}
-              className="h-8 gap-1.5 border-border text-xs hover:bg-primary/10 hover:text-primary hover:border-primary"
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="secondary"
+              className={cn('shrink-0 flex items-center gap-1 text-[10px]', cfg.className)}
             >
-              <Wrench className="h-3.5 w-3.5" />
-              Log Maintenance
+              <StatusIcon className="h-2.5 w-2.5" />
+              {cfg.label}
+            </Badge>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setConfirmOpen(true)}
+              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* Details grid */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            {machine.serial_number && (
+              <>
+                <span className="text-muted-foreground">Serial No.</span>
+                <span className="text-foreground">{machine.serial_number}</span>
+              </>
+            )}
+            {machine.purchase_date && (
+              <>
+                <span className="text-muted-foreground">Purchased</span>
+                <span className="text-foreground">
+                  {formatDate(machine.purchase_date)}
+                </span>
+              </>
+            )}
+            {machine.purchase_price_paisas != null && machine.purchase_price_paisas > 0 && (
+              <>
+                <span className="text-muted-foreground">Purchase Price</span>
+                <span className="font-medium text-foreground">
+                  {formatCurrencyPaisas(machine.purchase_price_paisas)}
+                </span>
+              </>
+            )}
+            {machine.last_service && (
+              <>
+                <span className="text-muted-foreground">Last Serviced</span>
+                <span className="text-foreground">
+                  {formatDate(machine.last_service)}
+                </span>
+              </>
+            )}
+            {machine.next_service && (
+              <>
+                <span className="text-muted-foreground">Next Service</span>
+                <span
+                  className={cn(
+                    'font-medium',
+                    machine.status === 'overdue'
+                      ? 'text-destructive'
+                      : machine.status === 'maintenance_due'
+                        ? 'text-warning'
+                        : 'text-foreground'
+                  )}
+                >
+                  {formatDate(machine.next_service)}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Maintenance history (last 3) */}
+          {machine.maintenanceRecords.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Recent Maintenance
+              </p>
+              <div className="space-y-1">
+                {machine.maintenanceRecords.slice(0, 3).map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between rounded-md bg-muted/20 px-2.5 py-1.5 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="capitalize text-foreground">
+                        {r.description ?? 'Service'}
+                      </span>
+                      {r.technician && (
+                        <span className="text-muted-foreground">
+                          by {r.technician}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground">
+                        {formatDate(r.service_date)}
+                      </span>
+                      {r.cost_paisas > 0 && (
+                        <span className="text-primary">
+                          {formatCurrencyPaisas(r.cost_paisas)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center justify-between pt-1">
+            {machine.status !== 'operational' && (
+              <div className="flex items-center gap-1.5 text-xs text-warning">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <span>
+                  {machine.status === 'overdue'
+                    ? 'Maintenance overdue'
+                    : 'Maintenance due within 7 days'}
+                </span>
+              </div>
+            )}
+            <div className="ml-auto">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onAddMaintenance(machine.id)}
+                className="h-8 gap-1.5 border-border text-xs hover:bg-primary/10 hover:text-primary hover:border-primary"
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                Log Maintenance
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   )
 }
 
@@ -220,9 +287,10 @@ export function EquipmentCard({ machine, onAddMaintenance }: EquipmentCardProps)
 interface EquipmentGridProps {
   machines: MachineryWithStatus[]
   onAddMaintenance: (machineId: string) => void
+  onDeleted: (machineId: string) => void
 }
 
-export function EquipmentGrid({ machines, onAddMaintenance }: EquipmentGridProps) {
+export function EquipmentGrid({ machines, onAddMaintenance, onDeleted }: EquipmentGridProps) {
   if (machines.length === 0) {
     return (
       <Card className="border-border bg-card">
@@ -247,6 +315,7 @@ export function EquipmentGrid({ machines, onAddMaintenance }: EquipmentGridProps
           key={m.id}
           machine={m}
           onAddMaintenance={onAddMaintenance}
+          onDeleted={onDeleted}
         />
       ))}
     </div>

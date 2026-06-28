@@ -302,6 +302,120 @@ export async function updateTest(id: string, rawData: unknown): Promise<ActionRe
 }
 
 // =============================================================================
+// createChemical
+// =============================================================================
+
+const createChemicalSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  quantity: z.number().min(0, 'Quantity cannot be negative'),
+  unit: z.string().min(1, 'Unit is required').max(50),
+  reorder_level: z.number().min(0),
+  cost_price_paisas: z.number().int().min(0),
+  supplier: z.string().max(200).optional().nullable(),
+  expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+})
+
+export async function createChemical(rawData: unknown): Promise<ActionResult<CpLabChemical>> {
+  try {
+    await requireAuth()
+    const parsed = createChemicalSchema.safeParse(rawData)
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid data' }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('cp_lab_chemicals')
+      .insert({
+        name: parsed.data.name,
+        quantity: parsed.data.quantity,
+        unit: parsed.data.unit,
+        reorder_level: parsed.data.reorder_level,
+        cost_price_paisas: parsed.data.cost_price_paisas,
+        supplier: parsed.data.supplier ?? null,
+        expiry_date: parsed.data.expiry_date ?? null,
+        is_active: true,
+      })
+      .select()
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    revalidatePath('/lab/chemicals')
+    return { success: true, data: data as unknown as CpLabChemical }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+// =============================================================================
+// createEquipment
+// =============================================================================
+
+const createEquipmentSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  model: z.string().max(200).optional().nullable(),
+  serial_number: z.string().max(100).optional().nullable(),
+  purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  next_service: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  notes: z.string().max(1000).optional().nullable(),
+  purchase_price_paisas: z.number().int('Price must be a whole number').min(0, 'Price cannot be negative').max(100_000_000_000, 'Price exceeds maximum').optional().nullable(),
+})
+
+export async function createEquipment(rawData: unknown): Promise<ActionResult<CpLabMachinery>> {
+  try {
+    await requireAuth()
+    const parsed = createEquipmentSchema.safeParse(rawData)
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid data' }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('cp_lab_machinery')
+      .insert({
+        name: parsed.data.name,
+        model: parsed.data.model ?? null,
+        serial_number: parsed.data.serial_number ?? null,
+        purchase_date: parsed.data.purchase_date ?? null,
+        next_service: parsed.data.next_service ?? null,
+        notes: parsed.data.notes ?? null,
+        purchase_price_paisas: parsed.data.purchase_price_paisas ?? null,
+        status: 'operational',
+      })
+      .select()
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    revalidatePath('/lab/equipment')
+    return { success: true, data: data as unknown as CpLabMachinery }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+// =============================================================================
+// deleteEquipment
+// =============================================================================
+
+export async function deleteEquipment(id: string): Promise<ActionResult<undefined>> {
+  try {
+    await requireAdmin()
+    const idParsed = z.string().uuid().safeParse(id)
+    if (!idParsed.success) return { success: false, error: 'Invalid equipment ID' }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('cp_lab_machinery')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .is('deleted_at', null)
+
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath('/lab/equipment')
+    return { success: true, data: undefined }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+// =============================================================================
 // getChemicals
 // =============================================================================
 
