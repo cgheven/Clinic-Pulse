@@ -1,45 +1,38 @@
 import { redirect } from "next/navigation";
+import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import type { CpUser } from "@/types/index";
+
+// Cached for 1 hour; busted by revalidateTag('settings-clinic') in updateGeneralSettings()
+const getClinicName = unstable_cache(
+  async () => {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("cp_settings")
+      .select("setting_value")
+      .eq("setting_key", "clinic.clinic_name")
+      .maybeSingle();
+    return (data?.setting_value as string | null) ?? "ClinicPulse";
+  },
+  ["clinic-name"],
+  { revalidate: 3600, tags: ["settings-clinic"] }
+);
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
+  // getCurrentUser() is memoized via React.cache — layout + every page's
+  // requireAuth() within the same render share exactly one getUser() round-trip.
+  const authUser = await getCurrentUser();
+  if (!authUser) redirect("/login");
 
-  // getSession() reads from cookies — no network round-trip to Supabase auth servers.
-  // Safe here because middleware.ts already called getUser() (which validates the JWT)
-  // on every request before we reach this layout.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) redirect("/login");
-
-  // Fetch profile + clinic name in parallel (two independent queries)
-  const [profileResult, settingResult] = await Promise.all([
-    supabase.from("cp_users").select("*").eq("id", session.user.id).single(),
-    supabase
-      .from("cp_settings")
-      .select("setting_value")
-      .eq("setting_key", "clinic.clinic_name")
-      .maybeSingle(),
-  ]);
-
-  const profile = profileResult.data as CpUser | null;
-
-  if (profileResult.error || !profile || !profile.is_active) {
-    redirect("/login");
-  }
-
-  const clinicName =
-    (settingResult.data?.setting_value as string | null) ?? "ClinicPulse";
+  const clinicName = await getClinicName();
 
   return (
-    <DashboardShell user={profile} clinicName={clinicName}>
+    <DashboardShell user={authUser.profile} clinicName={clinicName}>
       {children}
     </DashboardShell>
   );

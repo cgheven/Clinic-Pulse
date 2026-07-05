@@ -1,7 +1,7 @@
 'use server'
 
 import { z } from 'zod'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth'
 import type { CpPaymentMethod, CpExpenseHead, CpDoctor, CpXrayPartner } from '@/types/index'
@@ -227,14 +227,15 @@ export async function updateGeneralSettings(
       { setting_key: 'clinic.currency_symbol', setting_value: data.currency_symbol },
     ]
 
-    for (const row of upserts) {
-      const { error } = await supabase
-        .from('cp_settings')
-        .upsert(row, { onConflict: 'setting_key' })
-      if (error) return { success: false, error: error.message }
-    }
+    // Single batch upsert — 1 round-trip instead of 6
+    const { error: upsertErr } = await supabase
+      .from('cp_settings')
+      .upsert(upserts, { onConflict: 'setting_key' })
+
+    if (upsertErr) return { success: false, error: upsertErr.message }
 
     revalidatePath('/settings')
+    revalidateTag('settings-clinic', 'default')  // bust the layout's cached clinic name
     return { success: true, data: undefined }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
@@ -423,6 +424,10 @@ export async function togglePaymentMethod(
     if (error) return { success: false, error: error.message }
 
     revalidatePath('/settings')
+    revalidateTag('payment-methods', 'default')
+    revalidatePath('/opd/visits/new')
+    revalidatePath('/lab/expenses')
+    revalidatePath('/pharmacy/sales/new')
     return { success: true, data: undefined }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }

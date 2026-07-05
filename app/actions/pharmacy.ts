@@ -254,20 +254,32 @@ export async function recordSale(rawData: unknown): Promise<ActionResult<{ sale_
     const supabase = await createClient()
     const today = todayISO()
 
-    // Server-side price & stock validation — NEVER trust client prices
-    const inventoryCache = new Map<string, { stock_qty: number; name: string; is_active: boolean; sale_price_paisas: number }>()
+    // Server-side price & stock validation — batch all items in ONE query
+    const ids = items.map((i) => i.inventory_id)
+    const { data: invRows, error: invErr } = await supabase
+      .from('cp_pharmacy_inventory')
+      .select('id, stock_qty, name, is_active, sale_price_paisas')
+      .in('id', ids)
+      .is('deleted_at', null)
+
+    if (invErr) return { success: false, error: invErr.message }
+
+    const inventoryCache = new Map(
+      (invRows ?? []).map((r) => [
+        r.id as string,
+        r as { id: string; stock_qty: number; name: string; is_active: boolean; sale_price_paisas: number },
+      ])
+    )
+
     for (const item of items) {
-      const { data: inv, error: invErr } = await supabase
-        .from('cp_pharmacy_inventory')
-        .select('stock_qty, name, is_active, sale_price_paisas')
-        .eq('id', item.inventory_id)
-        .single()
-
-      if (invErr || !inv) return { success: false, error: `Item not found: ${item.inventory_id}` }
-      if (!(inv.is_active as boolean)) return { success: false, error: `Item is inactive: ${inv.name}` }
-      if ((inv.stock_qty as number) < item.qty) return { success: false, error: `Insufficient stock for ${inv.name}. Available: ${inv.stock_qty}, Requested: ${item.qty}` }
-
-      inventoryCache.set(item.inventory_id, inv as { stock_qty: number; name: string; is_active: boolean; sale_price_paisas: number })
+      const inv = inventoryCache.get(item.inventory_id)
+      if (!inv) return { success: false, error: `Item not found: ${item.inventory_id}` }
+      if (!inv.is_active) return { success: false, error: `Item is inactive: ${inv.name}` }
+      if (inv.stock_qty < item.qty)
+        return {
+          success: false,
+          error: `Insufficient stock for ${inv.name}. Available: ${inv.stock_qty}, Requested: ${item.qty}`,
+        }
     }
 
     // Compute line totals
@@ -305,14 +317,20 @@ export async function recordSale(rawData: unknown): Promise<ActionResult<{ sale_
 
     if (itemsErr) return { success: false, error: itemsErr.message }
 
-    // Decrement inventory (explicit, in case DB trigger is not set up)
-    for (const item of items) {
-      const inv = inventoryCache.get(item.inventory_id)!
-      await supabase.from('cp_pharmacy_inventory').update({ stock_qty: inv.stock_qty - item.qty }).eq('id', item.inventory_id)
-    }
+    // Decrement inventory in parallel (explicit fallback in case DB trigger is not set up)
+    await Promise.all(
+      items.map((item) => {
+        const inv = inventoryCache.get(item.inventory_id)!
+        return supabase
+          .from('cp_pharmacy_inventory')
+          .update({ stock_qty: inv.stock_qty - item.qty })
+          .eq('id', item.inventory_id)
+      })
+    )
 
     revalidatePath('/pharmacy/sales')
     revalidatePath('/pharmacy')
+    revalidatePath('/pharmacy/inventory')
     return { success: true, data: { sale_id: saleHeader.id as string, total_paisas: headerTotalPaisas } }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }

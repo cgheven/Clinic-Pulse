@@ -136,7 +136,8 @@ export async function getDailyPayments(
       supabase
         .from('cp_lab_test_logs')
         .select('price_paisas, payment_method')
-        .eq('test_date', date),
+        .eq('test_date', date)
+        .is('deleted_at', null),
       supabase
         .from('cp_xray_revenue')
         .select('amount_paisas, payment_method')
@@ -191,7 +192,8 @@ export async function getPaymentsByDepartment(
       supabase
         .from('cp_lab_test_logs')
         .select('price_paisas, payment_method')
-        .eq('test_date', date),
+        .eq('test_date', date)
+        .is('deleted_at', null),
       supabase
         .from('cp_xray_revenue')
         .select('amount_paisas, payment_method')
@@ -285,7 +287,8 @@ export async function getMonthlyPaymentSummary(
         .from('cp_lab_test_logs')
         .select('price_paisas, payment_method')
         .gte('test_date', startDate)
-        .lte('test_date', endDate),
+        .lte('test_date', endDate)
+        .is('deleted_at', null),
       supabase
         .from('cp_xray_revenue')
         .select('amount_paisas, payment_method')
@@ -374,7 +377,8 @@ export async function getDailyTrend(
         .from('cp_lab_test_logs')
         .select('test_date, price_paisas, payment_method')
         .gte('test_date', startDate)
-        .lte('test_date', endDate),
+        .lte('test_date', endDate)
+        .is('deleted_at', null),
       supabase
         .from('cp_xray_revenue')
         .select('revenue_date, amount_paisas, payment_method')

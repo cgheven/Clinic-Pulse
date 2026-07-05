@@ -20,9 +20,9 @@ import { ArrowLeft, FlaskConical, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import {
   getTestCatalog,
-  getPaymentMethodsForLab,
   recordTest,
 } from '@/app/actions/lab'
+import { getActivePaymentMethods } from '@/app/actions/opd'
 import type { CpLabTest } from '@/types/index'
 
 // =============================================================================
@@ -78,7 +78,7 @@ export default function NewTestPage() {
     async function loadData() {
       const [testsRes, pmRes] = await Promise.all([
         getTestCatalog(),
-        getPaymentMethodsForLab(),
+        getActivePaymentMethods(),
       ])
       if (testsRes.success) setTests(testsRes.data)
       if (pmRes.success) setPaymentMethods(pmRes.data)

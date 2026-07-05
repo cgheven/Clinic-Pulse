@@ -1,7 +1,7 @@
 'use server'
 
 import { z } from 'zod'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth, requireAdmin } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
@@ -753,18 +753,27 @@ export async function deletePatient(id: string): Promise<ActionResult<null>> {
   }
 }
 
-export async function getActivePaymentMethods(): Promise<ActionResult<Array<{ method: string; label: string }>>> {
-  try {
-    await requireAuth()
+// Cached inner query — pure DB read, no request-scoped auth context
+const _cachedGetActivePaymentMethods = unstable_cache(
+  async () => {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('cp_payment_methods')
-      .select('method, label')
+      .select('id, method, label, is_enabled, sort_order')
       .eq('is_enabled', true)
       .order('sort_order', { ascending: true })
+    if (error) throw new Error(error.message)
+    return data ?? []
+  },
+  ['active-payment-methods'],
+  { revalidate: 86400, tags: ['payment-methods'] }
+)
 
-    if (error) return { success: false, error: error.message }
-    return { success: true, data: (data ?? []) as Array<{ method: string; label: string }> }
+export async function getActivePaymentMethods(): Promise<ActionResult<Array<{ method: string; label: string }>>> {
+  try {
+    await requireAuth()
+    const data = await _cachedGetActivePaymentMethods()
+    return { success: true, data: data as Array<{ method: string; label: string }> }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { CpUser, UserRole } from "@/types/index";
@@ -16,7 +17,10 @@ export interface AuthUser {
  * Returns null if there is no session or if the profile doesn't exist / is inactive.
  * Safe to call from any Server Component or Server Action.
  */
-export async function getCurrentUser(): Promise<AuthUser | null> {
+// React.cache() deduplicates calls within the same server render tree.
+// The layout, every page's requireAuth(), and any server action calling
+// getCurrentUser() in the same request all share one result at zero cost.
+export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
   const supabase = await createClient();
 
   const {
@@ -42,7 +46,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     email: user.email ?? profile.email,
     profile,
   };
-}
+})
 
 // ─── getUserRole ──────────────────────────────────────────────────────────────
 /**

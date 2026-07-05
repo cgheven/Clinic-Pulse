@@ -1,7 +1,7 @@
 'use server'
 
 import { z } from 'zod'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth, requireAdmin } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
@@ -221,20 +221,28 @@ export async function recordTest(rawData: unknown): Promise<ActionResult<string>
 // getTestCatalog
 // =============================================================================
 
-export async function getTestCatalog(): Promise<ActionResult<CpLabTest[]>> {
-  try {
-    await requireAuth()
+// Cached inner query — pure DB read, no request-scoped auth context
+const _cachedGetTestCatalog = unstable_cache(
+  async () => {
     const supabase = await createClient()
-
     const { data, error } = await supabase
       .from('cp_lab_tests')
-      .select('*')
+      .select('id, name, category, price_paisas, duration_minutes, is_active, deleted_at')
       .is('deleted_at', null)
       .order('category', { ascending: true })
       .order('name', { ascending: true })
+    if (error) throw new Error(error.message)
+    return data ?? []
+  },
+  ['lab-test-catalog'],
+  { revalidate: 86400, tags: ['lab-tests'] }
+)
 
-    if (error) return { success: false, error: error.message }
-    return { success: true, data: (data ?? []) as unknown as CpLabTest[] }
+export async function getTestCatalog(): Promise<ActionResult<CpLabTest[]>> {
+  try {
+    await requireAuth()
+    const data = await _cachedGetTestCatalog()
+    return { success: true, data: data as unknown as CpLabTest[] }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
@@ -259,6 +267,8 @@ export async function createTest(rawData: unknown): Promise<ActionResult<CpLabTe
     }).select('*').single()
     if (error) return { success: false, error: error.message }
 
+    revalidateTag('lab-tests', 'default')
+    revalidatePath('/lab/tests/new')
     revalidatePath('/lab/catalog')
     return { success: true, data: data as unknown as CpLabTest }
   } catch (err) {
@@ -294,6 +304,8 @@ export async function updateTest(id: string, rawData: unknown): Promise<ActionRe
     const { error } = await supabase.from('cp_lab_tests').update(updatePayload).eq('id', id).is('deleted_at', null)
     if (error) return { success: false, error: error.message }
 
+    revalidateTag('lab-tests', 'default')
+    revalidatePath('/lab/tests/new')
     revalidatePath('/lab/catalog')
     return { success: true, data: undefined }
   } catch (err) {
@@ -624,18 +636,6 @@ export async function generateLabReport(date: string): Promise<ActionResult<LabR
 // =============================================================================
 // Helpers for forms
 // =============================================================================
-
-export async function getPaymentMethodsForLab(): Promise<ActionResult<Array<{ method: string; label: string }>>> {
-  try {
-    await requireAuth()
-    const supabase = await createClient()
-    const { data, error } = await supabase.from('cp_payment_methods').select('method, label').eq('is_enabled', true).order('sort_order', { ascending: true })
-    if (error) return { success: false, error: error.message }
-    return { success: true, data: (data ?? []) as Array<{ method: string; label: string }> }
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
-  }
-}
 
 export async function getExpenseHeadsForLab(): Promise<ActionResult<CpExpenseHead[]>> {
   try {
