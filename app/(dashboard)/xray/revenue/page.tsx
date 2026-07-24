@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Plus, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { requireAuth } from '@/lib/auth'
 import { getDailyRevenue } from '@/app/actions/xray'
@@ -10,10 +10,6 @@ import { getTodayPKT, formatDate } from '@/lib/utils'
 export const metadata: Metadata = {
   title: 'X-Ray Revenue — ClinicPulse',
 }
-
-// =============================================================================
-// Page
-// =============================================================================
 
 interface PageProps {
   searchParams: Promise<{ date?: string }>
@@ -25,47 +21,22 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
   const params = await searchParams
   const today = getTodayPKT()
 
-  // Sanitise the date param
   const dateParam = params.date ?? today
   const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
   const selectedDate = isValidDate ? dateParam : today
 
-  // Prev / next date navigation
   const prevDate = offsetDate(selectedDate, -1)
   const nextDate = offsetDate(selectedDate, +1)
   const isToday = selectedDate === today
 
-  // Fetch revenue for the selected date
   const result = await getDailyRevenue(selectedDate)
   const dailyData = result.success ? result.data : null
 
   return (
-    <div className="space-y-6">
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <TrendingUp className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Revenue Log</h1>
-            <p className="text-sm text-muted-foreground">
-              Daily X-ray revenue entries
-            </p>
-          </div>
-        </div>
-
-        <Link
-          href="/xray/revenue/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Record Revenue
-        </Link>
-      </div>
-
-      {/* ── Date navigation ──────────────────────────────────────────────────── */}
+    <div className="space-y-4">
+      {/* ── Header: date nav + action ──────────────────────────────────────── */}
       <div className="flex items-center gap-2">
+        {/* Prev */}
         <Link
           href={`/xray/revenue?date=${prevDate}`}
           className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
@@ -74,9 +45,10 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
           <ChevronLeft className="h-4 w-4" />
         </Link>
 
-        <div className="flex flex-1 items-center justify-center gap-3">
+        {/* Date label */}
+        <div className="flex flex-1 items-center justify-center gap-2">
           <span className="text-sm font-semibold text-foreground">
-            {formatDate(selectedDate, 'EEEE, dd MMM yyyy')}
+            {formatDate(selectedDate, 'EEE, dd MMM yyyy')}
           </span>
           {isToday && (
             <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
@@ -85,17 +57,20 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
           )}
         </div>
 
+        {/* Next */}
         <Link
           href={`/xray/revenue?date=${nextDate}`}
-          className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
+          className={`rounded-lg border border-border bg-card p-2 text-muted-foreground transition-colors ${
+            isToday ? 'opacity-30 pointer-events-none' : 'hover:border-primary/30 hover:text-foreground'
+          }`}
           aria-label="Next day"
           aria-disabled={isToday}
           tabIndex={isToday ? -1 : undefined}
         >
-          <ChevronRight className={`h-4 w-4 ${isToday ? 'opacity-30' : ''}`} />
+          <ChevronRight className="h-4 w-4" />
         </Link>
 
-        {/* Jump to today shortcut */}
+        {/* Jump to today */}
         {!isToday && (
           <Link
             href="/xray/revenue"
@@ -104,11 +79,22 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
             Today
           </Link>
         )}
+
+        <div className="h-5 w-px bg-border" />
+
+        {/* Record Revenue */}
+        <Link
+          href="/xray/revenue/new"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Record Revenue
+        </Link>
       </div>
 
       {/* ── Daily summary ────────────────────────────────────────────────────── */}
       {dailyData ? (
-        <DailySummary data={dailyData} showAddLink />
+        <DailySummary data={dailyData} showAddLink={false} />
       ) : (
         <Card className="border-border bg-card">
           <CardContent className="py-10 text-center">
@@ -131,11 +117,6 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
   )
 }
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/** Shift a YYYY-MM-DD date string by `days` days */
 function offsetDate(dateStr: string, days: number): string {
   const d = new Date(dateStr)
   d.setDate(d.getDate() + days)

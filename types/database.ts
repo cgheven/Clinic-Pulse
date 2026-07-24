@@ -225,6 +225,7 @@ type CpXrayRevenueRow = {
   service_type: string | null;
   amount_paisas: number; // bigint
   payment_method: "cash" | "jazzcash" | "easypaisa" | "bank_transfer" | null;
+  payment_status: "paid" | "due";
   notes: string | null;
   created_by: string | null;
   created_at: string;

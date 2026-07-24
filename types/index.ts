@@ -330,6 +330,7 @@ export interface CpXrayRevenue {
   service_type: string | null;
   amount_paisas: number; // bigint
   payment_method: PaymentMethodEnum | null;
+  payment_status: "paid" | "due";
   notes: string | null;
   created_by: string | null;
   created_at: string;

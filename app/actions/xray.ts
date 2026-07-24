@@ -34,7 +34,8 @@ export type PartnerPayoutData = {
 export type DailyRevenueData = {
   date: string
   entries: Array<CpXrayRevenue & { payment_method_name: string | null }>
-  total_gross: number // paisas
+  total_gross: number // paisas (all entries)
+  total_due: number // paisas (due entries only)
   partner_payouts: PartnerPayoutData[]
 }
 
@@ -84,6 +85,7 @@ const recordRevenueSchema = z.object({
     .enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer'])
     .nullable()
     .optional(),
+  payment_status: z.enum(['paid', 'due']).default('paid'),
   notes: z.string().max(1000).nullable().optional(),
 })
 
@@ -172,6 +174,10 @@ export async function getDailyRevenue(
       (sum, e) => sum + ((e as unknown as { amount_paisas: number }).amount_paisas ?? 0),
       0
     )
+    const totalDue = entries
+      .filter((e) => (e as unknown as { payment_status: string }).payment_status === 'due')
+      .reduce((sum, e) => sum + ((e as unknown as { amount_paisas: number }).amount_paisas ?? 0), 0)
+    const totalCollected = totalGross - totalDue
 
     const [partnersResult, splitsConfig] = await Promise.all([
       supabase
@@ -189,7 +195,7 @@ export async function getDailyRevenue(
 
     const partnerPayouts: PartnerPayoutData[] = partners.map((partner) => ({
       partner,
-      payout_amount: Math.round((totalGross * partner.split_pct) / 100),
+      payout_amount: Math.round((totalCollected * partner.split_pct) / 100),
     }))
 
     return {
@@ -198,6 +204,7 @@ export async function getDailyRevenue(
         date,
         entries,
         total_gross: totalGross,
+        total_due: totalDue,
         partner_payouts: partnerPayouts,
       },
     }
@@ -234,6 +241,7 @@ export async function recordRevenue(
       patient_name,
       gross_amount_pkr,
       payment_method,
+      payment_status,
       notes,
     } = parsed.data
 
@@ -257,7 +265,8 @@ export async function recordRevenue(
         amount_paisas: grossAmount,
         service_type,
         patient_name: patient_name ?? null,
-        payment_method: payment_method ?? null,
+        payment_method: payment_status === 'due' ? null : (payment_method ?? null),
+        payment_status,
         notes: notes ?? null,
         created_by: authUser.id,
       })
@@ -348,6 +357,7 @@ export async function getPartnerPayouts(
     const { data: revenueRows, error: revenueError } = await supabase
       .from('cp_xray_revenue')
       .select('amount_paisas')
+      .eq('payment_status', 'paid')
       .gte('revenue_date', startDate)
       .lte('revenue_date', endDate)
 
@@ -427,6 +437,7 @@ export async function getMonthlyReport(
         supabase
           .from('cp_xray_revenue')
           .select('amount_paisas')
+          .eq('payment_status', 'paid')
           .gte('revenue_date', startDate)
           .lte('revenue_date', endDate),
         supabase

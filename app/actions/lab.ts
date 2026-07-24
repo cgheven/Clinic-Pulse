@@ -715,3 +715,38 @@ export async function addLabExpense(input: {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
+
+// =============================================================================
+// getPatientPendingLabTests
+// Returns pending (unpaid) lab tests for a specific patient.
+// =============================================================================
+
+export type PendingLabTest = {
+  id: string
+  test_date: string
+  test_name: string
+  price_paisas: number
+}
+
+export async function getPatientPendingLabTests(
+  patientId: string
+): Promise<ActionResult<PendingLabTest[]>> {
+  try {
+    await requireAuth()
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('cp_lab_test_logs')
+      .select('id, test_date, test_name, price_paisas')
+      .eq('patient_id', patientId)
+      .eq('payment_status', 'pending')
+      .is('deleted_at', null)
+      .order('test_date', { ascending: false })
+
+    if (error) return { success: false, error: error.message }
+
+    return { success: true, data: (data ?? []) as PendingLabTest[] }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}

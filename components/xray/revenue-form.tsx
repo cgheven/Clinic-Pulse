@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
-import { Loader2, Zap } from 'lucide-react'
+import { Loader2, Zap, AlertTriangle } from 'lucide-react'
 import { recordRevenue } from '@/app/actions/xray'
 import type { CpPaymentMethod } from '@/types/index'
 
@@ -93,6 +93,7 @@ interface RevenueFormProps {
 export function RevenueForm({ paymentMethods, defaultDate, onSuccess }: RevenueFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [isDue, setIsDue] = useState(false)
 
   const [form, setForm] = useState<FormValues>({
     revenue_date: defaultDate,
@@ -138,7 +139,8 @@ export function RevenueForm({ paymentMethods, defaultDate, onSuccess }: RevenueF
         service_type: form.service_type,
         patient_name: form.patient_name || undefined,
         gross_amount_pkr: form.gross_amount_pkr,
-        payment_method: form.payment_method || null,
+        payment_method: isDue ? null : (form.payment_method || null),
+        payment_status: isDue ? 'due' : 'paid',
         notes: form.notes || null,
       })
 
@@ -276,30 +278,63 @@ export function RevenueForm({ paymentMethods, defaultDate, onSuccess }: RevenueF
         </div>
       </div>
 
-      {/* Payment Method */}
-      <div className="space-y-1.5">
-        <Label htmlFor="payment_method" className="text-xs text-muted-foreground">
-          Payment Method
-        </Label>
-        <Select
-          value={form.payment_method}
-          onValueChange={(v) => setField('payment_method', v)}
-          disabled={isPending}
+      {/* Mark as Due */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setIsDue((p) => !p)}
+        onKeyDown={(e) => e.key === 'Enter' && setIsDue((p) => !p)}
+        className={cn(
+          'flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors select-none',
+          isDue
+            ? 'border-amber-500/40 bg-amber-500/10'
+            : 'border-border bg-card hover:bg-accent/40'
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+            isDue ? 'border-amber-500 bg-amber-500' : 'border-muted-foreground/40'
+          )}
         >
-          <SelectTrigger id="payment_method">
-            <SelectValue placeholder="Select method…" />
-          </SelectTrigger>
-          <SelectContent>
-            {paymentMethods
-              .filter((m) => m.is_enabled)
-              .map((method) => (
-                <SelectItem key={method.method} value={method.method}>
-                  {method.label}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+          {isDue && <AlertTriangle className="h-2.5 w-2.5 text-white" />}
+        </div>
+        <div>
+          <p className={cn('text-sm font-medium', isDue ? 'text-amber-600' : 'text-foreground')}>
+            Mark as Due (Credit)
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Payment will be collected later — no payment method needed
+          </p>
+        </div>
       </div>
+
+      {/* Payment Method — hidden when marked as due */}
+      {!isDue && (
+        <div className="space-y-1.5">
+          <Label htmlFor="payment_method" className="text-xs text-muted-foreground">
+            Payment Method
+          </Label>
+          <Select
+            value={form.payment_method}
+            onValueChange={(v) => setField('payment_method', v)}
+            disabled={isPending}
+          >
+            <SelectTrigger id="payment_method">
+              <SelectValue placeholder="Select method…" />
+            </SelectTrigger>
+            <SelectContent>
+              {paymentMethods
+                .filter((m) => m.is_enabled)
+                .map((method) => (
+                  <SelectItem key={method.method} value={method.method}>
+                    {method.label}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Notes */}
       <div className="space-y-1.5">

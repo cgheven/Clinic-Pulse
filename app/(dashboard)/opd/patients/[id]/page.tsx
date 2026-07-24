@@ -12,8 +12,10 @@ import {
   FileText,
   Stethoscope,
   AlertTriangle,
+  FlaskConical,
 } from 'lucide-react'
 import { getPatient } from '@/app/actions/opd'
+import { getPatientPendingLabTests } from '@/app/actions/lab'
 import { PatientHistory } from '@/components/opd/patient-history'
 import { BpLog } from '@/components/opd/bp-log'
 import { DeletePatientButton } from '@/components/opd/delete-patient-button'
@@ -38,7 +40,10 @@ const genderColor: Record<string, string> = {
 }
 
 async function PatientDetailContent({ id }: { id: string }) {
-  const result = await getPatient(id)
+  const [result, labResult] = await Promise.all([
+    getPatient(id),
+    getPatientPendingLabTests(id),
+  ])
 
   if (!result.success) {
     if (result.error === 'Patient not found') notFound()
@@ -52,17 +57,46 @@ async function PatientDetailContent({ id }: { id: string }) {
   const patient = result.data
   const dueVisits = patient.visits.filter((v) => v.payment_status === 'due')
   const totalDuesPaisas = dueVisits.reduce((s, v) => s + v.fee_paisas, 0)
+  const pendingLabTests = labResult.success ? labResult.data : []
+  const totalLabDuesPaisas = pendingLabTests.reduce((s, t) => s + t.price_paisas, 0)
 
   return (
     <div className="space-y-6">
-      {/* Outstanding dues banner */}
+      {/* OPD outstanding dues banner */}
       {totalDuesPaisas > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
           <div className="flex-1 text-sm">
-            <span className="font-semibold text-amber-600">Outstanding dues: </span>
+            <span className="font-semibold text-amber-600">OPD dues: </span>
             <span className="text-amber-600">{formatCurrencyPaisas(totalDuesPaisas)}</span>
             <span className="ml-1.5 text-amber-500/70">({dueVisits.length} visit{dueVisits.length !== 1 ? 's' : ''} unpaid)</span>
+          </div>
+        </div>
+      )}
+
+      {/* Lab pending tests banner */}
+      {totalLabDuesPaisas > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3">
+          <FlaskConical className="h-4 w-4 shrink-0 text-violet-500 mt-0.5" />
+          <div className="flex-1">
+            <div className="text-sm">
+              <span className="font-semibold text-violet-600">Lab pending: </span>
+              <span className="text-violet-600">{formatCurrencyPaisas(totalLabDuesPaisas)}</span>
+              <span className="ml-1.5 text-violet-500/70">({pendingLabTests.length} test{pendingLabTests.length !== 1 ? 's' : ''} unpaid)</span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {pendingLabTests.slice(0, 5).map((t) => (
+                <span
+                  key={t.id}
+                  className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-600"
+                >
+                  {t.test_name}
+                </span>
+              ))}
+              {pendingLabTests.length > 5 && (
+                <span className="text-[10px] text-violet-500/70">+{pendingLabTests.length - 5} more</span>
+              )}
+            </div>
           </div>
         </div>
       )}
