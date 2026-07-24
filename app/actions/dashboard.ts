@@ -47,6 +47,17 @@ export type UpcomingService = {
   days_until: number
 }
 
+export type DoctorStat = {
+  doctor_id: string | null
+  doctor_name: string
+  visit_count: number
+  total_fees: number    // paisas (all visits incl. dues)
+  collected: number     // paisas (paid visits only)
+  earning_model: 'salaried' | 'commission' | null
+  commission_pct: number | null
+  earned: number        // paisas (commission on collected, 0 for salaried/unassigned)
+}
+
 export type DashboardStats = {
   revenue: number
   patients: number
@@ -58,6 +69,7 @@ export type DashboardStats = {
   lowStockItems: LowStockItem[]
   lowStockCount: number
   upcomingService: UpcomingService[]
+  doctorStats: DoctorStat[]
 }
 
 // =============================================================================
@@ -82,9 +94,9 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
     supabase
       .from('cp_patient_visits')
       .select(
-        'id, visit_date, fee_paisas, payment_method,' +
+        'id, visit_date, fee_paisas, payment_method, payment_status, doctor_id,' +
         'cp_patients!patient_id(name, patient_no),' +
-        'cp_doctors!doctor_id(name)'
+        'cp_doctors!doctor_id(name, earning_model, commission_pct)'
       )
       .eq('visit_date', today)
       .order('created_at', { ascending: false }),
@@ -128,9 +140,11 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
     id: string
     visit_date: string
     fee_paisas: number
-    payment_method: string
+    payment_method: string | null
+    payment_status: string
+    doctor_id: string | null
     cp_patients: { name: string; patient_no: number } | null
-    cp_doctors: { name: string } | null
+    cp_doctors: { name: string; earning_model: string; commission_pct: number | null } | null
   }
 
   const visits = (visitsResult.data as unknown as VisitRow[]) ?? []
@@ -201,6 +215,50 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
     fee_paisas: v.fee_paisas,
   }))
 
+  // Doctor performance — group visits by doctor, compute commission on COLLECTED fees
+  const drMap = new Map<string | null, {
+    name: string
+    earning_model: string | null
+    commission_pct: number | null
+    visits: VisitRow[]
+  }>()
+
+  for (const v of visits) {
+    const key = v.doctor_id ?? null
+    if (!drMap.has(key)) {
+      drMap.set(key, {
+        name: v.cp_doctors?.name ?? 'Unassigned',
+        earning_model: v.cp_doctors?.earning_model ?? null,
+        commission_pct: v.cp_doctors?.commission_pct ?? null,
+        visits: [],
+      })
+    }
+    drMap.get(key)!.visits.push(v)
+  }
+
+  const doctorStats: DoctorStat[] = Array.from(drMap.entries())
+    .map(([doctorId, d]) => {
+      const totalFees = d.visits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
+      const collected = d.visits
+        .filter((v) => v.payment_status === 'paid')
+        .reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
+      const earned =
+        d.earning_model === 'commission' && d.commission_pct
+          ? Math.round((collected * d.commission_pct) / 100)
+          : 0
+      return {
+        doctor_id: doctorId,
+        doctor_name: d.name,
+        visit_count: d.visits.length,
+        total_fees: totalFees,
+        collected,
+        earning_model: (d.earning_model as 'salaried' | 'commission' | null) ?? null,
+        commission_pct: d.commission_pct,
+        earned,
+      }
+    })
+    .sort((a, b) => b.visit_count - a.visit_count || b.collected - a.collected)
+
   // Upcoming service
   const upcomingService: UpcomingService[] = machineryRaw.map((m) => {
     const nextDate = m.next_service as string
@@ -227,5 +285,6 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
     lowStockItems,
     lowStockCount: lowStockItems.length,
     upcomingService,
+    doctorStats,
   }
 }

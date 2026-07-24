@@ -1,111 +1,68 @@
-import {
-  Banknote,
-  Smartphone,
-  CreditCard,
-  Building2,
-  Wallet,
-} from 'lucide-react'
+import { Banknote, Smartphone, Building2, Wallet } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { PaymentTotal } from '@/app/actions/dashboard'
 import { formatCurrencyPaisas } from '@/lib/utils'
-import { cn } from '@/lib/utils'
 
-// =============================================================================
-// Slug → icon mapping
-// =============================================================================
-
-const SLUG_ICONS: Record<string, LucideIcon> = {
-  cash: Banknote,
-  jazzcash: Smartphone,
-  easypaisa: Smartphone,
-  bank_transfer: Building2,
+const SLUG_META: Record<string, { icon: LucideIcon; color: string; bar: string }> = {
+  cash: { icon: Banknote, color: 'text-emerald-400', bar: 'bg-emerald-500' },
+  jazzcash: { icon: Smartphone, color: 'text-red-400', bar: 'bg-red-500' },
+  easypaisa: { icon: Smartphone, color: 'text-emerald-300', bar: 'bg-emerald-400' },
+  bank_transfer: { icon: Building2, color: 'text-blue-400', bar: 'bg-blue-500' },
 }
 
-function getIcon(slug: string): LucideIcon {
-  return SLUG_ICONS[slug] ?? Wallet
+function getMeta(slug: string) {
+  return SLUG_META[slug] ?? { icon: Wallet, color: 'text-primary', bar: 'bg-primary' }
 }
 
-// =============================================================================
-// Slug → accent colour
-// =============================================================================
-
-const SLUG_COLORS: Record<string, { icon: string; bg: string }> = {
-  cash: { icon: 'text-success', bg: 'bg-success/10' },
-  jazzcash: { icon: 'text-red-400', bg: 'bg-red-400/10' },
-  easypaisa: { icon: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-  bank_transfer: { icon: 'text-info', bg: 'bg-info/10' },
-}
-
-function getColors(slug: string) {
-  return SLUG_COLORS[slug] ?? { icon: 'text-primary', bg: 'bg-primary/10' }
-}
-
-// =============================================================================
-// Loading skeleton
-// =============================================================================
-
-function PaymentSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 animate-pulse">
-      {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-2">
-          <div className="h-8 w-8 rounded-lg bg-muted" />
-          <div className="h-3 w-20 rounded bg-muted" />
-          <div className="h-5 w-24 rounded bg-muted" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// =============================================================================
-// PaymentMethodCard
-// =============================================================================
-
-function PaymentMethodCard({ item }: { item: PaymentTotal }) {
-  const Icon = getIcon(item.method)
-  const colors = getColors(item.method)
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <div className={cn('inline-flex h-9 w-9 items-center justify-center rounded-lg', colors.bg)}>
-        <Icon className={cn('h-4 w-4', colors.icon)} />
-      </div>
-      <div>
-        <p className="text-xs font-medium text-muted-foreground truncate">{item.label}</p>
-        <p className="mt-0.5 text-base font-semibold text-foreground">
-          {formatCurrencyPaisas(item.total)}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// =============================================================================
-// PaymentSummary
-// =============================================================================
-
-interface PaymentSummaryProps {
+interface PaymentBreakdownProps {
   data: PaymentTotal[]
-  loading?: boolean
 }
 
-export function PaymentSummary({ data, loading = false }: PaymentSummaryProps) {
-  if (loading) return <PaymentSkeleton />
-
-  if (data.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-4">
-        No payment methods configured.
-      </p>
-    )
-  }
+export function PaymentBreakdown({ data }: PaymentBreakdownProps) {
+  const max = Math.max(...data.map((d) => d.total), 1)
+  const active = data.filter((d) => d.total > 0)
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      {data.map((item) => (
-        <PaymentMethodCard key={item.method} item={item} />
-      ))}
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border bg-muted/20 px-4 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Payment Methods
+        </span>
+      </div>
+
+      {active.length === 0 ? (
+        <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+          No payments recorded today.
+        </p>
+      ) : (
+        <div className="divide-y divide-border/50">
+          {data.map((d) => {
+            const { icon: Icon, color, bar } = getMeta(d.method)
+            const pct = (d.total / max) * 100
+            return (
+              <div key={d.method} className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
+                <Icon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
+                <span className="w-[72px] shrink-0 text-[11px] font-medium text-muted-foreground truncate sm:w-[80px]">
+                  {d.label}
+                </span>
+                <div className="flex-1 overflow-hidden rounded-full bg-muted h-1.5">
+                  <div
+                    className={`h-full rounded-full ${bar} transition-all duration-500`}
+                    style={{ width: d.total > 0 ? `${pct}%` : '0%' }}
+                  />
+                </div>
+                <span
+                  className={`shrink-0 text-right text-[12px] font-semibold tabular-nums w-[70px] sm:w-[76px] ${
+                    d.total > 0 ? 'text-foreground' : 'text-muted-foreground/40'
+                  }`}
+                >
+                  {d.total > 0 ? formatCurrencyPaisas(d.total) : '—'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

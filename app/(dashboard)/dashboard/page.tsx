@@ -1,30 +1,23 @@
 import type { Metadata } from 'next'
 import {
-  DollarSign,
   Users,
   ShoppingBag,
   FlaskConical,
+  Zap,
   AlertTriangle,
-  Wrench,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { StatCard } from '@/components/dashboard/stat-card'
-import { RevenueChart } from '@/components/dashboard/revenue-chart'
-import { PaymentSummary } from '@/components/dashboard/payment-summary'
-import { RecentVisits } from '@/components/dashboard/recent-visits'
-import { LowStockList, ServiceList } from '@/components/dashboard/alerts-panel'
+import { RevenueBreakdown } from '@/components/dashboard/revenue-chart'
+import { PaymentBreakdown } from '@/components/dashboard/payment-summary'
+import { RecentVisitsPanel } from '@/components/dashboard/recent-visits'
+import { AlertsPanel } from '@/components/dashboard/alerts-panel'
+import { DoctorStatsPanel } from '@/components/dashboard/doctor-stats'
 import { getDashboardStats } from '@/app/actions/dashboard'
 import { formatCurrencyPaisas, getTodayPKT, formatDate } from '@/lib/utils'
-
-// =============================================================================
-// Metadata
-// =============================================================================
 
 export const metadata: Metadata = {
   title: 'Dashboard — ClinicPulse',
 }
 
-// Always fetch fresh data on every request
 export const dynamic = 'force-dynamic'
 
 // =============================================================================
@@ -34,7 +27,6 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPage() {
   const today = getTodayPKT()
 
-  // Fetch stats; on error show empty-state UI rather than crashing
   let stats: Awaited<ReturnType<typeof getDashboardStats>> | null = null
   let fetchError: string | null = null
 
@@ -44,185 +36,136 @@ export default async function DashboardPage() {
     fetchError = err instanceof Error ? err.message : 'Failed to load dashboard data.'
   }
 
-  const loading = false // data is already resolved (SSR)
-  const hasError = fetchError !== null
-
-  // ── Stat card values
-  const totalRevenue = stats ? formatCurrencyPaisas(stats.revenue) : '—'
-  const opdPatients = stats ? String(stats.patients) : '—'
-  const pharmSales = stats ? formatCurrencyPaisas(stats.pharmSales) : '—'
-  const labTests = stats ? String(stats.labTests) : '—'
+  const xrayRevenue = stats?.revenueByDept.find((d) => d.dept === 'X-Ray')?.revenue ?? 0
+  const hasAlerts =
+    (stats?.lowStockItems.length ?? 0) > 0 || (stats?.upcomingService.length ?? 0) > 0
 
   return (
-    <div className="space-y-6">
-      {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Dashboard
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            <span className="hidden sm:inline">{formatDate(today, 'EEEE, dd MMMM yyyy')}</span>
+            <span className="sm:hidden">{formatDate(today, 'EEE, dd MMM yyyy')}</span>
+          </p>
+          <h1 className="mt-0.5 text-lg font-bold text-foreground sm:text-xl">
+            Today at a glance
           </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Today at a glance &mdash;{' '}
-            <span className="font-medium text-foreground/70">
-              {formatDate(today, 'EEEE, dd MMMM yyyy')}
-            </span>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            Revenue
+          </p>
+          <p className="text-xl font-bold tabular-nums text-primary sm:text-2xl">
+            {stats ? formatCurrencyPaisas(stats.revenue) : '—'}
           </p>
         </div>
       </div>
 
-      {/* ── Error banner ─────────────────────────────────────────────────── */}
-      {hasError && (
-        <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
+      {/* ── Error banner ──────────────────────────────────────────────────── */}
+      {fetchError && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2.5">
           <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
           <p className="text-sm text-destructive">{fetchError}</p>
         </div>
       )}
 
-      {/* ── Stats row ────────────────────────────────────────────────────── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Today's Total Revenue"
-          value={totalRevenue}
-          subtext="All departments"
-          icon={DollarSign}
-          iconColor="text-primary"
-          iconBg="bg-primary/10"
-          loading={loading}
-        />
-        <StatCard
-          label="OPD Patients"
-          value={opdPatients}
-          subtext="Visits today"
+      {/* ── Stat chips ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatChip
           icon={Users}
-          iconColor="text-info"
-          iconBg="bg-info/10"
-          loading={loading}
+          label="OPD Visits"
+          value={stats ? String(stats.patients) : '—'}
+          color="text-blue-400"
+          bg="bg-blue-400/10"
         />
-        <StatCard
-          label="Pharmacy Sales"
-          value={pharmSales}
-          subtext="Revenue today"
+        <StatChip
           icon={ShoppingBag}
-          iconColor="text-success"
-          iconBg="bg-success/10"
-          loading={loading}
+          label="Pharmacy"
+          value={stats ? formatCurrencyPaisas(stats.pharmSales) : '—'}
+          color="text-emerald-400"
+          bg="bg-emerald-400/10"
         />
-        <StatCard
-          label="Lab Tests"
-          value={labTests}
-          subtext="Tests processed"
+        <StatChip
           icon={FlaskConical}
-          iconColor="text-warning"
-          iconBg="bg-warning/10"
-          loading={loading}
+          label="Lab Tests"
+          value={stats ? String(stats.labTests) : '—'}
+          color="text-amber-400"
+          bg="bg-amber-400/10"
+        />
+        <StatChip
+          icon={Zap}
+          label="X-Ray"
+          value={stats ? formatCurrencyPaisas(xrayRevenue) : '—'}
+          color="text-violet-400"
+          bg="bg-violet-400/10"
         />
       </div>
 
-      {/* ── Revenue chart + Payment summary ──────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Bar chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Revenue by Department
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">Today&apos;s breakdown</p>
-          </CardHeader>
-          <CardContent>
-            <RevenueChart
-              data={stats?.revenueByDept ?? []}
-              loading={loading}
-            />
-          </CardContent>
-        </Card>
+      {/* ── Doctor performance ────────────────────────────────────────────── */}
+      {(stats?.doctorStats.length ?? 0) > 0 && (
+        <DoctorStatsPanel data={stats!.doctorStats} />
+      )}
 
-        {/* Payment methods */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Payment Methods
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Today&apos;s totals across all departments
-            </p>
-          </CardHeader>
-          <CardContent>
-            <PaymentSummary
-              data={stats?.paymentTotals ?? []}
-              loading={loading}
+      {/* ── Main grid ─────────────────────────────────────────────────────── */}
+      {/*
+        Source order (mobile): Revenue → Visits → Payments → Alerts
+        Desktop (lg): Revenue top-left, Visits+Alerts right col spanning 2 rows, Payments bottom-left
+      */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        {/* Revenue — top-left on desktop, 1st on mobile */}
+        <div className="lg:col-span-3 lg:col-start-1 lg:row-start-1">
+          <RevenueBreakdown data={stats?.revenueByDept ?? []} />
+        </div>
+
+        {/* Visits + Alerts — right col on desktop, 2nd on mobile */}
+        <div className="space-y-4 lg:col-span-2 lg:col-start-4 lg:row-start-1 lg:row-end-3">
+          <RecentVisitsPanel data={stats?.recentVisits ?? []} />
+          {hasAlerts && (
+            <AlertsPanel
+              lowStock={stats?.lowStockItems ?? []}
+              service={stats?.upcomingService ?? []}
             />
-          </CardContent>
-        </Card>
+          )}
+        </div>
+
+        {/* Payments — bottom-left on desktop, 3rd on mobile */}
+        <div className="lg:col-span-3 lg:col-start-1 lg:row-start-2">
+          <PaymentBreakdown data={stats?.paymentTotals ?? []} />
+        </div>
       </div>
+    </div>
+  )
+}
 
-      {/* ── Recent visits ─────────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-foreground">
-            Recent OPD Visits
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">Last 5 visits today</p>
-        </CardHeader>
-        <CardContent>
-          <RecentVisits
-            data={stats?.recentVisits ?? []}
-            loading={loading}
-          />
-        </CardContent>
-      </Card>
+// =============================================================================
+// StatChip — compact inline stat
+// =============================================================================
 
-      {/* ── Alerts row ──────────────────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Low stock */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-foreground">
-                Low Stock Alerts
-              </CardTitle>
-              {stats && stats.lowStockCount > 0 && (
-                <span className="flex h-5 items-center rounded-full bg-warning/15 px-2 text-xs font-semibold text-warning">
-                  {stats.lowStockCount}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Pharmacy items below reorder level
-            </p>
-          </CardHeader>
-          <CardContent>
-            <LowStockList
-              items={stats?.lowStockItems ?? []}
-              loading={loading}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Upcoming equipment service */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-foreground">
-                Upcoming Equipment Service
-              </CardTitle>
-              {stats && stats.upcomingService.length > 0 && (
-                <span className="flex h-5 items-center rounded-full bg-info/15 px-2 text-xs font-semibold text-info">
-                  <Wrench className="mr-1 h-3 w-3" />
-                  {stats.upcomingService.length}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Lab machinery due within 30 days
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ServiceList
-              items={stats?.upcomingService ?? []}
-              loading={loading}
-            />
-          </CardContent>
-        </Card>
+function StatChip({
+  icon: Icon,
+  label,
+  value,
+  color,
+  bg,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string
+  color: string
+  bg: string
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+        <Icon className={`h-3.5 w-3.5 ${color}`} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 truncate">
+          {label}
+        </p>
+        <p className="text-sm font-bold tabular-nums text-foreground">{value}</p>
       </div>
     </div>
   )

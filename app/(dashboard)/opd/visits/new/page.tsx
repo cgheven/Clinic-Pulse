@@ -15,7 +15,6 @@ interface NewVisitPageProps {
 
 async function NewVisitForm({ patientId }: { patientId?: string }) {
   if (patientId) {
-    // Fetch patient + dropdown data in one parallel batch
     const [patientRes, doctorsRes, pmRes] = await Promise.all([
       getPatient(patientId),
       getActiveDoctors(),
@@ -37,7 +36,6 @@ async function NewVisitForm({ patientId }: { patientId?: string }) {
     }
   }
 
-  // No patient pre-selected — fetch patient list + dropdown data in parallel
   const [patientsRes, doctorsRes, pmRes] = await Promise.all([
     getPatients({ limit: 500 }),
     getActiveDoctors(),
@@ -67,20 +65,19 @@ export default async function NewVisitPage({ searchParams }: NewVisitPageProps) 
   const patientId = params.patient_id
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/opd/visits"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Visits
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Record New Visit</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Log a new OPD consultation</p>
+    <div className="space-y-4">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <Link
+          href="/opd/visits"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-border/80 hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Record Visit</h1>
       </div>
 
+      {/* ── Form ──────────────────────────────────────────────────────────── */}
       <div className="max-w-2xl">
         <Suspense
           fallback={

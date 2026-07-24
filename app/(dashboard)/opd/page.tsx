@@ -1,32 +1,90 @@
+import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import {
   Users,
   TrendingUp,
   CalendarDays,
-  Stethoscope,
   Plus,
   AlertCircle,
   Activity,
   ArrowRight,
+  ClipboardList,
 } from 'lucide-react'
 import { getOpdDashboard } from '@/app/actions/opd'
-import { formatCurrencyPaisas } from '@/lib/utils'
+import { formatCurrencyPaisas, getTodayPKT, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'OPD — ClinicPulse',
 }
+
+export const dynamic = 'force-dynamic'
+
+// =============================================================================
+// Page
+// =============================================================================
+
+export default function OpdPage() {
+  const today = getTodayPKT()
+
+  return (
+    <div className="space-y-4">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            <span className="hidden sm:inline">{formatDate(today, 'EEEE, dd MMMM yyyy')}</span>
+            <span className="sm:hidden">{formatDate(today, 'EEE, dd MMM yyyy')}</span>
+          </p>
+          <h1 className="mt-0.5 text-lg font-bold text-foreground sm:text-xl">OPD</h1>
+        </div>
+        <Button asChild size="sm" className="shrink-0">
+          <Link href="/opd/visits/new">
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Record Visit
+          </Link>
+        </Button>
+      </div>
+
+      {/* ── Content (async) ───────────────────────────────────────────────── */}
+      <Suspense fallback={<OpdSkeleton />}>
+        <OpdDashboardContent />
+      </Suspense>
+    </div>
+  )
+}
+
+// =============================================================================
+// Skeleton
+// =============================================================================
+
+function OpdSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-[58px] animate-pulse rounded-xl border border-border bg-card" />
+        ))}
+      </div>
+      <div className="h-40 animate-pulse rounded-xl border border-border bg-card" />
+      <div className="h-9 w-72 animate-pulse rounded-lg border border-border bg-card" />
+    </div>
+  )
+}
+
+// =============================================================================
+// Dashboard content
+// =============================================================================
 
 async function OpdDashboardContent() {
   const result = await getOpdDashboard()
 
   if (!result.success) {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center">
-        <AlertCircle className="mx-auto mb-2 h-8 w-8 text-destructive" />
-        <p className="text-sm font-medium text-destructive">Failed to load dashboard</p>
-        <p className="mt-1 text-xs text-muted-foreground">{result.error}</p>
+      <div className="flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2.5">
+        <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
+        <p className="text-sm text-destructive">{result.error}</p>
       </div>
     )
   }
@@ -34,232 +92,184 @@ async function OpdDashboardContent() {
   const stats = result.data
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Today's Visits"
+    <div className="space-y-4">
+      {/* ── Stat chips ────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatChip
+          icon={CalendarDays}
+          label="Visits Today"
           value={String(stats.today_visits)}
-          sub="OPD consultations today"
-          icon={<CalendarDays className="h-5 w-5" />}
-          color="text-primary"
-          bg="bg-primary/10"
-        />
-        <StatCard
-          label="Today's Patients"
-          value={String(stats.today_patients)}
-          sub="Unique patients seen"
-          icon={<Users className="h-5 w-5" />}
           color="text-blue-400"
-          bg="bg-blue-500/10"
+          bg="bg-blue-400/10"
         />
-        <StatCard
-          label="Today's Revenue"
+        <StatChip
+          icon={Users}
+          label="Patients"
+          value={String(stats.today_patients)}
+          color="text-violet-400"
+          bg="bg-violet-400/10"
+        />
+        <StatChip
+          icon={TrendingUp}
+          label="Revenue"
           value={formatCurrencyPaisas(stats.today_revenue)}
-          sub="Net consultation fees"
-          icon={<TrendingUp className="h-5 w-5" />}
           color="text-emerald-400"
-          bg="bg-emerald-500/10"
+          bg="bg-emerald-400/10"
         />
-        <StatCard
+        <StatChip
+          icon={Activity}
           label="Month Visits"
           value={String(stats.month_visits)}
-          sub={`Revenue: ${formatCurrencyPaisas(stats.month_revenue)}`}
-          icon={<Activity className="h-5 w-5" />}
+          sub={formatCurrencyPaisas(stats.month_revenue)}
           color="text-amber-400"
-          bg="bg-amber-500/10"
+          bg="bg-amber-400/10"
         />
       </div>
 
-      {/* Doctor Stats */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Stethoscope className="h-4 w-4 text-primary" />
+      {/* ── Doctor activity ───────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Doctor Activity — Today
-          </h2>
+          </span>
           <Link
             href="/opd/doctors"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
           >
             View all
-            <ArrowRight className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
 
         {stats.doctor_stats.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-background/50 py-8 text-center">
-            <Stethoscope className="mx-auto mb-2 h-7 w-7 text-muted-foreground/30" />
-            <p className="text-sm text-muted-foreground">No doctor activity today</p>
-          </div>
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+            No doctor activity today.
+          </p>
         ) : (
-          <div className="space-y-2">
-            {stats.doctor_stats
-              .sort((a, b) => b.today_visits - a.today_visits)
-              .map((ds) => (
-                <Link
-                  key={ds.doctor_id}
-                  href={`/opd/doctors/${ds.doctor_id}`}
-                  className="group flex items-center gap-4 rounded-lg border border-border bg-background/30 px-4 py-3 hover:border-primary/30 hover:bg-card transition-all"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                    {ds.doctor_name
-                      .split(' ')
-                      .slice(0, 2)
-                      .map((n) => n[0]?.toUpperCase())
-                      .join('')}
-                  </div>
+          <>
+            {/* Col headers */}
+            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 border-b border-border/50 px-4 py-1.5 sm:grid-cols-[1fr_56px_110px]">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Doctor
+              </span>
+              <span className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Visits
+              </span>
+              <span className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Revenue
+              </span>
+            </div>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                      Dr. {ds.doctor_name}
-                    </p>
-                    {ds.specialization && (
-                      <p className="text-[11px] text-muted-foreground">{ds.specialization}</p>
-                    )}
-                  </div>
+            <div className="divide-y divide-border/50">
+              {[...stats.doctor_stats]
+                .sort((a, b) => b.today_visits - a.today_visits)
+                .map((ds) => {
+                  const initials = ds.doctor_name
+                    .split(' ')
+                    .slice(0, 2)
+                    .map((n) => n[0]?.toUpperCase() ?? '')
+                    .join('')
 
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold text-foreground">{ds.today_visits}</p>
-                    <p className="text-[10px] text-muted-foreground">visits</p>
-                  </div>
-
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold text-primary">
-                      {formatCurrencyPaisas(ds.today_revenue)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">revenue</p>
-                  </div>
-
-                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/30 group-hover:text-primary/60 transition-colors" />
-                </Link>
-              ))}
-          </div>
+                  return (
+                    <Link
+                      key={ds.doctor_id}
+                      href={`/opd/doctors/${ds.doctor_id}`}
+                      className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 px-4 py-2.5 hover:bg-muted/20 transition-colors sm:grid-cols-[1fr_56px_110px]"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium text-foreground">
+                            Dr. {ds.doctor_name}
+                          </p>
+                          {ds.specialization && (
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {ds.specialization}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-right text-[13px] font-semibold tabular-nums text-foreground">
+                        {ds.today_visits}
+                      </p>
+                      <p className="text-right text-[12px] tabular-nums text-muted-foreground">
+                        {formatCurrencyPaisas(ds.today_revenue)}
+                      </p>
+                    </Link>
+                  )
+                })}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <QuickAction
-          href="/opd/visits/new"
-          icon={<Plus className="h-5 w-5" />}
-          label="Record Visit"
-          description="Log a new patient consultation"
-          primary
-        />
-        <QuickAction
-          href="/opd/patients/new"
-          icon={<Users className="h-5 w-5" />}
-          label="New Patient"
-          description="Register a new patient"
-        />
-        <QuickAction
-          href="/opd/visits"
-          icon={<CalendarDays className="h-5 w-5" />}
-          label="Daily Log"
-          description="View today's visit log"
-        />
+      {/* ── Quick links ───────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2">
+        <QuickLink href="/opd/patients/new" icon={Users} label="New Patient" />
+        <QuickLink href="/opd/visits" icon={CalendarDays} label="Daily Log" />
+        <QuickLink href="/opd/patients" icon={ClipboardList} label="All Patients" />
       </div>
     </div>
   )
 }
 
-function StatCard({
+// =============================================================================
+// StatChip
+// =============================================================================
+
+function StatChip({
+  icon: Icon,
   label,
   value,
   sub,
-  icon,
   color,
   bg,
 }: {
+  icon: React.ElementType
   label: string
   value: string
-  sub: string
-  icon: React.ReactNode
+  sub?: string
   color: string
   bg: string
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg ${bg} ${color}`}>
-        {icon}
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+        <Icon className={`h-3.5 w-3.5 ${color}`} />
       </div>
-      <p className="text-2xl font-bold text-foreground">{value}</p>
-      <p className="mt-0.5 text-sm font-medium text-foreground/80">{label}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+      <div className="min-w-0">
+        <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+          {label}
+        </p>
+        <p className="text-sm font-bold tabular-nums text-foreground">{value}</p>
+        {sub && <p className="text-[10px] tabular-nums text-muted-foreground">{sub}</p>}
+      </div>
     </div>
   )
 }
 
-function QuickAction({
+// =============================================================================
+// QuickLink
+// =============================================================================
+
+function QuickLink({
   href,
-  icon,
+  icon: Icon,
   label,
-  description,
-  primary,
 }: {
   href: string
-  icon: React.ReactNode
+  icon: React.ElementType
   label: string
-  description: string
-  primary?: boolean
 }) {
   return (
     <Link
       href={href}
-      className={`group flex items-center gap-4 rounded-xl border p-4 transition-all ${
-        primary
-          ? 'border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/60'
-          : 'border-border bg-card hover:border-border/80 hover:bg-card/80'
-      }`}
+      className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12px] font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
     >
-      <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors ${
-          primary
-            ? 'bg-primary/20 text-primary group-hover:bg-primary/30'
-            : 'bg-muted text-muted-foreground group-hover:bg-muted/80'
-        }`}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
+      <Icon className="h-3.5 w-3.5" />
+      {label}
     </Link>
-  )
-}
-
-export default function OpdPage() {
-  return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">OPD Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Outpatient department overview and quick actions
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/opd/visits/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Record Visit
-          </Link>
-        </Button>
-      </div>
-
-      <Suspense
-        fallback={
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-32 animate-pulse rounded-xl border border-border bg-card" />
-            ))}
-          </div>
-        }
-      >
-        <OpdDashboardContent />
-      </Suspense>
-    </div>
   )
 }
