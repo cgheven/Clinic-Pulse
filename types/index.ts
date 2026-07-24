@@ -152,6 +152,8 @@ export interface CpBpLog {
   recorded_by: string | null;
 }
 
+export type OpdPaymentStatus = 'paid' | 'due';
+
 // ─── cp_patient_visits ────────────────────────────────────────────────────────
 
 export interface CpPatientVisit {
@@ -159,8 +161,10 @@ export interface CpPatientVisit {
   patient_id: string;
   doctor_id: string | null;
   visit_date: string; // date
+  voucher_no: number | null;
   fee_paisas: number; // bigint
   payment_method: PaymentMethodEnum | null;
+  payment_status: OpdPaymentStatus;
   diagnosis: string | null;
   prescription: string | null;
   notes: string | null;

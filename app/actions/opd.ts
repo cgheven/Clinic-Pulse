@@ -45,13 +45,17 @@ export type Doctor = {
   deleted_at: string | null
 }
 
+export type OpdPaymentStatus = 'paid' | 'due'
+
 export type Visit = {
   id: string
   patient_id: string
   doctor_id: string | null
   visit_date: string
+  voucher_no: number | null
   fee_paisas: number
-  payment_method: 'cash' | 'jazzcash' | 'easypaisa' | 'bank_transfer'
+  payment_method: 'cash' | 'jazzcash' | 'easypaisa' | 'bank_transfer' | null
+  payment_status: OpdPaymentStatus
   diagnosis: string | null
   prescription: string | null
   notes: string | null
@@ -159,11 +163,15 @@ const recordVisitSchema = z.object({
   doctor_id: z.string().uuid().nullable().optional(),
   visit_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
   fee_paisas: z.number().int().min(0, 'Fee cannot be negative'),
-  payment_method: z.enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer']),
+  payment_method: z.enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer']).nullable().optional(),
+  payment_status: z.enum(['paid', 'due']).default('paid'),
   diagnosis: z.string().max(2000).nullable().optional(),
   prescription: z.string().max(5000).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
-})
+}).refine(
+  (d) => d.payment_status === 'due' || !!d.payment_method,
+  { message: 'Payment method is required for paid visits', path: ['payment_method'] }
+)
 
 const addBpLogSchema = z.object({
   systolic: z.number().int().min(50).max(300),
@@ -295,13 +303,15 @@ export async function getPatients(params: {
   search?: string
   page?: number
   limit?: number
+  gender?: string
+  registeredOn?: string // YYYY-MM-DD
 }): Promise<ActionResult<PaginatedResponse<PatientWithVisitCount>>> {
   try {
     await requireAuth()
     const supabase = await createClient()
 
     const page = Math.max(1, params.page ?? 1)
-    const limit = Math.min(100, Math.max(1, params.limit ?? 20))
+    const limit = Math.min(500, Math.max(1, params.limit ?? 20))
     const from = (page - 1) * limit
     const to = from + limit - 1
 
@@ -320,6 +330,16 @@ export async function getPatients(params: {
         orParts.push(`patient_no.eq.${termAsNum}`)
       }
       query = query.or(orParts.join(','))
+    }
+
+    if (params.gender && ['male', 'female', 'other'].includes(params.gender)) {
+      query = query.eq('gender', params.gender as 'male' | 'female' | 'other')
+    }
+
+    if (params.registeredOn && /^\d{4}-\d{2}-\d{2}$/.test(params.registeredOn)) {
+      query = query
+        .gte('created_at', `${params.registeredOn}T00:00:00+05:00`)
+        .lte('created_at', `${params.registeredOn}T23:59:59.999+05:00`)
     }
 
     const { data, error, count } = await query
@@ -546,7 +566,8 @@ export async function recordVisit(rawData: unknown): Promise<ActionResult<Visit>
         doctor_id: parsed.data.doctor_id ?? null,
         visit_date: parsed.data.visit_date,
         fee_paisas: parsed.data.fee_paisas,
-        payment_method: parsed.data.payment_method,
+        payment_method: parsed.data.payment_method ?? null,
+        payment_status: parsed.data.payment_status,
         diagnosis: parsed.data.diagnosis ?? null,
         prescription: parsed.data.prescription ?? null,
         notes: parsed.data.notes ?? null,

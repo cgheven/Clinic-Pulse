@@ -1,8 +1,9 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Plus, Users, Search, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import { Plus, Users, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import { getPatients } from '@/app/actions/opd'
 import { PatientCard } from '@/components/opd/patient-card'
+import { PatientFilters } from '@/components/opd/patient-filters'
 import { Button } from '@/components/ui/button'
 
 export const metadata = {
@@ -12,10 +13,12 @@ export const metadata = {
 interface PatientListProps {
   search: string
   page: number
+  gender: string
+  registeredOn: string
 }
 
-async function PatientList({ search, page }: PatientListProps) {
-  const result = await getPatients({ search, page, limit: 20 })
+async function PatientList({ search, page, gender, registeredOn }: PatientListProps) {
+  const result = await getPatients({ search, page, limit: 20, gender: gender || undefined, registeredOn: registeredOn || undefined })
 
   if (!result.success) {
     return (
@@ -37,6 +40,8 @@ async function PatientList({ search, page }: PatientListProps) {
             ? 'No patients found'
             : `${count} patient${count !== 1 ? 's' : ''} found`}
           {search && ` for "${search}"`}
+          {gender && ` · ${gender}`}
+          {registeredOn && ` · registered ${registeredOn}`}
         </p>
         <p className="text-xs text-muted-foreground">
           Page {page} of {totalPages}
@@ -76,7 +81,7 @@ async function PatientList({ search, page }: PatientListProps) {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
           <Link
-            href={`/opd/patients?search=${encodeURIComponent(search)}&page=${Math.max(1, page - 1)}`}
+            href={`/opd/patients?search=${encodeURIComponent(search)}&gender=${encodeURIComponent(gender)}&date=${encodeURIComponent(registeredOn)}&page=${Math.max(1, page - 1)}`}
             aria-disabled={page <= 1}
             className={
               page <= 1
@@ -93,7 +98,7 @@ async function PatientList({ search, page }: PatientListProps) {
               return (
                 <Link
                   key={p}
-                  href={`/opd/patients?search=${encodeURIComponent(search)}&page=${p}`}
+                  href={`/opd/patients?search=${encodeURIComponent(search)}&gender=${encodeURIComponent(gender)}&date=${encodeURIComponent(registeredOn)}&page=${p}`}
                   className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm transition-colors ${
                     p === page
                       ? 'bg-primary text-primary-foreground font-semibold'
@@ -107,7 +112,7 @@ async function PatientList({ search, page }: PatientListProps) {
           </div>
 
           <Link
-            href={`/opd/patients?search=${encodeURIComponent(search)}&page=${Math.min(totalPages, page + 1)}`}
+            href={`/opd/patients?search=${encodeURIComponent(search)}&gender=${encodeURIComponent(gender)}&date=${encodeURIComponent(registeredOn)}&page=${Math.min(totalPages, page + 1)}`}
             aria-disabled={page >= totalPages}
             className={
               page >= totalPages
@@ -124,13 +129,15 @@ async function PatientList({ search, page }: PatientListProps) {
 }
 
 interface PatientsPageProps {
-  searchParams: Promise<{ search?: string; page?: string }>
+  searchParams: Promise<{ search?: string; page?: string; gender?: string; date?: string }>
 }
 
 export default async function PatientsPage({ searchParams }: PatientsPageProps) {
   const params = await searchParams
   const search = params.search ?? ''
   const page = Math.max(1, parseInt(params.page ?? '1'))
+  const gender = params.gender ?? ''
+  const registeredOn = params.date ?? ''
 
   return (
     <div className="space-y-6">
@@ -150,22 +157,11 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
         </Button>
       </div>
 
-      {/* Search */}
-      <form method="GET" action="/opd/patients">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <input
-            name="search"
-            type="text"
-            defaultValue={search}
-            placeholder="Search by name, phone, patient ID, CNIC..."
-            className="w-full rounded-lg border border-border bg-card pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
-          />
-        </div>
-      </form>
+      {/* Filters */}
+      <PatientFilters search={search} gender={gender} registeredOn={registeredOn} />
 
       <Suspense
-        key={`${search}-${page}`}
+        key={`${search}-${page}-${gender}-${registeredOn}`}
         fallback={
           <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -174,7 +170,7 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
           </div>
         }
       >
-        <PatientList search={search} page={page} />
+        <PatientList search={search} page={page} gender={gender} registeredOn={registeredOn} />
       </Suspense>
     </div>
   )

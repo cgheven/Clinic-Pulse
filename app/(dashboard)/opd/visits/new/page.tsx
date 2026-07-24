@@ -39,7 +39,7 @@ async function NewVisitForm({ patientId }: { patientId?: string }) {
 
   // No patient pre-selected — fetch patient list + dropdown data in parallel
   const [patientsRes, doctorsRes, pmRes] = await Promise.all([
-    getPatients({ limit: 100 }),
+    getPatients({ limit: 500 }),
     getActiveDoctors(),
     getActivePaymentMethods(),
   ])

@@ -9,6 +9,7 @@ import {
   Clock,
   Users,
   Filter,
+  AlertTriangle,
 } from 'lucide-react'
 import { getDailyVisits, getDoctors } from '@/app/actions/opd'
 import { formatCurrencyPaisas, formatDate, getTodayPKT, cn } from '@/lib/utils'
@@ -53,11 +54,13 @@ async function VisitLog({
     : allVisits
 
   const uniquePatients = new Set(visits.map((v) => v.patient_id)).size
+  const dueCount = visits.filter((v) => v.payment_status === 'due').length
+  const dueAmount = visits.filter((v) => v.payment_status === 'due').reduce((s, v) => s + v.fee_paisas, 0)
 
   return (
     <div className="space-y-4">
       {/* Summary Row */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-4">
         <SummaryCard
           label="Total Visits"
           value={String(doctorFilter ? visits.length : total_visits)}
@@ -82,6 +85,13 @@ async function VisitLog({
           icon={<Users className="h-4 w-4" />}
           color="text-amber-400"
           bg="bg-amber-500/10"
+        />
+        <SummaryCard
+          label={`Dues (${dueCount} visit${dueCount !== 1 ? 's' : ''})`}
+          value={formatCurrencyPaisas(dueAmount)}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          color="text-rose-400"
+          bg="bg-rose-500/10"
         />
       </div>
 
@@ -108,6 +118,9 @@ async function VisitLog({
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Voucher
+                  </th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Patient
                   </th>
                   <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -128,8 +141,13 @@ async function VisitLog({
                 {visits.map((visit) => (
                   <tr
                     key={visit.id}
-                    className="hover:bg-muted/20 transition-colors"
+                    className={cn("hover:bg-muted/20 transition-colors", visit.payment_status === 'due' && "bg-amber-500/5")}
                   >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {visit.voucher_no ? `#${visit.voucher_no}` : '—'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <Link
                         href={`/opd/patients/${visit.patient_id}`}
@@ -139,7 +157,7 @@ async function VisitLog({
                           {visit.patient?.name ?? '—'}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {visit.patient?.patient_no}
+                          #{visit.patient?.patient_no}
                         </p>
                       </Link>
                     </td>
@@ -164,14 +182,21 @@ async function VisitLog({
                       </p>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <p className="text-sm font-semibold text-primary">
+                      <p className={cn("text-sm font-semibold", visit.payment_status === 'due' ? "text-amber-500" : "text-primary")}>
                         {formatCurrencyPaisas(visit.fee_paisas)}
                       </p>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-xs text-muted-foreground">
-                        {visit.payment_method ? formatPaymentMethod(visit.payment_method) : '—'}
-                      </span>
+                      {visit.payment_status === 'due' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-500">
+                          <AlertTriangle className="h-3 w-3" />
+                          Due
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {visit.payment_method ? formatPaymentMethod(visit.payment_method) : '—'}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useTransition, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, User, Stethoscope, Banknote, Loader2, Plus } from 'lucide-react'
-import { getTodayPKT } from '@/lib/utils'
+import { CalendarDays, User, Stethoscope, Banknote, Loader2, Plus, Search, ChevronDown, X, Check, AlertTriangle } from 'lucide-react'
+import { getTodayPKT, cn } from '@/lib/utils'
 import { recordVisit, getActivePaymentMethods, getActiveDoctors } from '@/app/actions/opd'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,12 +38,44 @@ export function VisitForm({ patient, patients, initialDoctors, initialPaymentMet
 
   // Form fields
   const [patientId, setPatientId] = useState(patient?.id ?? '')
+
+  // Patient search combobox
+  const [patientSearch, setPatientSearch] = useState('')
+  const [patientDropOpen, setPatientDropOpen] = useState(false)
+  const patientComboRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (patientComboRef.current && !patientComboRef.current.contains(e.target as Node)) {
+        setPatientDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filteredPatients = useMemo(() => {
+    const q = patientSearch.trim().toLowerCase()
+    if (!q) return patients ?? []
+    return (patients ?? []).filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        String(p.patient_no).includes(q) ||
+        (p.phone && p.phone.includes(q))
+    )
+  }, [patients, patientSearch])
+
+  const selectedPatient = useMemo(
+    () => (patients ?? []).find((p) => p.id === patientId) ?? null,
+    [patients, patientId]
+  )
   const [doctorId, setDoctorId] = useState('')
   const [visitDate, setVisitDate] = useState(getTodayPKT())
   const [diagnosis, setDiagnosis] = useState('')
   const [prescription, setPrescription] = useState('')
   const [fee, setFee] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
+  const [isDue, setIsDue] = useState(false)
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
@@ -71,7 +103,7 @@ export function VisitForm({ patient, patients, initialDoctors, initialPaymentMet
       setError('Please enter a valid consultation fee')
       return
     }
-    if (!paymentMethod) {
+    if (!isDue && !paymentMethod) {
       setError('Please select a payment method')
       return
     }
@@ -84,7 +116,8 @@ export function VisitForm({ patient, patients, initialDoctors, initialPaymentMet
         doctor_id: doctorId && doctorId !== 'none' ? doctorId : null,
         visit_date: visitDate,
         fee_paisas: feePaisas,
-        payment_method: paymentMethod,
+        payment_method: isDue ? null : paymentMethod,
+        payment_status: isDue ? 'due' : 'paid',
         diagnosis: diagnosis || null,
         prescription: prescription || null,
         notes: notes || null,
@@ -133,19 +166,96 @@ export function VisitForm({ patient, patients, initialDoctors, initialPaymentMet
                 Loading...
               </div>
             ) : (
-              <Select value={patientId} onValueChange={setPatientId}>
-                <SelectTrigger id="patient_id">
-                  <SelectValue placeholder="Search and select patient..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(patients ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} — {p.patient_no}
-                      {p.phone ? ` (${p.phone})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div ref={patientComboRef} className="relative">
+                <button
+                  type="button"
+                  id="patient_id"
+                  onClick={() => setPatientDropOpen((o) => !o)}
+                  className={cn(
+                    "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+                    "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                    !selectedPatient && "text-muted-foreground"
+                  )}
+                >
+                  {selectedPatient ? (
+                    <span className="truncate">
+                      <span className="font-medium">{selectedPatient.name}</span>
+                      <span className="ml-1.5 text-muted-foreground">#{selectedPatient.patient_no}</span>
+                      {selectedPatient.phone && (
+                        <span className="ml-1.5 text-muted-foreground">· {selectedPatient.phone}</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span>Select patient...</span>
+                  )}
+                  <ChevronDown className={cn("ml-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform", patientDropOpen && "rotate-180")} />
+                </button>
+
+                {patientDropOpen && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
+                    <div className="p-2">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                        <input
+                          autoFocus
+                          value={patientSearch}
+                          onChange={(e) => setPatientSearch(e.target.value)}
+                          placeholder="Search by name, ID or phone..."
+                          className="w-full rounded-sm border border-input bg-background py-1.5 pl-8 pr-8 text-sm outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        {patientSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setPatientSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto border-t border-border">
+                      {filteredPatients.length === 0 ? (
+                        <p className="py-6 text-center text-sm text-muted-foreground">
+                          No patients found
+                        </p>
+                      ) : (
+                        filteredPatients.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className={cn(
+                              "flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-accent hover:text-accent-foreground transition-colors",
+                              p.id === patientId && "bg-accent/50"
+                            )}
+                            onClick={() => {
+                              setPatientId(p.id)
+                              setPatientSearch('')
+                              setPatientDropOpen(false)
+                            }}
+                          >
+                            <Check className={cn("h-3.5 w-3.5 shrink-0 text-primary", p.id !== patientId && "invisible")} />
+                            <span>
+                              <span className="font-medium">{p.name}</span>
+                              <span className="ml-1.5 text-muted-foreground">#{p.patient_no}</span>
+                              {p.phone && (
+                                <span className="ml-1.5 text-muted-foreground">· {p.phone}</span>
+                              )}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    {patients && patients.length >= 500 && (
+                      <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                        Showing first 500 patients — use search to narrow down
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -240,48 +350,82 @@ export function VisitForm({ patient, patients, initialDoctors, initialPaymentMet
       </div>
 
       {/* Payment */}
-      <div className="rounded-xl border border-border bg-card p-5">
+      <div className={cn(
+        "rounded-xl border bg-card p-5 transition-colors",
+        isDue ? "border-amber-500/40 bg-amber-500/5" : "border-border"
+      )}>
         <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Banknote className="h-4 w-4 text-primary" />
+          <Banknote className={cn("h-4 w-4", isDue ? "text-amber-500" : "text-primary")} />
           Payment
+          {isDue && (
+            <span className="ml-auto flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-500">
+              <AlertTriangle className="h-3 w-3" />
+              Due
+            </span>
+          )}
         </h3>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="fee">Consultation Fee (PKR) *</Label>
-            <Input
-              id="fee"
-              type="number"
-              min="0"
-              step="1"
-              value={fee}
-              onChange={(e) => setFee(e.target.value)}
-              placeholder="500"
-              required
-            />
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="fee">Consultation Fee (PKR) *</Label>
+              <Input
+                id="fee"
+                type="number"
+                min="0"
+                step="1"
+                value={fee}
+                onChange={(e) => setFee(e.target.value)}
+                placeholder="500"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="payment_method">
+                Payment Method {isDue ? <span className="text-muted-foreground">(optional — due)</span> : '*'}
+              </Label>
+              {isDue ? (
+                <div className="flex h-10 items-center rounded-md border border-dashed border-amber-500/40 bg-amber-500/5 px-3 text-sm text-amber-600/80">
+                  Will be recorded when settled
+                </div>
+              ) : loadingDeps ? (
+                <div className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : (
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger id="payment_method">
+                    <SelectValue placeholder="Select method..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethods.map((pm) => (
+                      <SelectItem key={pm.method} value={pm.method}>
+                        {pm.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="payment_method">Payment Method *</Label>
-            {loadingDeps ? (
-              <div className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
-            ) : (
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger id="payment_method">
-                  <SelectValue placeholder="Select method..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentMethods.map((pm) => (
-                    <SelectItem key={pm.method} value={pm.method}>
-                      {pm.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+          {/* Due toggle */}
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background/50 px-3 py-2.5 hover:bg-muted/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={isDue}
+              onChange={(e) => {
+                setIsDue(e.target.checked)
+                if (e.target.checked) setPaymentMethod('')
+              }}
+              className="h-4 w-4 rounded accent-amber-500"
+            />
+            <div>
+              <p className="text-sm font-medium text-foreground">Mark as Due (Credit)</p>
+              <p className="text-xs text-muted-foreground">Patient will pay later — fee is recorded as outstanding</p>
+            </div>
+          </label>
         </div>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Stethoscope, FileText, CreditCard, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react'
+import { Stethoscope, FileText, CreditCard, ChevronDown, ChevronUp, Trash2, Loader2, AlertTriangle, Receipt } from 'lucide-react'
 import { cn, formatDate, formatCurrencyPaisas } from '@/lib/utils'
 import { deleteVisit } from '@/app/actions/opd'
 import { Button } from '@/components/ui/button'
@@ -59,7 +59,7 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
         <div className="h-2.5 w-2.5 rounded-full border-2 border-primary bg-background" />
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-border/80">
+      <div className={cn("rounded-xl border bg-card p-4 transition-colors hover:border-border/80", visit.payment_status === 'due' ? "border-amber-500/30 bg-amber-500/5" : "border-border")}>
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -67,6 +67,18 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
               <span className="text-sm font-semibold text-foreground">
                 {formatDate(visit.visit_date)}
               </span>
+              {visit.voucher_no && (
+                <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground">
+                  <Receipt className="h-3 w-3" />
+                  #{visit.voucher_no}
+                </span>
+              )}
+              {visit.payment_status === 'due' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  Due
+                </span>
+              )}
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -77,7 +89,7 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
                   {visit.doctor.specialization ? ` · ${visit.doctor.specialization}` : ''}
                 </span>
               )}
-              {visit.payment_method && (
+              {visit.payment_method && visit.payment_status !== 'due' && (
                 <span className="flex items-center gap-1">
                   <CreditCard className="h-3 w-3" />
                   {formatPaymentMethod(visit.payment_method)}
@@ -88,7 +100,7 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
 
           {/* Fee + delete */}
           <div className="flex items-center gap-2 shrink-0">
-            <p className="text-sm font-bold text-primary">
+            <p className={cn("text-sm font-bold", visit.payment_status === 'due' ? "text-amber-500" : "text-primary")}>
               {formatCurrencyPaisas(visit.fee_paisas)}
             </p>
             <button

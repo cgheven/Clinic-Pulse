@@ -81,8 +81,10 @@ type CpPatientVisitRow = {
   patient_id: string;
   doctor_id: string | null;
   visit_date: string;
+  voucher_no: number | null;
   fee_paisas: number; // bigint
   payment_method: "cash" | "jazzcash" | "easypaisa" | "bank_transfer" | null;
+  payment_status: "paid" | "due";
   chief_complaint: string | null;
   diagnosis: string | null;
   prescription: string | null;

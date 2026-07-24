@@ -11,6 +11,7 @@ import {
   Droplets,
   FileText,
   Stethoscope,
+  AlertTriangle,
 } from 'lucide-react'
 import { getPatient } from '@/app/actions/opd'
 import { PatientHistory } from '@/components/opd/patient-history'
@@ -18,7 +19,7 @@ import { BpLog } from '@/components/opd/bp-log'
 import { DeletePatientButton } from '@/components/opd/delete-patient-button'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatDate, cn } from '@/lib/utils'
+import { formatDate, formatCurrencyPaisas, cn } from '@/lib/utils'
 
 interface PatientDetailPageProps {
   params: Promise<{ id: string }>
@@ -49,9 +50,23 @@ async function PatientDetailContent({ id }: { id: string }) {
   }
 
   const patient = result.data
+  const dueVisits = patient.visits.filter((v) => v.payment_status === 'due')
+  const totalDuesPaisas = dueVisits.reduce((s, v) => s + v.fee_paisas, 0)
 
   return (
     <div className="space-y-6">
+      {/* Outstanding dues banner */}
+      {totalDuesPaisas > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+          <div className="flex-1 text-sm">
+            <span className="font-semibold text-amber-600">Outstanding dues: </span>
+            <span className="text-amber-600">{formatCurrencyPaisas(totalDuesPaisas)}</span>
+            <span className="ml-1.5 text-amber-500/70">({dueVisits.length} visit{dueVisits.length !== 1 ? 's' : ''} unpaid)</span>
+          </div>
+        </div>
+      )}
+
       {/* Patient Info Card */}
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex items-start justify-between gap-4">
