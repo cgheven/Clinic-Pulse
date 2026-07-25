@@ -88,7 +88,7 @@ export async function getDailyLedger(
 
     const supabase = await createClient()
 
-    const [clinicName, doctorsRes, staffRes] = await Promise.all([
+    const [clinicName, doctorsRes, staffRes, visitsWithPartial] = await Promise.all([
       getClinicName(supabase),
       supabase
         .from('cp_doctors')
@@ -102,6 +102,11 @@ export async function getDailyLedger(
         .eq('is_active', true)
         .is('deleted_at', null)
         .order('name', { ascending: true }),
+      // Try with paid_amount_paisas first; falls back below if the column is absent
+      supabase
+        .from('cp_patient_visits')
+        .select('doctor_id, fee_paisas, payment_status, paid_amount_paisas')
+        .eq('visit_date', date),
     ])
 
     if (doctorsRes.error) return { success: false, error: doctorsRes.error.message }
@@ -120,12 +125,6 @@ export async function getDailyLedger(
 
     let visitsData: VisitRow[] = []
     let hasPartialCol = true
-
-    // Try with paid_amount_paisas first
-    const visitsWithPartial = await supabase
-      .from('cp_patient_visits')
-      .select('doctor_id, fee_paisas, payment_status, paid_amount_paisas')
-      .eq('visit_date', date)
 
     if (visitsWithPartial.error) {
       // Column likely doesn't exist — retry without it

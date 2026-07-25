@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DollarSign, TrendingUp, Calendar, Loader2, AlertCircle } from 'lucide-react'
 import { cn, formatCurrencyPaisas, formatBasisPoints } from '@/lib/utils'
 import { getDoctorEarnings } from '@/app/actions/opd'
@@ -10,6 +10,8 @@ interface DoctorEarningsProps {
   doctorId: string
   /** Initial month in 'YYYY-MM' format. Defaults to current month. */
   initialMonth?: string
+  /** Server-fetched earnings for `initialMonth`, to skip the first client round-trip. */
+  initialData?: DoctorEarningsResult | null
   className?: string
 }
 
@@ -24,13 +26,21 @@ function monthLabel(ym: string): string {
   return d.toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
 }
 
-export function DoctorEarnings({ doctorId, initialMonth, className }: DoctorEarningsProps) {
+export function DoctorEarnings({ doctorId, initialMonth, initialData, className }: DoctorEarningsProps) {
   const [month, setMonth] = useState(initialMonth ?? currentYearMonth())
-  const [earnings, setEarnings] = useState<DoctorEarningsResult | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [earnings, setEarnings] = useState<DoctorEarningsResult | null>(initialData ?? null)
+  const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
+  // When the server already supplied data for `initialMonth`, skip the very first
+  // effect run. Month switching keeps fetching client-side exactly as before.
+  const skipInitialFetch = useRef(Boolean(initialData))
 
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false
+      return
+    }
+
     setLoading(true)
     setError(null)
 

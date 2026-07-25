@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import {
   ChevronLeft,
@@ -15,8 +16,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { requireAuth } from '@/lib/auth'
 import { getDailyLedger } from '@/app/actions/ledger'
-import { ReportsTabNav } from '@/components/reports/reports-tab-nav'
 import { DatePickerNav } from '@/components/reports/date-picker-nav'
+import { LedgerSkeleton } from '@/components/reports/ledger-skeleton'
 import { formatCurrencyPaisas, getTodayPKT, formatDate } from '@/lib/utils'
 
 // =============================================================================
@@ -61,84 +62,18 @@ function doctorInitials(name: string): string {
 }
 
 // =============================================================================
-// Page
+// Streamed content
+//
+// The ledger aggregation used to block the whole page (header + date nav
+// included). It now resolves inside its own Suspense boundary so the
+// navigation paints immediately.
 // =============================================================================
 
-interface PageProps {
-  searchParams: Promise<{ date?: string }>
-}
-
-export default async function DailyLedgerPage({ searchParams }: PageProps) {
-  await requireAuth()
-
-  const params = await searchParams
-  const today = getTodayPKT()
-
-  const dateParam = params.date ?? today
-  const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
-  const selectedDate = isValidDate ? dateParam : today
-
-  const prevDate = offsetDate(selectedDate, -1)
-  const nextDate = offsetDate(selectedDate, +1)
-  const isToday = selectedDate === today
-
+async function LedgerContent({ selectedDate }: { selectedDate: string }) {
   const result = await getDailyLedger(selectedDate)
 
   return (
-    <div className="space-y-0">
-      {/* ── Tab navigation ───────────────────────────────────────────────── */}
-      <ReportsTabNav />
-
-      <div className="space-y-6 p-6">
-        {/* ── Page header ──────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <BookOpen className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Daily Cash Ledger
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                OPD cash collections per doctor — collected, due &amp; commission
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Date navigation ───────────────────────────────────────────── */}
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/reports/ledger?date=${prevDate}`}
-            className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
-            aria-label="Previous day"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Link>
-
-          <DatePickerNav selectedDate={selectedDate} isToday={isToday} basePath="/reports/ledger" />
-
-          <Link
-            href={`/reports/ledger?date=${nextDate}`}
-            className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
-            aria-label="Next day"
-            aria-disabled={isToday}
-            tabIndex={isToday ? -1 : undefined}
-          >
-            <ChevronRight className={`h-4 w-4 ${isToday ? 'opacity-30' : ''}`} />
-          </Link>
-
-          {!isToday && (
-            <Link
-              href="/reports/ledger"
-              className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground hover:border-primary/30 hover:text-primary transition-colors"
-            >
-              Today
-            </Link>
-          )}
-        </div>
-
+    <>
         {/* ── Error banner ─────────────────────────────────────────────── */}
         {!result.success && (
           <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
@@ -479,7 +414,87 @@ export default async function DailyLedgerPage({ searchParams }: PageProps) {
             </CardContent>
           </Card>
         )}
+    </>
+  )
+}
+
+// =============================================================================
+// Page
+// =============================================================================
+
+interface PageProps {
+  searchParams: Promise<{ date?: string }>
+}
+
+export default async function DailyLedgerPage({ searchParams }: PageProps) {
+  await requireAuth()
+
+  const params = await searchParams
+  const today = getTodayPKT()
+
+  const dateParam = params.date ?? today
+  const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+  const selectedDate = isValidDate ? dateParam : today
+
+  const prevDate = offsetDate(selectedDate, -1)
+  const nextDate = offsetDate(selectedDate, +1)
+  const isToday = selectedDate === today
+
+  return (
+      <div className="space-y-6 p-6">
+        {/* ── Page header ──────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+              <BookOpen className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Daily Cash Ledger
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                OPD cash collections per doctor — collected, due &amp; commission
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Date navigation ───────────────────────────────────────────── */}
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/reports/ledger?date=${prevDate}`}
+            className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
+            aria-label="Previous day"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Link>
+
+          <DatePickerNav selectedDate={selectedDate} isToday={isToday} basePath="/reports/ledger" />
+
+          <Link
+            href={`/reports/ledger?date=${nextDate}`}
+            className="rounded-lg border border-border bg-card p-2 text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
+            aria-label="Next day"
+            aria-disabled={isToday}
+            tabIndex={isToday ? -1 : undefined}
+          >
+            <ChevronRight className={`h-4 w-4 ${isToday ? 'opacity-30' : ''}`} />
+          </Link>
+
+          {!isToday && (
+            <Link
+              href="/reports/ledger"
+              className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground hover:border-primary/30 hover:text-primary transition-colors"
+            >
+              Today
+            </Link>
+          )}
+        </div>
+
+        {/* ── Ledger content (streams behind Suspense) ──────────────────── */}
+        <Suspense key={selectedDate} fallback={<LedgerSkeleton />}>
+          <LedgerContent selectedDate={selectedDate} />
+        </Suspense>
       </div>
-    </div>
   )
 }

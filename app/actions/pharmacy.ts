@@ -476,23 +476,6 @@ export async function updatePharmacyRevenueSplit(rawData: unknown): Promise<Acti
   }
 }
 
-// =============================================================================
-// getActivePaymentMethods — for sale form
-// =============================================================================
-
-export async function getActivePaymentMethods(): Promise<ActionResult<Array<{ method: string; label: string }>>> {
-  try {
-    await requireAuth()
-    const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('cp_payment_methods')
-      .select('method, label')
-      .eq('is_enabled', true)
-      .order('sort_order', { ascending: true })
-
-    if (error) return { success: false, error: error.message }
-    return { success: true, data: (data ?? []) as Array<{ method: string; label: string }> }
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
-  }
-}
+// getActivePaymentMethods lived here as a byte-identical, uncached duplicate of
+// the cached one in app/actions/opd.ts. Its single caller
+// (app/(dashboard)/pharmacy/sales/new/page.tsx) now imports that one instead.

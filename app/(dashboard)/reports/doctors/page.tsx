@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
+import { Suspense, cache } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import { getDoctorEarningsReport } from '@/app/actions/reports'
-import { ReportsTabNav } from '@/components/reports/reports-tab-nav'
 import { DoctorEarningsTable } from '@/components/reports/doctor-earnings-table'
+import { ReportSkeleton } from '@/components/reports/report-skeleton'
 import { PdfGenerator } from '@/components/reports/pdf-generator'
 import { getTodayPKT } from '@/lib/utils'
 import { format } from 'date-fns'
@@ -41,6 +42,49 @@ function formatMonthLabel(ym: string): string {
 }
 
 // =============================================================================
+// Data loading
+//
+// Wrapped in React.cache so the two Suspense boundaries below share a single
+// getDoctorEarningsReport() call (and therefore a single DB round-trip) per request.
+// =============================================================================
+
+const loadReport = cache(getDoctorEarningsReport)
+
+async function ReportPdf({ period }: { period: string }) {
+  const result = await loadReport(period)
+  if (!result.success) return null
+  return (
+    <PdfGenerator
+      report={{ type: 'doctors', data: result.data }}
+      fileName={`doctor-earnings-${period}`}
+    />
+  )
+}
+
+async function ReportContent({ period }: { period: string }) {
+  const result = await loadReport(period)
+
+  if (!result.success) {
+    return (
+      <>
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+          <p className="text-sm text-destructive">{result.error}</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card px-4 py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            No doctor earnings data available for this period.
+          </p>
+        </div>
+      </>
+    )
+  }
+
+  return <DoctorEarningsTable data={result.data} />
+}
+
+// =============================================================================
 // Page
 // =============================================================================
 
@@ -62,12 +106,7 @@ export default async function DoctorEarningsPage({ searchParams }: PageProps) {
   const nextMonth = offsetMonth(selectedMonth, +1)
   const isCurrent = selectedMonth === currentMonth
 
-  const result = await getDoctorEarningsReport(selectedMonth)
-
   return (
-    <div className="space-y-0">
-      <ReportsTabNav />
-
       <div className="space-y-4 p-4">
         {/* ── Compact header ──────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -80,12 +119,9 @@ export default async function DoctorEarningsPage({ searchParams }: PageProps) {
             </p>
           </div>
 
-          {result.success && (
-            <PdfGenerator
-              report={{ type: 'doctors', data: result.data }}
-              fileName={`doctor-earnings-${selectedMonth}`}
-            />
-          )}
+          <Suspense key={selectedMonth} fallback={null}>
+            <ReportPdf period={selectedMonth} />
+          </Suspense>
         </div>
 
         {/* ── Month navigation ─────────────────────────────────────────── */}
@@ -129,25 +165,10 @@ export default async function DoctorEarningsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* ── Error banner ─────────────────────────────────────────────── */}
-        {!result.success && (
-          <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-            <p className="text-sm text-destructive">{result.error}</p>
-          </div>
-        )}
-
-        {/* ── Report content ────────────────────────────────────────────── */}
-        {result.success ? (
-          <DoctorEarningsTable data={result.data} />
-        ) : (
-          <div className="rounded-xl border border-border bg-card px-4 py-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              No doctor earnings data available for this period.
-            </p>
-          </div>
-        )}
+        {/* ── Report content (streams behind Suspense) ─────────────────── */}
+        <Suspense key={selectedMonth} fallback={<ReportSkeleton />}>
+          <ReportContent period={selectedMonth} />
+        </Suspense>
       </div>
-    </div>
   )
 }

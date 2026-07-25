@@ -222,17 +222,17 @@ export interface CpPharmacySaleItem {
 
 // ─── cp_lab_tests ─────────────────────────────────────────────────────────────
 
+// Mirrors the actual cp_lab_tests columns. There is no test_code,
+// reference_range, unit or updated_at column — declaring them here is what
+// let a query select them and fail at runtime instead of at compile time.
 export interface CpLabTest {
   id: string;
   name: string;
-  test_code: string | null;
   category: string | null;
   price_paisas: number; // bigint
-  reference_range: string | null;
   duration_minutes: number | null;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
   deleted_at: string | null;
 }
 

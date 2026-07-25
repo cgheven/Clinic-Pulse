@@ -226,6 +226,23 @@ async function getWorkingDaysConfig(
   return 26
 }
 
+// Shared gross-earnings formula so getDoctor and getDoctorEarnings stay bit-identical.
+// All money is integer paisas; rounding must not change.
+function computeDoctorGrossEarnings(
+  doctor: Pick<Doctor, 'earning_model' | 'monthly_salary' | 'commission_pct'>,
+  visits: Array<{ visit_date?: string | null; fee_paisas?: number | null }>,
+  workingDays: number
+): number {
+  if (doctor.earning_model === 'salaried') {
+    const salary = doctor.monthly_salary ?? 0
+    const daysWorked = new Set(visits.map((v) => v.visit_date)).size
+    return workingDays > 0 ? Math.round((salary / workingDays) * daysWorked) : salary
+  }
+  const totalRevenue = visits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
+  const pct = Number(doctor.commission_pct ?? 0)
+  return Math.round((totalRevenue * pct) / 100)
+}
+
 // =============================================================================
 // OPD Dashboard
 // =============================================================================
@@ -313,6 +330,8 @@ export async function getPatients(params: {
   limit?: number
   gender?: string
   registeredOn?: string // YYYY-MM-DD
+  /** Set false to skip the per-patient visit_count/last_visit_date rollup query. */
+  withVisitStats?: boolean
 }): Promise<ActionResult<PaginatedResponse<PatientWithVisitCount>>> {
   try {
     await requireAuth()
@@ -325,7 +344,7 @@ export async function getPatients(params: {
 
     let query = supabase
       .from('cp_patients')
-      .select('*', { count: 'exact' })
+      .select('id, name, patient_no, phone, gender, created_at, deleted_at', { count: 'exact' })
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(from, to)
@@ -356,7 +375,7 @@ export async function getPatients(params: {
     const patients = (data ?? []) as Patient[]
     let enriched: PatientWithVisitCount[] = patients.map((p) => ({ ...p, visit_count: 0, last_visit_date: null }))
 
-    if (patients.length > 0) {
+    if (params.withVisitStats !== false && patients.length > 0) {
       const { data: visitData } = await supabase
         .from('cp_patient_visits')
         .select('patient_id, visit_date')
@@ -512,23 +531,30 @@ export async function getDoctor(id: string): Promise<ActionResult<DoctorDetail>>
 
     const supabase = await createClient()
     const today = todayISO()
-    const monthStart = today.slice(0, 7) + '-01'
+    const month = today.slice(0, 7)
+    const monthStart = firstDayOfMonth(month)
+    const monthEnd = lastDayOfMonth(month)
 
-    const [docRes, monthVisitsRes] = await Promise.all([
+    // Fetch the whole month once: rows up to `today` drive the visit/revenue counters,
+    // the full-month set drives earnings (same range getDoctorEarnings used).
+    const [docRes, monthVisitsRes, workingDays] = await Promise.all([
       supabase.from('cp_doctors').select('*').eq('id', id).is('deleted_at', null).single(),
-      supabase.from('cp_patient_visits').select('id, fee_paisas').eq('doctor_id', id).gte('visit_date', monthStart).lte('visit_date', today),
+      supabase.from('cp_patient_visits').select('id, visit_date, fee_paisas').eq('doctor_id', id).gte('visit_date', monthStart).lte('visit_date', monthEnd),
+      getWorkingDaysConfig(supabase),
     ])
 
     if (docRes.error || !docRes.data) return { success: false, error: docRes.error?.message ?? 'Doctor not found' }
 
     const doctor = docRes.data as unknown as Doctor
-    const monthRevenue = (monthVisitsRes.data ?? []).reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
-    const earningsResult = await getDoctorEarnings(id, today.slice(0, 7))
-    const earnings = earningsResult.success ? earningsResult.data.gross_earnings : 0
+    const allMonthVisits = monthVisitsRes.data ?? []
+    const visitsToDate = allMonthVisits.filter((v) => (v.visit_date as string) <= today)
+    const monthRevenue = visitsToDate.reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
+
+    const earnings = computeDoctorGrossEarnings(doctor, allMonthVisits, workingDays)
 
     return {
       success: true,
-      data: { ...doctor, visits_this_month: (monthVisitsRes.data ?? []).length, revenue_this_month: monthRevenue, earnings_this_month: earnings },
+      data: { ...doctor, visits_this_month: visitsToDate.length, revenue_this_month: monthRevenue, earnings_this_month: earnings },
     }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
@@ -605,7 +631,7 @@ export async function getDailyVisits(date: string): Promise<ActionResult<DailyVi
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('cp_patient_visits')
-      .select('*, cp_patients!patient_id(id, name, patient_no, phone), cp_doctors!doctor_id(id, name, specialization)')
+      .select('id, patient_id, doctor_id, visit_date, voucher_no, fee_paisas, payment_method, payment_status, paid_amount_paisas, diagnosis, created_at, cp_patients!patient_id(id, name, patient_no, phone), cp_doctors!doctor_id(id, name, specialization)')
       .eq('visit_date', date)
       .order('created_at', { ascending: false })
 
@@ -697,14 +723,7 @@ export async function getDoctorEarnings(doctorId: string, month: string): Promis
     const totalRevenue = visits.reduce((s, v) => s + (v.fee_paisas ?? 0), 0)
     const daysWorked = new Set(visits.map((v) => v.visit_date)).size
 
-    let grossEarnings = 0
-    if (doctor.earning_model === 'salaried') {
-      const salary = doctor.monthly_salary ?? 0
-      grossEarnings = workingDays > 0 ? Math.round((salary / workingDays) * daysWorked) : salary
-    } else {
-      const pct = Number(doctor.commission_pct ?? 0)
-      grossEarnings = Math.round((totalRevenue * pct) / 100)
-    }
+    const grossEarnings = computeDoctorGrossEarnings(doctor, visits, workingDays)
 
     return {
       success: true,

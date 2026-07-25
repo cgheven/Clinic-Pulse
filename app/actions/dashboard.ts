@@ -89,6 +89,7 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
     xrayResult,
     paymentMethodsResult,
     machineryResult,
+    inventoryResult,
   ] = await Promise.all([
     // OPD visits today — fee_paisas, payment_method (enum), no deleted_at on visits
     supabase
@@ -134,6 +135,14 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
       .lte('next_service', format(addDays(new Date(today), 30), 'yyyy-MM-dd'))
       .order('next_service', { ascending: true })
       .limit(5),
+
+    // Low stock — separate query (Supabase can't compare two columns inline)
+    supabase
+      .from('cp_pharmacy_inventory')
+      .select('id, name, stock_qty, reorder_level, unit')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .gt('reorder_level', 0),
   ])
 
   type VisitRow = {
@@ -154,13 +163,7 @@ export async function getDashboardStats(date?: string): Promise<DashboardStats> 
   const paymentMethods = paymentMethodsResult.data ?? []
   const machineryRaw = machineryResult.data ?? []
 
-  // Low stock — separate query (Supabase can't compare two columns inline)
-  const { data: allInventory } = await supabase
-    .from('cp_pharmacy_inventory')
-    .select('id, name, stock_qty, reorder_level, unit')
-    .eq('is_active', true)
-    .is('deleted_at', null)
-    .gt('reorder_level', 0)
+  const allInventory = inventoryResult.data
 
   const lowStockItems: LowStockItem[] = (allInventory ?? [])
     .filter((item) => (item.stock_qty as number) <= (item.reorder_level as number))

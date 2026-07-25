@@ -25,7 +25,6 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { CpUser, UserRole } from "@/types/index";
 
@@ -134,6 +133,7 @@ export function Sidebar({ userRole, user, onClose, mobile }: SidebarProps) {
   }
 
   async function handleSignOut() {
+    const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");

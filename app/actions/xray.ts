@@ -1,5 +1,6 @@
 'use server'
 
+import { cache } from 'react'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
@@ -110,10 +111,15 @@ const recordExpenseSchema = z.object({
 // Internal helpers
 // =============================================================================
 
-/** Read the partner splits JSON from cp_settings */
-async function fetchPartnerSplitsConfig(
+/**
+ * Read the partner splits JSON from cp_settings.
+ * Request-scoped memoisation: several X-Ray actions run in the same render and
+ * each used to issue this identical read. `createClient` is itself React.cache'd,
+ * so the supabase argument has a stable identity and the cache key hits.
+ */
+const fetchPartnerSplitsConfig = cache(async (
   supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<Record<string, number>> {
+): Promise<Record<string, number>> => {
   const { data } = await supabase
     .from('cp_settings')
     .select('setting_value')
@@ -128,7 +134,18 @@ async function fetchPartnerSplitsConfig(
   } catch {
     return {}
   }
-}
+})
+
+/** Active partners, ordered oldest-first. Request-scoped memoised (see above). */
+const fetchActivePartners = cache(async (
+  supabase: Awaited<ReturnType<typeof createClient>>
+) =>
+  supabase
+    .from('cp_xray_partners')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+)
 
 /** Convert a PKR string entered by the user to paisas (integer) */
 function pkrToPaisas(pkrStr: string): number {
@@ -155,11 +172,19 @@ export async function getDailyRevenue(
     await requireAuth()
     const supabase = await createClient()
 
-    const { data: rawEntries, error } = await supabase
-      .from('cp_xray_revenue')
-      .select('*')
-      .eq('revenue_date', date)
-      .order('created_at', { ascending: false })
+    // Partners/splits do not depend on the revenue rows — only the JS payout math
+    // below needs both, so all three reads go out in one wave.
+    const [revenueRes, partnersResult, splitsConfig] = await Promise.all([
+      supabase
+        .from('cp_xray_revenue')
+        .select('*')
+        .eq('revenue_date', date)
+        .order('created_at', { ascending: false }),
+      fetchActivePartners(supabase),
+      fetchPartnerSplitsConfig(supabase),
+    ])
+
+    const { data: rawEntries, error } = revenueRes
 
     if (error) return { success: false, error: error.message }
 
@@ -178,15 +203,6 @@ export async function getDailyRevenue(
       .filter((e) => (e as unknown as { payment_status: string }).payment_status === 'due')
       .reduce((sum, e) => sum + ((e as unknown as { amount_paisas: number }).amount_paisas ?? 0), 0)
     const totalCollected = totalGross - totalDue
-
-    const [partnersResult, splitsConfig] = await Promise.all([
-      supabase
-        .from('cp_xray_partners')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: true }),
-      fetchPartnerSplitsConfig(supabase),
-    ])
 
     const partners: XrayPartnerWithSplit[] = (partnersResult.data ?? []).map((p) => ({
       ...(p as unknown as CpXrayPartner),
@@ -298,11 +314,7 @@ export async function getPartners(): Promise<ActionResult<XrayPartnerWithSplit[]
     const supabase = await createClient()
 
     const [partnersResult, splitsConfig] = await Promise.all([
-      supabase
-        .from('cp_xray_partners')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: true }),
+      fetchActivePartners(supabase),
       fetchPartnerSplitsConfig(supabase),
     ])
 
@@ -354,12 +366,19 @@ export async function getPartnerPayouts(
 
     const supabase = await createClient()
 
-    const { data: revenueRows, error: revenueError } = await supabase
-      .from('cp_xray_revenue')
-      .select('amount_paisas')
-      .eq('payment_status', 'paid')
-      .gte('revenue_date', startDate)
-      .lte('revenue_date', endDate)
+    // Neither query consumes the other's rows — issue them together.
+    const [revenueRes, partnersResult, splitsConfig] = await Promise.all([
+      supabase
+        .from('cp_xray_revenue')
+        .select('amount_paisas')
+        .eq('payment_status', 'paid')
+        .gte('revenue_date', startDate)
+        .lte('revenue_date', endDate),
+      fetchActivePartners(supabase),
+      fetchPartnerSplitsConfig(supabase),
+    ])
+
+    const { data: revenueRows, error: revenueError } = revenueRes
 
     if (revenueError) return { success: false, error: revenueError.message }
 
@@ -367,15 +386,6 @@ export async function getPartnerPayouts(
       (sum, r) => sum + ((r as { amount_paisas: number }).amount_paisas ?? 0),
       0
     )
-
-    const [partnersResult, splitsConfig] = await Promise.all([
-      supabase
-        .from('cp_xray_partners')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: true }),
-      fetchPartnerSplitsConfig(supabase),
-    ])
 
     if (partnersResult.error) {
       return { success: false, error: partnersResult.error.message }
@@ -447,11 +457,7 @@ export async function getMonthlyReport(
           .eq('status', 'active')
           .gte('expense_date', startDate)
           .lte('expense_date', endDate),
-        supabase
-          .from('cp_xray_partners')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: true }),
+        fetchActivePartners(supabase),
         fetchPartnerSplitsConfig(supabase),
       ])
 
@@ -609,27 +615,24 @@ export async function recordXrayExpense(
 
     const supabase = await createClient()
 
+    // The two lookups and the partner count are mutually independent and none of
+    // them depends on the insert, so they all go out in one wave.
+    const [headRes, pmRes, partnersRes] = await Promise.all([
+      expense_head_id
+        ? supabase.from('cp_expense_heads').select('name').eq('id', expense_head_id).single()
+        : Promise.resolve(null),
+      payment_method_id
+        ? supabase.from('cp_payment_methods').select('method').eq('id', payment_method_id).single()
+        : Promise.resolve(null),
+      supabase.from('cp_xray_partners').select('id').eq('is_active', true),
+    ])
+
     // Resolve head_name from expense_head_id, fall back to custom_head or 'General'
     let headName = custom_head ?? 'General'
-    if (expense_head_id) {
-      const { data: headData } = await supabase
-        .from('cp_expense_heads')
-        .select('name')
-        .eq('id', expense_head_id)
-        .single()
-      if (headData?.name) headName = headData.name
-    }
+    if (headRes?.data?.name) headName = headRes.data.name
 
     // Resolve payment_method enum value from payment_method_id UUID
-    let paymentMethod: string | null = null
-    if (payment_method_id) {
-      const { data: pmData } = await supabase
-        .from('cp_payment_methods')
-        .select('method')
-        .eq('id', payment_method_id)
-        .single()
-      paymentMethod = pmData?.method ?? null
-    }
+    const paymentMethod: string | null = pmRes?.data?.method ?? null
 
     const { data, error } = await supabase
       .from('cp_expenses')
@@ -650,12 +653,7 @@ export async function recordXrayExpense(
     if (error) return { success: false, error: error.message }
 
     // Compute per_partner_amount based on current active partner count
-    const { data: partnersData } = await supabase
-      .from('cp_xray_partners')
-      .select('id')
-      .eq('is_active', true)
-
-    const activePartnerCount = (partnersData ?? []).length
+    const activePartnerCount = (partnersRes.data ?? []).length
     const expense = data as unknown as CpExpense
 
     const result: XrayExpenseWithSplit = {

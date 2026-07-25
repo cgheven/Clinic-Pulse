@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import {
-  getDailyPayments,
   getPaymentsByDepartment,
   getDailyTrend,
 } from '@/app/actions/payments'
@@ -87,14 +86,18 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
 
   const isToday = date === today
 
-  const [dailyResult, deptResult, trendResult] = await Promise.all([
-    getDailyPayments(date),
+  // getPaymentsByDepartment issues the exact same four queries as getDailyPayments
+  // and its `totals`/`grand_total` are the same accumulation over the same rows,
+  // so `daily` is derived from it instead of paying for a duplicate round trip.
+  const [deptResult, trendResult] = await Promise.all([
     getPaymentsByDepartment(date),
     getDailyTrend(30),
   ])
 
-  const daily = dailyResult.success ? dailyResult.data : null
   const dept  = deptResult.success  ? deptResult.data  : null
+  const daily = dept
+    ? { date, totals: dept.totals, grand_total: dept.grand_total }
+    : null
   const trend = trendResult.success ? trendResult.data  : null
 
   const mobileTotal = daily
@@ -189,9 +192,9 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
       ) : (
         <ErrorBanner
           message={
-            dailyResult.success
+            deptResult.success
               ? 'No payment data available for this date.'
-              : dailyResult.error
+              : deptResult.error
           }
         />
       )}

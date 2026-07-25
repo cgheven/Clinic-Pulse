@@ -2,7 +2,10 @@ import React from 'react'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { SaleForm } from '@/components/pharmacy/sale-form'
-import { getActiveInventoryForSale, getActivePaymentMethods } from '@/app/actions/pharmacy'
+import { getActiveInventoryForSale } from '@/app/actions/pharmacy'
+// Same query as the (now-deleted) pharmacy copy, but request/24h-cached and
+// busted by the 'payment-methods' tag in togglePaymentMethod.
+import { getActivePaymentMethods } from '@/app/actions/opd'
 import { getTodayPKT } from '@/lib/utils'
 
 // =============================================================================

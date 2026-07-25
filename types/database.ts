@@ -144,13 +144,11 @@ type CpPharmacySaleItemRow = {
 type CpLabTestRow = {
   id: string;
   name: string;
-  test_code: string | null;
   category: string | null;
   price_paisas: number; // bigint
-  reference_range: string | null;
+  duration_minutes: number | null;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
   deleted_at: string | null;
 };
 

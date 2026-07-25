@@ -1,5 +1,3 @@
-'use client'
-
 import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyPaisas } from '@/lib/utils'
@@ -165,9 +163,9 @@ export function LabDailyReportTable({ data }: LabDailyReportTableProps) {
                   {' · '}
                   {formatCurrencyPaisas(e.price_paisas)}
                 </p>
-                {e.test?.test_code && (
+                {e.test?.category && (
                   <p className="hidden text-[11px] text-muted-foreground sm:block">
-                    {e.test.test_code}
+                    {e.test.category}
                   </p>
                 )}
               </div>

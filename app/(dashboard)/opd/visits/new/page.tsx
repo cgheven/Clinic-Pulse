@@ -37,7 +37,8 @@ async function NewVisitForm({ patientId }: { patientId?: string }) {
   }
 
   const [patientsRes, doctorsRes, pmRes] = await Promise.all([
-    getPatients({ limit: 500 }),
+    // This form only needs id/name/patient_no/phone — skip the visit rollup query.
+    getPatients({ limit: 500, withVisitStats: false }),
     getActiveDoctors(),
     getActivePaymentMethods(),
   ])

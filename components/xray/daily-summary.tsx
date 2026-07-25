@@ -1,5 +1,3 @@
-'use client'
-
 import Link from 'next/link'
 import { AlertTriangle, Plus, TrendingUp, Wallet, Clock, FileText } from 'lucide-react'
 import { formatCurrencyPaisas } from '@/lib/utils'

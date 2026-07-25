@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Building2, LogOut, Menu, Settings, User } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +28,7 @@ export function DashboardShell({ user, children, clinicName }: DashboardShellPro
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function handleSignOut() {
+    const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");

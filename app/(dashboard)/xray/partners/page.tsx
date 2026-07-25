@@ -74,13 +74,25 @@ export default async function XrayPartnersPage() {
   const today = getTodayPKT()
   const currentMonth = today.slice(0, 7)
 
-  const [partnersResult, payoutsResult] = await Promise.all([
-    getPartners(),
-    getPartnerPayouts(currentMonth),
-  ])
+  // getPartnerPayouts already fetches the identical active-partner list
+  // (same query, same is_active filter, same created_at ordering, same
+  // split_pct lookup), so we derive `partners` from it instead of issuing
+  // a second, byte-identical round-trip via getPartners().
+  const payoutsResult = await getPartnerPayouts(currentMonth)
 
-  const partners = partnersResult.success ? partnersResult.data : []
   const payoutsData = payoutsResult.success ? payoutsResult.data : null
+
+  // Happy path: derive the partner list from the payouts result — no extra
+  // round-trip. Only if the payouts call failed (e.g. the revenue query erred
+  // while the partner table is perfectly readable) do we fall back to
+  // getPartners(), so the page still lists partners exactly as it did before.
+  let partners: XrayPartnerWithSplit[]
+  if (payoutsData) {
+    partners = payoutsData.partner_payouts.map((pp) => pp.partner)
+  } else {
+    const partnersResult = await getPartners()
+    partners = partnersResult.success ? partnersResult.data : []
+  }
 
   const splitTotalBp = partners.reduce((sum, p) => sum + p.split_pct, 0)
   const splitValid = splitTotalBp === 100

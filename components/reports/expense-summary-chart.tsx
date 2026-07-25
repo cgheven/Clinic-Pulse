@@ -1,5 +1,3 @@
-'use client'
-
 import React from 'react'
 import { formatCurrencyPaisas } from '@/lib/utils'
 import { TrendingDown, Receipt, LayoutGrid, Tag } from 'lucide-react'

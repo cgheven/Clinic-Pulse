@@ -480,18 +480,24 @@ export async function getEquipment(): Promise<ActionResult<MachineryWithStatus[]
     await requireAuth()
     const supabase = await createClient()
 
-    const [machineryRes, maintenanceRes] = await Promise.all([
-      supabase.from('cp_lab_machinery').select('*').is('deleted_at', null).order('name', { ascending: true }),
-      supabase.from('cp_lab_maintenance').select('*').order('service_date', { ascending: false }),
-    ])
+    // Embed maintenance rows so only records belonging to a live machine are
+    // transferred (the old query pulled the whole append-only table every load).
+    const machineryRes = await supabase
+      .from('cp_lab_machinery')
+      .select('*, cp_lab_maintenance(*)')
+      .is('deleted_at', null)
+      .order('name', { ascending: true })
+      .order('service_date', { ascending: false, referencedTable: 'cp_lab_maintenance' })
 
     if (machineryRes.error) return { success: false, error: machineryRes.error.message }
 
     const today = new Date(todayISO())
-    const allRecords = (maintenanceRes.data ?? []) as CpLabMaintenance[]
 
-    const result = ((machineryRes.data ?? []) as CpLabMachinery[]).map((m) => {
-      const records = allRecords.filter((r) => r.machinery_id === m.id)
+    type MachineryRow = CpLabMachinery & { cp_lab_maintenance: CpLabMaintenance[] | null }
+
+    const result = ((machineryRes.data ?? []) as unknown as MachineryRow[]).map((row) => {
+      const { cp_lab_maintenance, ...m } = row
+      const records = cp_lab_maintenance ?? []
 
       let status: 'operational' | 'maintenance_due' | 'overdue' = 'operational'
       if (m.next_service) {
@@ -661,27 +667,22 @@ export async function addLabExpense(input: {
     const authUser = await requireAuth()
     const supabase = await createClient()
 
+    // Both lookups are independent and both ignore errors — one wave, not two.
+    const [headRes, pmRes] = await Promise.all([
+      input.expense_head_id
+        ? supabase.from('cp_expense_heads').select('name').eq('id', input.expense_head_id).single()
+        : Promise.resolve(null),
+      input.payment_method_id
+        ? supabase.from('cp_payment_methods').select('method').eq('id', input.payment_method_id).single()
+        : Promise.resolve(null),
+    ])
+
     // Resolve head_name
     let headName = input.custom_head ?? 'General'
-    if (input.expense_head_id) {
-      const { data: headData } = await supabase
-        .from('cp_expense_heads')
-        .select('name')
-        .eq('id', input.expense_head_id)
-        .single()
-      if (headData?.name) headName = headData.name
-    }
+    if (headRes?.data?.name) headName = headRes.data.name
 
     // Resolve payment_method enum value from UUID
-    let paymentMethod: string | null = null
-    if (input.payment_method_id) {
-      const { data: pmData } = await supabase
-        .from('cp_payment_methods')
-        .select('method')
-        .eq('id', input.payment_method_id)
-        .single()
-      paymentMethod = pmData?.method ?? null
-    }
+    const paymentMethod: string | null = pmRes?.data?.method ?? null
 
     const { error } = await supabase
       .from('cp_expenses')

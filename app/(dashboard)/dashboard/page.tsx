@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense, cache } from 'react'
 import {
   Users,
   ShoppingBag,
@@ -24,45 +25,59 @@ export const dynamic = 'force-dynamic'
 // Page
 // =============================================================================
 
-export default async function DashboardPage() {
-  const today = getTodayPKT()
+// Shared by the two Suspense boundaries below, so the whole dashboard still
+// costs exactly one getDashboardStats() call per request.
+const loadStats = cache(getDashboardStats)
 
-  let stats: Awaited<ReturnType<typeof getDashboardStats>> | null = null
-  let fetchError: string | null = null
+type Stats = Awaited<ReturnType<typeof getDashboardStats>>
 
+async function loadStatsSafe(
+  today: string
+): Promise<{ stats: Stats | null; fetchError: string | null }> {
   try {
-    stats = await getDashboardStats(today)
+    return { stats: await loadStats(today), fetchError: null }
   } catch (err) {
-    fetchError = err instanceof Error ? err.message : 'Failed to load dashboard data.'
+    return {
+      stats: null,
+      fetchError: err instanceof Error ? err.message : 'Failed to load dashboard data.',
+    }
   }
+}
 
+// ── Revenue figure (header, right) ──────────────────────────────────────────
+
+function RevenueFigure({ stats }: { stats: Stats | null }) {
+  return (
+    <p className="text-xl font-bold tabular-nums text-primary sm:text-2xl">
+      {stats ? formatCurrencyPaisas(stats.revenue) : '—'}
+    </p>
+  )
+}
+
+async function AsyncRevenueFigure({ today }: { today: string }) {
+  const { stats } = await loadStatsSafe(today)
+  return <RevenueFigure stats={stats} />
+}
+
+// ── Body ────────────────────────────────────────────────────────────────────
+//
+// Rendered twice: once with `stats = null` as the Suspense fallback (which is
+// byte-for-byte the placeholder state this page already rendered before the
+// data arrived), and once with the resolved stats.
+
+function DashboardBody({
+  stats,
+  fetchError,
+}: {
+  stats: Stats | null
+  fetchError: string | null
+}) {
   const xrayRevenue = stats?.revenueByDept.find((d) => d.dept === 'X-Ray')?.revenue ?? 0
   const hasAlerts =
     (stats?.lowStockItems.length ?? 0) > 0 || (stats?.upcomingService.length ?? 0) > 0
 
   return (
-    <div className="space-y-4">
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60">
-            <span className="hidden sm:inline">{formatDate(today, 'EEEE, dd MMMM yyyy')}</span>
-            <span className="sm:hidden">{formatDate(today, 'EEE, dd MMM yyyy')}</span>
-          </p>
-          <h1 className="mt-0.5 text-lg font-bold text-foreground sm:text-xl">
-            Today at a glance
-          </h1>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
-            Revenue
-          </p>
-          <p className="text-xl font-bold tabular-nums text-primary sm:text-2xl">
-            {stats ? formatCurrencyPaisas(stats.revenue) : '—'}
-          </p>
-        </div>
-      </div>
-
+    <>
       {/* ── Error banner ──────────────────────────────────────────────────── */}
       {fetchError && (
         <div className="flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2.5">
@@ -135,6 +150,51 @@ export default async function DashboardPage() {
           <PaymentBreakdown data={stats?.paymentTotals ?? []} />
         </div>
       </div>
+    </>
+  )
+}
+
+async function DashboardContent({ today }: { today: string }) {
+  const { stats, fetchError } = await loadStatsSafe(today)
+  return <DashboardBody stats={stats} fetchError={fetchError} />
+}
+
+// =============================================================================
+// Page
+//
+// The header (date + "Today at a glance") paints immediately; the stats stream
+// in behind Suspense instead of blocking the whole tree on getDashboardStats().
+// =============================================================================
+
+export default async function DashboardPage() {
+  const today = getTodayPKT()
+
+  return (
+    <div className="space-y-4">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            <span className="hidden sm:inline">{formatDate(today, 'EEEE, dd MMMM yyyy')}</span>
+            <span className="sm:hidden">{formatDate(today, 'EEE, dd MMM yyyy')}</span>
+          </p>
+          <h1 className="mt-0.5 text-lg font-bold text-foreground sm:text-xl">
+            Today at a glance
+          </h1>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            Revenue
+          </p>
+          <Suspense fallback={<RevenueFigure stats={null} />}>
+            <AsyncRevenueFigure today={today} />
+          </Suspense>
+        </div>
+      </div>
+
+      <Suspense fallback={<DashboardBody stats={null} fetchError={null} />}>
+        <DashboardContent today={today} />
+      </Suspense>
     </div>
   )
 }

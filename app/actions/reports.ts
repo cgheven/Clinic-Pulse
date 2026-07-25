@@ -1,5 +1,6 @@
 'use server'
 
+import { cache } from 'react'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth'
@@ -125,7 +126,7 @@ export type ExpenseReport = {
   clinic_name: string
   by_department: DeptExpenseRow[]
   grand_total: number // paisas
-  chart_data: { name: string; amount: number }[] // amount in PKR (not paisas) for recharts
+  chart_data: { name: string; amount: number }[] // amount in PKR (not paisas) for charts
 }
 
 // =============================================================================
@@ -184,43 +185,58 @@ function lastDayOfMonth(yearMonth: string): string {
   return `${yearMonth}-${String(last.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * One indexed read for every cp_settings key the reports need, memoised for the
+ * request. Replaces up to three separate single-key round trips per report.
+ */
+const REPORT_SETTING_KEYS = [
+  'clinic.clinic_name',
+  'salary.working_days',
+  'clinic.working_days',
+] as const
+
+const fetchReportSettings = cache(async (
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<Map<string, unknown>> => {
+  const { data } = await supabase
+    .from('cp_settings')
+    .select('setting_key, setting_value')
+    .in('setting_key', REPORT_SETTING_KEYS as unknown as string[])
+
+  const map = new Map<string, unknown>()
+  for (const row of data ?? []) {
+    if (!map.has(row.setting_key)) map.set(row.setting_key, row.setting_value)
+  }
+  return map
+})
+
 async function getClinicName(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<string> {
-  const { data } = await supabase
-    .from('cp_settings')
-    .select('setting_value')
-    .eq('setting_key', 'clinic.clinic_name')
-    .maybeSingle()
-  const val = data?.setting_value
+  const settings = await fetchReportSettings(supabase)
+  const val = settings.get('clinic.clinic_name')
   return (typeof val === 'string' ? val : null) ?? 'ClinicPulse'
 }
 
 async function getWorkingDaysConfig(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<number> {
+  const settings = await fetchReportSettings(supabase)
+
   // Try salary-specific working days setting first
-  const { data: salaryData } = await supabase
-    .from('cp_settings')
-    .select('setting_value')
-    .eq('setting_key', 'salary.working_days')
-    .maybeSingle()
-  if (salaryData?.setting_value) {
+  const salaryValue = settings.get('salary.working_days')
+  if (salaryValue) {
     const v =
-      typeof salaryData.setting_value === 'number'
-        ? salaryData.setting_value
-        : parseInt(String(salaryData.setting_value), 10)
+      typeof salaryValue === 'number'
+        ? salaryValue
+        : parseInt(String(salaryValue), 10)
     if (!isNaN(v) && v > 0) return v
   }
 
   // Fall back to clinic working days array
-  const { data: clinicData } = await supabase
-    .from('cp_settings')
-    .select('setting_value')
-    .eq('setting_key', 'clinic.working_days')
-    .maybeSingle()
-  if (clinicData?.setting_value) {
-    const val = clinicData.setting_value
+  const clinicValue = settings.get('clinic.working_days')
+  if (clinicValue) {
+    const val = clinicValue
     const days = Array.isArray(val) ? val : (() => { try { return JSON.parse(val as string) } catch { return null } })()
     if (Array.isArray(days)) return Math.round(days.length * 4.33)
   }
@@ -874,10 +890,11 @@ export async function getLabDailyReport(
         .from('cp_lab_test_logs')
         .select(
           `*,
-          cp_lab_tests(id, test_name, test_code, category, unit, reference_range),
+          cp_lab_tests(id, name, category),
           cp_patients(id, name, patient_no, phone)`
         )
         .eq('test_date', date)
+        .is('deleted_at', null)
         .order('created_at', { ascending: true }),
       supabase
         .from('cp_payment_methods')

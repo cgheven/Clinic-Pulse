@@ -11,7 +11,7 @@ import {
   CalendarDays,
   DollarSign,
 } from 'lucide-react'
-import { getDoctor } from '@/app/actions/opd'
+import { getDoctor, getDoctorEarnings } from '@/app/actions/opd'
 import { DoctorEarnings } from '@/components/opd/doctor-earnings'
 import { formatCurrencyPaisas, formatBasisPoints, cn } from '@/lib/utils'
 
@@ -20,7 +20,15 @@ interface DoctorDetailPageProps {
 }
 
 async function DoctorDetailContent({ id }: { id: string }) {
-  const result = await getDoctor(id)
+  // Same PKT "current month" the earnings card would have computed client-side.
+  const month = new Date()
+    .toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' })
+    .slice(0, 7)
+
+  const [result, earningsResult] = await Promise.all([
+    getDoctor(id),
+    getDoctorEarnings(id, month),
+  ])
 
   if (!result.success) {
     if (result.error === 'Doctor not found') notFound()
@@ -128,7 +136,11 @@ async function DoctorDetailContent({ id }: { id: string }) {
       </div>
 
       {/* ── Earnings calculator ───────────────────────────────────────────── */}
-      <DoctorEarnings doctorId={doctor.id} />
+      <DoctorEarnings
+        doctorId={doctor.id}
+        initialMonth={month}
+        initialData={earningsResult.success ? earningsResult.data : null}
+      />
     </div>
   )
 }

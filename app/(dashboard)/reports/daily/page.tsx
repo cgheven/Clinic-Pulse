@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
+import { Suspense, cache } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { requireAuth } from '@/lib/auth'
 import { getDailyRevenue } from '@/app/actions/reports'
-import { ReportsTabNav } from '@/components/reports/reports-tab-nav'
 import { DailyRevenueTable } from '@/components/reports/daily-revenue-table'
+import { ReportSkeleton } from '@/components/reports/report-skeleton'
 import { PdfGenerator } from '@/components/reports/pdf-generator'
 import { DatePickerNav } from '@/components/reports/date-picker-nav'
 import { getTodayPKT } from '@/lib/utils'
@@ -31,6 +32,51 @@ function offsetDate(dateStr: string, days: number): string {
 }
 
 // =============================================================================
+// Data loading
+//
+// Wrapped in React.cache so the two Suspense boundaries below share a single
+// getDailyRevenue() call (and therefore a single DB round-trip) per request.
+// =============================================================================
+
+const loadReport = cache(getDailyRevenue)
+
+async function ReportPdf({ period }: { period: string }) {
+  const result = await loadReport(period)
+  if (!result.success) return null
+  return (
+    <PdfGenerator
+      report={{ type: 'daily', data: result.data }}
+      fileName={`daily-revenue-${period}`}
+    />
+  )
+}
+
+async function ReportContent({ period }: { period: string }) {
+  const result = await loadReport(period)
+
+  if (!result.success) {
+    return (
+      <>
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+          <p className="text-sm text-destructive">{result.error}</p>
+        </div>
+
+        <Card className="border-border bg-card">
+          <CardContent className="py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              No revenue data available for this date.
+            </p>
+          </CardContent>
+        </Card>
+      </>
+    )
+  }
+
+  return <DailyRevenueTable data={result.data} />
+}
+
+// =============================================================================
 // Page
 // =============================================================================
 
@@ -52,13 +98,7 @@ export default async function DailyReportPage({ searchParams }: PageProps) {
   const nextDate = offsetDate(selectedDate, +1)
   const isToday = selectedDate === today
 
-  const result = await getDailyRevenue(selectedDate)
-
   return (
-    <div className="space-y-0">
-      {/* ── Tab navigation ──────────────────────────────────────────────────── */}
-      <ReportsTabNav />
-
       <div className="space-y-6 p-6">
         {/* ── Page header ─────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -76,12 +116,9 @@ export default async function DailyReportPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          {result.success && (
-            <PdfGenerator
-              report={{ type: 'daily', data: result.data }}
-              fileName={`daily-revenue-${selectedDate}`}
-            />
-          )}
+          <Suspense key={selectedDate} fallback={null}>
+            <ReportPdf period={selectedDate} />
+          </Suspense>
         </div>
 
         {/* ── Date navigation ─────────────────────────────────────────────── */}
@@ -116,27 +153,10 @@ export default async function DailyReportPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* ── Error banner ────────────────────────────────────────────────── */}
-        {!result.success && (
-          <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
-            <p className="text-sm text-destructive">{result.error}</p>
-          </div>
-        )}
-
-        {/* ── Report content ──────────────────────────────────────────────── */}
-        {result.success ? (
-          <DailyRevenueTable data={result.data} />
-        ) : (
-          <Card className="border-border bg-card">
-            <CardContent className="py-12 text-center">
-              <p className="text-sm text-muted-foreground">
-                No revenue data available for this date.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {/* ── Report content (streams behind Suspense) ────────────────────── */}
+        <Suspense key={selectedDate} fallback={<ReportSkeleton />}>
+          <ReportContent period={selectedDate} />
+        </Suspense>
       </div>
-    </div>
   )
 }
