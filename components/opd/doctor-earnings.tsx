@@ -53,15 +53,29 @@ export function DoctorEarnings({ doctorId, initialMonth, className }: DoctorEarn
           Earnings
         </h3>
 
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          className={cn(
-            'rounded-lg border border-border bg-background px-3 py-1.5 text-xs text-foreground',
-            'focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors'
-          )}
-        />
+        <div className="flex items-center gap-1">
+          <select
+            value={month.split('-')[1]}
+            onChange={(e) => setMonth(`${month.split('-')[0]}-${e.target.value}`)}
+            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+          >
+            {Array.from({ length: 12 }, (_, i) => {
+              const m = String(i + 1).padStart(2, '0')
+              const label = new Date(2000, i, 1).toLocaleDateString('en-PK', { month: 'short' })
+              return <option key={m} value={m}>{label}</option>
+            })}
+          </select>
+          <select
+            value={month.split('-')[0]}
+            onChange={(e) => setMonth(`${e.target.value}-${month.split('-')[1]}`)}
+            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+          >
+            {Array.from({ length: 5 }, (_, i) => {
+              const year = new Date().getFullYear() - 2 + i
+              return <option key={year} value={year}>{year}</option>
+            })}
+          </select>
+        </div>
       </div>
 
       {loading ? (

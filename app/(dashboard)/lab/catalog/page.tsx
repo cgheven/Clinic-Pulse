@@ -4,8 +4,6 @@ import React, { useState, useEffect, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
@@ -43,26 +41,14 @@ interface TestRow extends CpLabTest {
 
 interface NewTestForm {
   test_name: string
-  test_code: string
   category: string
   price: string
-  cost: string
-  reference_range: string
-  unit: string
-  turnaround_time: string
-  notes: string
 }
 
 const DEFAULT_NEW: NewTestForm = {
   test_name: '',
-  test_code: '',
   category: '',
   price: '',
-  cost: '',
-  reference_range: '',
-  unit: '',
-  turnaround_time: '',
-  notes: '',
 }
 
 // =============================================================================
@@ -276,8 +262,6 @@ export default function LabCatalogPage() {
             {/* Column headers */}
             <div className="flex items-center border-b border-border/50 px-4 py-1.5">
               <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground">Name</span>
-              <span className="w-20 text-[10px] uppercase tracking-wide text-muted-foreground hidden sm:block">Code</span>
-              <span className="w-36 text-[10px] uppercase tracking-wide text-muted-foreground hidden md:block">Reference</span>
               <span className="w-28 text-right text-[10px] uppercase tracking-wide text-muted-foreground">Price</span>
               <span className="w-14 text-center text-[10px] uppercase tracking-wide text-muted-foreground">Active</span>
               <span className="w-16 text-right text-[10px] uppercase tracking-wide text-muted-foreground">Edit</span>
@@ -295,24 +279,6 @@ export default function LabCatalogPage() {
                   {/* Name */}
                   <div className="flex-1 min-w-0 pr-2">
                     <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
-                  </div>
-
-                  {/* Code */}
-                  <div className="w-20 hidden sm:block">
-                    {t.test_code ? (
-                      <Badge variant="secondary" className="text-[10px] bg-muted">
-                        {t.test_code}
-                      </Badge>
-                    ) : (
-                      <span className="text-[12px] text-muted-foreground">—</span>
-                    )}
-                  </div>
-
-                  {/* Reference range */}
-                  <div className="w-36 hidden md:block">
-                    <span className="text-[12px] text-muted-foreground truncate block">
-                      {t.reference_range ?? '—'}
-                    </span>
                   </div>
 
                   {/* Price (editable) */}
@@ -429,20 +395,6 @@ export default function LabCatalogPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="new-code" className="text-xs text-muted-foreground">
-                  Test Code
-                </Label>
-                <Input
-                  id="new-code"
-                  value={newForm.test_code}
-                  onChange={(e) =>
-                    setNewForm((p) => ({ ...p, test_code: e.target.value }))
-                  }
-                  placeholder="e.g. CBC"
-                />
-              </div>
-
-              <div className="space-y-1.5">
                 <Label htmlFor="new-category" className="text-xs text-muted-foreground">
                   Category
                 </Label>
@@ -475,81 +427,6 @@ export default function LabCatalogPage() {
                 {newErrors.price && (
                   <p className="text-xs text-destructive">{newErrors.price}</p>
                 )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="new-cost" className="text-xs text-muted-foreground">
-                  Cost (Rs.)
-                </Label>
-                <Input
-                  id="new-cost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={newForm.cost}
-                  onChange={(e) =>
-                    setNewForm((p) => ({ ...p, cost: e.target.value }))
-                  }
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="new-unit" className="text-xs text-muted-foreground">
-                  Unit
-                </Label>
-                <Input
-                  id="new-unit"
-                  value={newForm.unit}
-                  onChange={(e) =>
-                    setNewForm((p) => ({ ...p, unit: e.target.value }))
-                  }
-                  placeholder="e.g. mg/dL"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="new-tat" className="text-xs text-muted-foreground">
-                  Turnaround Time
-                </Label>
-                <Input
-                  id="new-tat"
-                  value={newForm.turnaround_time}
-                  onChange={(e) =>
-                    setNewForm((p) => ({ ...p, turnaround_time: e.target.value }))
-                  }
-                  placeholder="e.g. 2 hours"
-                />
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="new-ref" className="text-xs text-muted-foreground">
-                  Reference Range
-                </Label>
-                <Input
-                  id="new-ref"
-                  value={newForm.reference_range}
-                  onChange={(e) =>
-                    setNewForm((p) => ({ ...p, reference_range: e.target.value }))
-                  }
-                  placeholder="e.g. 4.5–5.5 g/dL"
-                />
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="new-notes" className="text-xs text-muted-foreground">
-                  Notes
-                </Label>
-                <Textarea
-                  id="new-notes"
-                  value={newForm.notes}
-                  onChange={(e) =>
-                    setNewForm((p) => ({ ...p, notes: e.target.value }))
-                  }
-                  placeholder="Optional notes…"
-                  rows={2}
-                  className="resize-none"
-                />
               </div>
             </div>
           </div>

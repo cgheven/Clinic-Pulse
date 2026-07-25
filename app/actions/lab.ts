@@ -1,7 +1,7 @@
 'use server'
 
 import { z } from 'zod'
-import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth, requireAdmin } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
@@ -221,9 +221,9 @@ export async function recordTest(rawData: unknown): Promise<ActionResult<string>
 // getTestCatalog
 // =============================================================================
 
-// Cached inner query — pure DB read, no request-scoped auth context
-const _cachedGetTestCatalog = unstable_cache(
-  async () => {
+export async function getTestCatalog(): Promise<ActionResult<CpLabTest[]>> {
+  try {
+    await requireAuth()
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('cp_lab_tests')
@@ -231,18 +231,8 @@ const _cachedGetTestCatalog = unstable_cache(
       .is('deleted_at', null)
       .order('category', { ascending: true })
       .order('name', { ascending: true })
-    if (error) throw new Error(error.message)
-    return data ?? []
-  },
-  ['lab-test-catalog'],
-  { revalidate: 86400, tags: ['lab-tests'] }
-)
-
-export async function getTestCatalog(): Promise<ActionResult<CpLabTest[]>> {
-  try {
-    await requireAuth()
-    const data = await _cachedGetTestCatalog()
-    return { success: true, data: data as unknown as CpLabTest[] }
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: (data ?? []) as unknown as CpLabTest[] }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
@@ -267,7 +257,7 @@ export async function createTest(rawData: unknown): Promise<ActionResult<CpLabTe
     }).select('*').single()
     if (error) return { success: false, error: error.message }
 
-    revalidateTag('lab-tests', 'default')
+    revalidateTag('lab-tests')
     revalidatePath('/lab/tests/new')
     revalidatePath('/lab/catalog')
     return { success: true, data: data as unknown as CpLabTest }
@@ -304,7 +294,7 @@ export async function updateTest(id: string, rawData: unknown): Promise<ActionRe
     const { error } = await supabase.from('cp_lab_tests').update(updatePayload).eq('id', id).is('deleted_at', null)
     if (error) return { success: false, error: error.message }
 
-    revalidateTag('lab-tests', 'default')
+    revalidateTag('lab-tests')
     revalidatePath('/lab/tests/new')
     revalidatePath('/lab/catalog')
     return { success: true, data: undefined }
