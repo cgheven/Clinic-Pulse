@@ -78,6 +78,8 @@ export function VisitForm({
   const [fee, setFee] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
   const [isDue, setIsDue] = useState(false)
+  const [isPartial, setIsPartial] = useState(false)
+  const [partialAmount, setPartialAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [notesExpanded, setNotesExpanded] = useState(false)
 
@@ -131,21 +133,39 @@ export function VisitForm({
       setError('Please enter a valid consultation fee')
       return
     }
-    if (!isDue && !paymentMethod) {
+
+    const feePaisas = Math.round(parseFloat(fee) * 100)
+
+    if (isPartial) {
+      const partialVal = parseFloat(partialAmount)
+      if (!partialAmount || isNaN(partialVal) || partialVal <= 0) {
+        setError('Please enter a valid partial payment amount')
+        return
+      }
+      const partialPaisas = Math.round(partialVal * 100)
+      if (partialPaisas >= feePaisas) {
+        setError('Partial amount paid must be less than the full fee')
+        return
+      }
+      if (!paymentMethod) {
+        setError('Please select a payment method for the partial payment')
+        return
+      }
+    } else if (!isDue && !paymentMethod) {
       setError('Please select a payment method')
       return
     }
 
-    const feePaisas = Math.round(parseFloat(fee) * 100)
-
     startTransition(async () => {
+      const partialPaisas = isPartial ? Math.round(parseFloat(partialAmount) * 100) : undefined
       const result = await recordVisit({
         patient_id: patientId,
         doctor_id: doctorId && doctorId !== 'none' ? doctorId : null,
         visit_date: visitDate,
         fee_paisas: feePaisas,
         payment_method: isDue ? null : paymentMethod,
-        payment_status: isDue ? 'due' : 'paid',
+        payment_status: isDue ? 'due' : isPartial ? 'partial' : 'paid',
+        paid_amount_paisas: isPartial ? partialPaisas : undefined,
         diagnosis: diagnosis || null,
         prescription: prescription || null,
         notes: notes || null,
@@ -186,7 +206,7 @@ export function VisitForm({
       <div
         className={cn(
           'overflow-hidden rounded-xl border bg-card transition-colors duration-200',
-          isDue ? 'border-amber-500/30' : 'border-border'
+          isDue ? 'border-amber-500/30' : isPartial ? 'border-amber-400/40' : 'border-border'
         )}
       >
         {/* ── Patient ─────────────────────────────────────────────────────── */}
@@ -367,7 +387,8 @@ export function VisitForm({
         <div
           className={cn(
             'border-b border-border/70 px-4 py-3 transition-colors duration-200',
-            isDue && 'bg-amber-500/5'
+            isDue && 'bg-amber-500/5',
+            isPartial && !isDue && 'bg-amber-400/5'
           )}
         >
           <div className="mb-2 flex items-center gap-1.5">
@@ -376,6 +397,12 @@ export function VisitForm({
               <span className="ml-auto flex items-center gap-0.5 text-[10px] font-semibold text-amber-500">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 DUE
+              </span>
+            )}
+            {isPartial && !isDue && (
+              <span className="ml-auto flex items-center gap-0.5 text-[10px] font-semibold text-amber-500">
+                <AlertTriangle className="h-2.5 w-2.5" />
+                PARTIAL
               </span>
             )}
           </div>
@@ -423,19 +450,73 @@ export function VisitForm({
             </div>
           </div>
 
-          <label className="mt-3 flex cursor-pointer items-center gap-2 select-none">
-            <input
-              type="checkbox"
-              checked={isDue}
-              onChange={(e) => {
-                setIsDue(e.target.checked)
-                if (e.target.checked) setPaymentMethod('')
-              }}
-              className="h-3.5 w-3.5 rounded accent-amber-500"
-            />
-            <span className="text-sm font-medium text-foreground">Mark as Due</span>
-            <span className="text-xs text-muted-foreground">— patient pays later</span>
-          </label>
+          {/* Partial payment row — shown only when isPartial is active */}
+          {isPartial && !isDue && (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Amount Paid (PKR) *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={partialAmount}
+                  onChange={(e) => setPartialAmount(e.target.value)}
+                  placeholder="200"
+                />
+              </div>
+
+              <div className="space-y-1">
+                {/* Due amount computed label */}
+                <Label className="text-xs text-muted-foreground">Due Amount</Label>
+                <div className="flex h-10 items-center rounded-md border border-dashed border-amber-500/40 px-3 text-sm font-medium text-amber-600">
+                  {(() => {
+                    const feeVal = parseFloat(fee) || 0
+                    const paidVal = parseFloat(partialAmount) || 0
+                    const due = feeVal - paidVal
+                    return due > 0 ? `Rs ${due.toLocaleString('en-PK')}` : '—'
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Checkboxes */}
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:gap-4">
+            <label className="flex cursor-pointer items-center gap-2 select-none">
+              <input
+                type="checkbox"
+                checked={isPartial}
+                onChange={(e) => {
+                  setIsPartial(e.target.checked)
+                  if (e.target.checked) {
+                    setIsDue(false)
+                    setPartialAmount('')
+                  }
+                }}
+                className="h-3.5 w-3.5 rounded accent-amber-500"
+              />
+              <span className="text-sm font-medium text-foreground">Partial Payment</span>
+              <span className="text-xs text-muted-foreground">— patient pays some now</span>
+            </label>
+
+            <label className="flex cursor-pointer items-center gap-2 select-none">
+              <input
+                type="checkbox"
+                checked={isDue}
+                onChange={(e) => {
+                  setIsDue(e.target.checked)
+                  if (e.target.checked) {
+                    setIsPartial(false)
+                    setPartialAmount('')
+                    setPaymentMethod('')
+                  }
+                }}
+                className="h-3.5 w-3.5 rounded accent-amber-500"
+              />
+              <span className="text-sm font-medium text-foreground">Mark as Due</span>
+              <span className="text-xs text-muted-foreground">— patient pays later</span>
+            </label>
+          </div>
         </div>
 
         {/* ── Clinical Notes (collapsible) ──────────────────────────────────── */}

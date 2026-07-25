@@ -7,7 +7,8 @@ import { getDailyRevenue } from '@/app/actions/reports'
 import { ReportsTabNav } from '@/components/reports/reports-tab-nav'
 import { DailyRevenueTable } from '@/components/reports/daily-revenue-table'
 import { PdfGenerator } from '@/components/reports/pdf-generator'
-import { getTodayPKT, formatDate } from '@/lib/utils'
+import { DatePickerNav } from '@/components/reports/date-picker-nav'
+import { getTodayPKT } from '@/lib/utils'
 
 // =============================================================================
 // Metadata
@@ -93,16 +94,7 @@ export default async function DailyReportPage({ searchParams }: PageProps) {
             <ChevronLeft className="h-4 w-4" />
           </Link>
 
-          <div className="flex flex-1 items-center justify-center gap-3">
-            <span className="text-sm font-semibold text-foreground">
-              {formatDate(selectedDate, 'EEEE, dd MMM yyyy')}
-            </span>
-            {isToday && (
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                Today
-              </span>
-            )}
-          </div>
+          <DatePickerNav selectedDate={selectedDate} isToday={isToday} />
 
           <Link
             href={`/reports/daily?date=${nextDate}`}

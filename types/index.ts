@@ -152,7 +152,7 @@ export interface CpBpLog {
   recorded_by: string | null;
 }
 
-export type OpdPaymentStatus = 'paid' | 'due';
+export type OpdPaymentStatus = 'paid' | 'due' | 'partial';
 
 // ─── cp_patient_visits ────────────────────────────────────────────────────────
 
@@ -165,6 +165,7 @@ export interface CpPatientVisit {
   fee_paisas: number; // bigint
   payment_method: PaymentMethodEnum | null;
   payment_status: OpdPaymentStatus;
+  paid_amount_paisas: number | null; // bigint; partial payment amount; NULL = full fee paid
   diagnosis: string | null;
   prescription: string | null;
   notes: string | null;

@@ -18,6 +18,7 @@ import { requireAuth } from '@/lib/auth'
 import { getPartners, getPartnerPayouts } from '@/app/actions/xray'
 import { formatCurrencyPaisas, formatBasisPoints, getTodayPKT } from '@/lib/utils'
 import type { XrayPartnerWithSplit } from '@/app/actions/xray'
+import { AddPartnerDialog } from '@/components/xray/add-partner-dialog'
 
 export const metadata: Metadata = {
   title: 'X-Ray Partners — ClinicPulse',
@@ -82,7 +83,7 @@ export default async function XrayPartnersPage() {
   const payoutsData = payoutsResult.success ? payoutsResult.data : null
 
   const splitTotalBp = partners.reduce((sum, p) => sum + p.split_pct, 0)
-  const splitValid = splitTotalBp === 10000
+  const splitValid = splitTotalBp === 100
 
   // Build a lookup: partner_id → payout_amount for this month
   const payoutMap = new Map<string, number>(
@@ -109,14 +110,17 @@ export default async function XrayPartnersPage() {
         </div>
 
         {isAdmin && (
-          <Link
-            href="/settings"
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
-          >
-            <Settings className="h-4 w-4" />
-            Manage in Settings
-            <ExternalLink className="h-3.5 w-3.5 opacity-60" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <AddPartnerDialog />
+            <Link
+              href="/settings"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors"
+            >
+              <Settings className="h-4 w-4" />
+              Manage in Settings
+              <ExternalLink className="h-3.5 w-3.5 opacity-60" />
+            </Link>
+          </div>
         )}
       </div>
 
@@ -139,7 +143,7 @@ export default async function XrayPartnersPage() {
           >
             {splitValid
               ? 'Partner splits total 100% — all revenue will be fully distributed.'
-              : `Partner splits total ${(splitTotalBp / 100).toFixed(2)}% — configure 100% in Settings.`}
+              : `Partner splits total ${splitTotalBp.toFixed(2)}% — configure 100% in Settings.`}
           </p>
         </div>
       )}
@@ -185,7 +189,7 @@ export default async function XrayPartnersPage() {
                   key={p.id}
                   className="inline-block h-full transition-all duration-500"
                   style={{
-                    width: `${Math.max(0, Math.min(100, p.split_pct / 100))}%`,
+                    width: `${Math.max(0, Math.min(100, p.split_pct))}%`,
                     backgroundColor: `hsl(${hue}, 70%, 55%)`,
                   }}
                   title={`${p.name}: ${formatBasisPoints(p.split_pct)}`}
@@ -272,7 +276,7 @@ function PartnerCard({
       {/* Amber split bar */}
       <div
         className="h-0.5 bg-primary/50"
-        style={{ width: `${Math.min(100, partner.split_pct / 100)}%` }}
+        style={{ width: `${Math.min(100, partner.split_pct)}%` }}
         aria-hidden
       />
 

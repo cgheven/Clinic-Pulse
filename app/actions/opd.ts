@@ -45,7 +45,7 @@ export type Doctor = {
   deleted_at: string | null
 }
 
-export type OpdPaymentStatus = 'paid' | 'due'
+export type OpdPaymentStatus = 'paid' | 'due' | 'partial'
 
 export type Visit = {
   id: string
@@ -56,6 +56,7 @@ export type Visit = {
   fee_paisas: number
   payment_method: 'cash' | 'jazzcash' | 'easypaisa' | 'bank_transfer' | null
   payment_status: OpdPaymentStatus
+  paid_amount_paisas: number | null // bigint; partial payment amount; NULL = full fee paid
   diagnosis: string | null
   prescription: string | null
   notes: string | null
@@ -164,13 +165,20 @@ const recordVisitSchema = z.object({
   visit_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
   fee_paisas: z.number().int().min(0, 'Fee cannot be negative'),
   payment_method: z.enum(['cash', 'jazzcash', 'easypaisa', 'bank_transfer']).nullable().optional(),
-  payment_status: z.enum(['paid', 'due']).default('paid'),
+  payment_status: z.enum(['paid', 'due', 'partial']).default('paid'),
+  paid_amount_paisas: z.number().int().positive('Partial amount must be positive').nullable().optional(),
   diagnosis: z.string().max(2000).nullable().optional(),
   prescription: z.string().max(5000).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
 }).refine(
   (d) => d.payment_status === 'due' || !!d.payment_method,
   { message: 'Payment method is required for paid visits', path: ['payment_method'] }
+).refine(
+  (d) => d.payment_status !== 'partial' || (d.paid_amount_paisas != null && d.paid_amount_paisas > 0),
+  { message: 'Partial amount paid is required for partial payment', path: ['paid_amount_paisas'] }
+).refine(
+  (d) => d.payment_status !== 'partial' || d.paid_amount_paisas == null || d.paid_amount_paisas < d.fee_paisas,
+  { message: 'Partial amount paid must be less than the full fee', path: ['paid_amount_paisas'] }
 )
 
 const addBpLogSchema = z.object({
@@ -568,6 +576,7 @@ export async function recordVisit(rawData: unknown): Promise<ActionResult<Visit>
         fee_paisas: parsed.data.fee_paisas,
         payment_method: parsed.data.payment_method ?? null,
         payment_status: parsed.data.payment_status,
+        paid_amount_paisas: parsed.data.payment_status === 'partial' ? (parsed.data.paid_amount_paisas ?? null) : null,
         diagnosis: parsed.data.diagnosis ?? null,
         prescription: parsed.data.prescription ?? null,
         notes: parsed.data.notes ?? null,

@@ -84,7 +84,8 @@ type CpPatientVisitRow = {
   voucher_no: number | null;
   fee_paisas: number; // bigint
   payment_method: "cash" | "jazzcash" | "easypaisa" | "bank_transfer" | null;
-  payment_status: "paid" | "due";
+  payment_status: "paid" | "due" | "partial";
+  paid_amount_paisas: number | null; // bigint; partial payment amount; NULL = full fee paid
   chief_complaint: string | null;
   diagnosis: string | null;
   prescription: string | null;

@@ -39,6 +39,8 @@ export type DeptRevenueData = {
   total: number // paisas
   count: number
   payment_breakdown: PaymentBreakdownItem[]
+  due_total?: number       // paisas – transactions marked as 'due'
+  collected_total?: number // paisas – transactions already paid
 }
 
 export type DailyRevenueReport = {
@@ -50,6 +52,8 @@ export type DailyRevenueReport = {
   xray: DeptRevenueData
   grand_total: number // paisas
   payment_totals: PaymentBreakdownItem[]
+  expenses_total: number // paisas
+  expenses_breakdown: Array<{ head_name: string; total: number }> // paisas per head
 }
 
 // =============================================================================
@@ -261,17 +265,17 @@ export async function getDailyRevenue(
     if (!dateParsed.success) return { success: false, error: 'Invalid date format (YYYY-MM-DD)' }
 
     const supabase = await createClient()
-    const [clinicName, pmRes, opdRes, pharmRes, labRes, xrayRes] = await Promise.all([
+    const [clinicName, pmRes, opdRes, pharmRes, labRes, xrayRes, expensesRes, labExpRes, xrayExpRes] = await Promise.all([
       getClinicName(supabase),
       // Fetch payment methods for label lookup (method → label)
       supabase
         .from('cp_payment_methods')
         .select('method, label')
         .eq('is_enabled', true),
-      // OPD
+      // OPD — include payment_status to split collected vs due
       supabase
         .from('cp_patient_visits')
-        .select('fee_paisas, payment_method')
+        .select('fee_paisas, payment_method, payment_status, paid_amount_paisas')
         .eq('visit_date', date),
       // Pharmacy
       supabase
@@ -283,11 +287,27 @@ export async function getDailyRevenue(
         .from('cp_lab_test_logs')
         .select('price_paisas, payment_method')
         .eq('test_date', date),
-      // X-Ray
+      // X-Ray — include payment_status to split collected vs due
       supabase
         .from('cp_xray_revenue')
-        .select('amount_paisas, payment_method')
+        .select('amount_paisas, payment_method, payment_status')
         .eq('revenue_date', date),
+      // Daily general expenses grouped by head
+      supabase
+        .from('cp_expenses')
+        .select('amount_paisas, head_id, cp_expense_heads(name)')
+        .eq('expense_date', date)
+        .is('deleted_at', null),
+      // Lab-specific daily expenses
+      supabase
+        .from('cp_lab_expenses')
+        .select('amount')
+        .eq('expense_date', date),
+      // X-Ray-specific daily expenses
+      supabase
+        .from('cp_xray_expenses')
+        .select('amount')
+        .eq('expense_date', date),
     ])
 
     // Build method enum → label map
@@ -311,17 +331,31 @@ export async function getDailyRevenue(
       return { total, count: safe.length, payment_breakdown: breakdown }
     }
 
-    type OpdRow = { fee_paisas: number; payment_method: string | null }
+    type OpdRow = { fee_paisas: number; payment_method: string | null; payment_status: string | null; paid_amount_paisas?: number | null }
     type PharmRow = { total_paisas: number; payment_method: string | null }
     type LabRow = { price_paisas: number; payment_method: string | null }
-    type XrayRow = { amount_paisas: number; payment_method: string | null }
+    type XrayRow = { amount_paisas: number; payment_method: string | null; payment_status: string | null }
+    type ExpenseRow = { amount_paisas: number; head_id: string | null; cp_expense_heads: { name: string } | null }
+    type DeptExpRow = { amount: number }
 
-    const opd = buildDept(
-      ((opdRes.data ?? []) as unknown as OpdRow[]).map((r) => ({
-        amount: r.fee_paisas,
-        payment_method: r.payment_method,
-      }))
-    )
+    const opdRawRows = (opdRes.data ?? []) as unknown as OpdRow[]
+    const xrayRawRows = (xrayRes.data ?? []) as unknown as XrayRow[]
+
+    // Build dept data for OPD with due/collected split
+    const opd: DeptRevenueData = (() => {
+      const base = buildDept(opdRawRows.map((r) => ({ amount: r.fee_paisas, payment_method: r.payment_method })))
+      const due_total = opdRawRows
+        .filter((r) => r.payment_status === 'due')
+        .reduce((s, r) => s + (r.fee_paisas ?? 0), 0)
+      const collected_total = opdRawRows
+        .filter((r) => r.payment_status !== 'due')
+        .reduce((s, r) =>
+          s + (r.payment_status === 'partial' ? (r.paid_amount_paisas ?? 0) : (r.fee_paisas ?? 0)),
+          0
+        )
+      return { ...base, due_total, collected_total }
+    })()
+
     const pharmacy = buildDept(
       ((pharmRes.data ?? []) as unknown as PharmRow[]).map((r) => ({
         amount: r.total_paisas,
@@ -334,22 +368,31 @@ export async function getDailyRevenue(
         payment_method: r.payment_method,
       }))
     )
-    const xray = buildDept(
-      ((xrayRes.data ?? []) as unknown as XrayRow[]).map((r) => ({
-        amount: r.amount_paisas,
-        payment_method: r.payment_method,
-      }))
-    )
+
+    // Build dept data for X-Ray with due/collected split
+    const xray: DeptRevenueData = (() => {
+      const base = buildDept(xrayRawRows.map((r) => ({ amount: r.amount_paisas, payment_method: r.payment_method })))
+      const due_total = xrayRawRows
+        .filter((r) => r.payment_status === 'due')
+        .reduce((s, r) => s + (r.amount_paisas ?? 0), 0)
+      const collected_total = xrayRawRows
+        .filter((r) => r.payment_status !== 'due')
+        .reduce((s, r) => s + (r.amount_paisas ?? 0), 0)
+      return { ...base, due_total, collected_total }
+    })()
 
     const grand_total = opd.total + pharmacy.total + lab.total + xray.total
 
     // Aggregate all payment totals
     const allRows = [
-      ...((opdRes.data ?? []) as unknown as OpdRow[]).map((r) => ({
-        amount: r.fee_paisas,
-        method_id: r.payment_method,
-        method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
-      })),
+      // Exclude due OPD visits — they have no payment_method and are not yet collected
+      ...opdRawRows
+        .filter((r) => r.payment_status !== 'due')
+        .map((r) => ({
+          amount: r.payment_status === 'partial' ? (r.paid_amount_paisas ?? 0) : r.fee_paisas,
+          method_id: r.payment_method,
+          method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
+        })),
       ...((pharmRes.data ?? []) as unknown as PharmRow[]).map((r) => ({
         amount: r.total_paisas,
         method_id: r.payment_method,
@@ -360,17 +403,53 @@ export async function getDailyRevenue(
         method_id: r.payment_method,
         method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
       })),
-      ...((xrayRes.data ?? []) as unknown as XrayRow[]).map((r) => ({
-        amount: r.amount_paisas,
-        method_id: r.payment_method,
-        method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
-      })),
+      // Exclude due xray entries — not yet collected
+      ...xrayRawRows
+        .filter((r) => r.payment_status !== 'due')
+        .map((r) => ({
+          amount: r.amount_paisas,
+          method_id: r.payment_method,
+          method_name: r.payment_method ? (pmMap.get(r.payment_method) ?? r.payment_method) : null,
+        })),
     ]
     const payment_totals = buildPaymentBreakdown(allRows)
 
+    // ── Daily expenses ─────────────────────────────────────────────────────────
+    // Build breakdown by head for general expenses
+    const headTotals = new Map<string, number>()
+    for (const e of (expensesRes.data ?? []) as unknown as ExpenseRow[]) {
+      const headName = e.cp_expense_heads?.name ?? 'General'
+      headTotals.set(headName, (headTotals.get(headName) ?? 0) + (e.amount_paisas ?? 0))
+    }
+    // Lab and X-Ray expenses contribute to totals under their department name
+    const labExpTotal = ((labExpRes.data ?? []) as unknown as DeptExpRow[]).reduce(
+      (s, r) => s + (r.amount ?? 0), 0
+    )
+    const xrayExpTotal = ((xrayExpRes.data ?? []) as unknown as DeptExpRow[]).reduce(
+      (s, r) => s + (r.amount ?? 0), 0
+    )
+    if (labExpTotal > 0) headTotals.set('Lab Expenses', (headTotals.get('Lab Expenses') ?? 0) + labExpTotal)
+    if (xrayExpTotal > 0) headTotals.set('X-Ray Expenses', (headTotals.get('X-Ray Expenses') ?? 0) + xrayExpTotal)
+
+    const expenses_breakdown = Array.from(headTotals.entries())
+      .map(([head_name, total]) => ({ head_name, total }))
+      .sort((a, b) => b.total - a.total)
+    const expenses_total = expenses_breakdown.reduce((s, e) => s + e.total, 0)
+
     return {
       success: true,
-      data: { date, clinic_name: clinicName, opd, pharmacy, lab, xray, grand_total, payment_totals },
+      data: {
+        date,
+        clinic_name: clinicName,
+        opd,
+        pharmacy,
+        lab,
+        xray,
+        grand_total,
+        payment_totals,
+        expenses_total,
+        expenses_breakdown,
+      },
     }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }

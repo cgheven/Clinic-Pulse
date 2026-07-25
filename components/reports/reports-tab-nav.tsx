@@ -11,6 +11,7 @@ import {
   Receipt,
   Users,
   FlaskConical,
+  BookOpen,
 } from 'lucide-react'
 
 const TABS = [
@@ -20,6 +21,7 @@ const TABS = [
   { label: 'Expenses', href: '/reports/expenses', icon: Receipt },
   { label: 'Payroll', href: '/reports/payroll', icon: Users },
   { label: 'Lab Report', href: '/reports/lab', icon: FlaskConical },
+  { label: 'Cash Ledger', href: '/reports/ledger', icon: BookOpen },
 ] as const
 
 export function ReportsTabNav() {

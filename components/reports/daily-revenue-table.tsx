@@ -3,7 +3,7 @@
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrencyPaisas } from '@/lib/utils'
-import { TrendingUp, Pill, FlaskConical, Scan, CreditCard } from 'lucide-react'
+import { TrendingUp, Pill, FlaskConical, Scan, CreditCard, Receipt } from 'lucide-react'
 import type { DailyRevenueReport } from '@/app/actions/reports'
 
 interface DailyRevenueTableProps {
@@ -34,6 +34,7 @@ export function DailyRevenueTable({ data }: DailyRevenueTableProps) {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {DEPT_CONFIG.map(({ key, label, icon: Icon, color, bg }) => {
           const dept = data[key as keyof Pick<DailyRevenueReport, 'opd' | 'pharmacy' | 'lab' | 'xray'>]
+          const hasDue = (dept.due_total ?? 0) > 0
           return (
             <Card key={key} className="border-border bg-card">
               <CardContent className="p-4">
@@ -47,6 +48,22 @@ export function DailyRevenueTable({ data }: DailyRevenueTableProps) {
                   {formatCurrencyPaisas(dept.total)}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{dept.count} transactions</p>
+                {hasDue && (
+                  <div className="mt-2 space-y-0.5 border-t border-border pt-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Collected</span>
+                      <span className="font-medium text-foreground">
+                        {formatCurrencyPaisas(dept.collected_total ?? 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-amber-600 dark:text-amber-400">Due</span>
+                      <span className="font-medium text-amber-600 dark:text-amber-400">
+                        {formatCurrencyPaisas(dept.due_total ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )
@@ -67,6 +84,56 @@ export function DailyRevenueTable({ data }: DailyRevenueTableProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Expenses + Net Revenue section */}
+      {(data.expenses_total ?? 0) > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* Expenses card */}
+          <Card className="border-amber-200/60 bg-amber-50/40 dark:border-amber-800/30 dark:bg-amber-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                  Daily Expenses
+                </p>
+                <Receipt className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <p className="text-xl font-bold text-amber-800 dark:text-amber-300">
+                {formatCurrencyPaisas(data.expenses_total)}
+              </p>
+              {data.expenses_breakdown.length > 0 && (
+                <div className="mt-2 space-y-0.5 border-t border-amber-200/60 dark:border-amber-800/30 pt-2">
+                  {data.expenses_breakdown.map((e) => (
+                    <div key={e.head_name} className="flex justify-between text-xs">
+                      <span className="text-amber-700/80 dark:text-amber-400/80">{e.head_name}</span>
+                      <span className="font-medium text-amber-700 dark:text-amber-400">
+                        {formatCurrencyPaisas(e.total)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Net revenue card */}
+          <Card className="border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-800/30 dark:bg-emerald-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  Net Revenue
+                </p>
+                <CreditCard className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <p className="text-xl font-bold text-emerald-800 dark:text-emerald-300">
+                {formatCurrencyPaisas(data.grand_total - (data.expenses_total ?? 0))}
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-600/80 dark:text-emerald-500">
+                After deducting expenses
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Department × Payment Method Matrix */}
       <Card className="border-border bg-card">
