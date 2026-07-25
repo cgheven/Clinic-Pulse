@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, AlertTriangle } from 'lucide-react'
 import type { RecentVisit } from '@/app/actions/dashboard'
-import { formatCurrencyPaisas } from '@/lib/utils'
+import { formatCurrencyPaisas, formatDoctorName } from '@/lib/utils'
 
 interface RecentVisitsPanelProps {
   data: RecentVisit[]
@@ -72,7 +72,7 @@ export function RecentVisitsPanel({ data }: RecentVisitsPanelProps) {
                       {/* Doctor shown in sub-text on mobile */}
                       {visit.doctor_name && (
                         <p className="truncate text-[11px] text-muted-foreground sm:hidden">
-                          Dr. {visit.doctor_name}
+                          {formatDoctorName(visit.doctor_name)}
                         </p>
                       )}
                     </div>

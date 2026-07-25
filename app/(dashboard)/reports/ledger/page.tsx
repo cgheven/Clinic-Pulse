@@ -18,7 +18,7 @@ import { requireAuth } from '@/lib/auth'
 import { getDailyLedger } from '@/app/actions/ledger'
 import { DatePickerNav } from '@/components/reports/date-picker-nav'
 import { LedgerSkeleton } from '@/components/reports/ledger-skeleton'
-import { formatCurrencyPaisas, getTodayPKT, formatDate } from '@/lib/utils'
+import { formatCurrencyPaisas, getTodayPKT, formatDate, formatDoctorName } from '@/lib/utils'
 
 // =============================================================================
 // Metadata
@@ -215,7 +215,7 @@ async function LedgerContent({ selectedDate }: { selectedDate: string }) {
                           </div>
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-medium text-foreground">
-                              Dr. {d.doctor_name}
+                              {formatDoctorName(d.doctor_name)}
                             </p>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {d.specialization && (

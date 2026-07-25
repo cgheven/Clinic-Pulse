@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { CalendarDays } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 
 interface DateSelectorProps {
@@ -24,14 +23,13 @@ export function DateSelector({ currentDate }: DateSelectorProps) {
   }
 
   return (
-    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground transition-colors hover:border-primary/40 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-      <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <DateInput
-        value={currentDate}
-        onChange={handleChange}
-        className="bg-transparent text-sm text-foreground outline-none"
-        aria-label="Select date"
-      />
-    </label>
+    // DateInput already renders its own bordered trigger with a calendar icon,
+    // so it needs no wrapping label border or second icon.
+    <DateInput
+      value={currentDate}
+      onChange={handleChange}
+      className="w-[170px]"
+      aria-label="Select date"
+    />
   )
 }

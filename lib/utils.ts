@@ -139,3 +139,17 @@ export function formatPaymentMethod(method: string): string {
   };
   return map[method] ?? method;
 }
+
+/**
+ * Renders a doctor's name with exactly one "Dr." prefix.
+ *
+ * Names are entered by staff and most already begin with "Dr" or "Dr.", so
+ * hard-coding `Dr. {name}` in the UI produced "Dr. Dr Ayaz Sardar khan
+ * Chandio SB" — which also wasted ~4 characters in already-tight table
+ * columns. Only prefixes when the stored name doesn't have one.
+ */
+export function formatDoctorName(name: string | null | undefined): string {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return "—";
+  return /^dr\.?\s/i.test(trimmed) ? trimmed : `Dr. ${trimmed}`;
+}

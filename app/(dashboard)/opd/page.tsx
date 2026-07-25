@@ -12,7 +12,7 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import { getOpdDashboard } from '@/app/actions/opd'
-import { formatCurrencyPaisas, getTodayPKT, formatDate } from '@/lib/utils'
+import { formatCurrencyPaisas, getTodayPKT, formatDate, formatDoctorName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 export const metadata: Metadata = {
@@ -182,7 +182,7 @@ async function OpdDashboardContent() {
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-medium text-foreground">
-                            Dr. {ds.doctor_name}
+                            {formatDoctorName(ds.doctor_name)}
                           </p>
                           {ds.specialization && (
                             <p className="truncate text-[11px] text-muted-foreground">

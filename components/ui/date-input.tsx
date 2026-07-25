@@ -38,6 +38,12 @@ export function DateInput({
   const ref = useRef<HTMLInputElement>(null)
 
   return (
+    // `className` is applied to BOTH the wrapper and the trigger button.
+    // The wrapper needs it for layout (w-40, flex-1, shrink-0), but the button
+    // is what actually owns the border, height and text size — so caller
+    // classes like `h-8` or `border-destructive` have to reach it too, or they
+    // silently do nothing. cn() is tailwind-merge, so caller classes listed
+    // last correctly override the defaults below.
     <div className={cn('relative', className)}>
       <button
         type="button"
@@ -48,7 +54,8 @@ export function DateInput({
           'flex h-9 w-full items-center justify-between rounded-lg border border-border bg-background px-3 text-sm transition-colors',
           'hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/40',
           value ? 'text-foreground' : 'text-muted-foreground',
-          disabled && 'cursor-not-allowed opacity-50'
+          disabled && 'cursor-not-allowed opacity-50',
+          className
         )}
       >
         <span>{formatDisplay(value)}</span>

@@ -11,7 +11,7 @@ import {
   Receipt,
 } from 'lucide-react'
 import { getDailyVisits, getDoctors } from '@/app/actions/opd'
-import { formatCurrencyPaisas, formatDate, getTodayPKT, cn } from '@/lib/utils'
+import { formatCurrencyPaisas, formatDate, getTodayPKT, cn, formatDoctorName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 export const metadata = {
@@ -171,13 +171,17 @@ async function VisitLog({
             <div className="w-[72px] shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
               Voucher
             </div>
-            <div className="flex-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            {/* Patient / Doctor / Diagnosis share the free space equally.
+                Doctor was pinned at 130px, which truncated real names like
+                "Dr Ayaz Sardar khan Chandio SB" while Patient (flex-1) took
+                every spare pixel. */}
+            <div className="min-w-0 flex-1 pr-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
               Patient
             </div>
-            <div className="hidden w-[130px] shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
+            <div className="hidden min-w-0 flex-1 pr-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
               Doctor
             </div>
-            <div className="hidden w-[140px] shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
+            <div className="hidden min-w-0 flex-1 pr-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
               Diagnosis
             </div>
             <div className="w-[88px] shrink-0 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
@@ -212,7 +216,7 @@ async function VisitLog({
                 </div>
 
                 {/* Patient */}
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 pr-3">
                   <Link
                     href={`/opd/patients/${visit.patient_id}`}
                     className="hover:text-primary transition-colors"
@@ -224,21 +228,21 @@ async function VisitLog({
                       #{visit.patient?.patient_no}
                       {/* Doctor shown as sub-text on mobile */}
                       {visit.doctor && (
-                        <span className="ml-1.5 sm:hidden">· Dr. {visit.doctor.name}</span>
+                        <span className="ml-1.5 sm:hidden">· {formatDoctorName(visit.doctor.name)}</span>
                       )}
                     </p>
                   </Link>
                 </div>
 
                 {/* Doctor (sm+) */}
-                <div className="hidden w-[130px] shrink-0 pr-3 sm:block">
+                <div className="hidden min-w-0 flex-1 pr-3 sm:block">
                   {visit.doctor ? (
                     <Link
                       href={`/opd/doctors/${visit.doctor.id}`}
                       className="hover:text-primary transition-colors"
                     >
                       <p className="truncate text-[12px] text-muted-foreground">
-                        Dr. {visit.doctor.name}
+                        {formatDoctorName(visit.doctor.name)}
                       </p>
                     </Link>
                   ) : (
@@ -247,7 +251,7 @@ async function VisitLog({
                 </div>
 
                 {/* Diagnosis (sm+) */}
-                <div className="hidden w-[140px] shrink-0 pr-3 sm:block">
+                <div className="hidden min-w-0 flex-1 pr-3 sm:block">
                   <p className="truncate text-[12px] text-muted-foreground">
                     {visit.diagnosis ?? '—'}
                   </p>
@@ -300,7 +304,7 @@ async function DoctorFilterOptions() {
       <option value="">All Doctors</option>
       {result.data.map((d) => (
         <option key={d.id} value={d.id}>
-          Dr. {d.name}
+          {formatDoctorName(d.name)}
         </option>
       ))}
     </>

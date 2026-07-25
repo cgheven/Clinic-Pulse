@@ -12,7 +12,7 @@ import {
   Receipt,
   FileText,
 } from 'lucide-react'
-import { cn, formatDate, formatCurrencyPaisas } from '@/lib/utils'
+import { cn, formatDate, formatCurrencyPaisas, formatDoctorName } from '@/lib/utils'
 import { deleteVisit } from '@/app/actions/opd'
 import { Button } from '@/components/ui/button'
 import {
@@ -161,7 +161,7 @@ function VisitRow({ visit }: { visit: VisitWithRelations }) {
             {visit.doctor && (
               <span className="flex items-center gap-1">
                 <Stethoscope className="h-3 w-3" />
-                Dr. {visit.doctor.name}
+                {formatDoctorName(visit.doctor.name)}
               </span>
             )}
             {visit.payment_method && !isDue && (

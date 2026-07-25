@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { Stethoscope, AlertCircle, ChevronRight } from 'lucide-react'
 import { getDoctors } from '@/app/actions/opd'
-import { formatCurrencyPaisas, formatBasisPoints, cn } from '@/lib/utils'
+import { formatCurrencyPaisas, formatBasisPoints, cn, formatDoctorName } from '@/lib/utils'
 
 export const metadata = {
   title: 'Doctors — OPD — ClinicPulse',
@@ -83,7 +83,7 @@ async function DoctorList() {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-medium text-foreground group-hover:text-primary transition-colors">
-                    Dr. {doctor.name}
+                    {formatDoctorName(doctor.name)}
                   </p>
                   {/* Sub-text on mobile: specialization + model */}
                   <p className="truncate text-[11px] text-muted-foreground sm:hidden">

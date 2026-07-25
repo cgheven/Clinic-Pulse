@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { DateInput } from '@/components/ui/date-input'
 
 // =============================================================================
@@ -59,13 +59,11 @@ export function SalesDateNav({
           <ChevronLeft className="h-4 w-4" />
         </button>
 
-        <div className="relative max-w-xs flex-1">
-          <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="max-w-xs flex-1">
           <DateInput
             value={dateParam}
             onChange={(v) => v && navigateToDate(v)}
             max={todayStr}
-            className="pl-9"
           />
         </div>
 

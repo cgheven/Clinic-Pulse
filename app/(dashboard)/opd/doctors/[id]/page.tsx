@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { getDoctor, getDoctorEarnings } from '@/app/actions/opd'
 import { DoctorEarnings } from '@/components/opd/doctor-earnings'
-import { formatCurrencyPaisas, formatBasisPoints, cn } from '@/lib/utils'
+import { formatCurrencyPaisas, formatBasisPoints, cn, formatDoctorName } from '@/lib/utils'
 
 interface DoctorDetailPageProps {
   params: Promise<{ id: string }>
@@ -59,7 +59,7 @@ async function DoctorDetailContent({ id }: { id: string }) {
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
-              <h2 className="text-base font-bold text-foreground">Dr. {doctor.name}</h2>
+              <h2 className="text-base font-bold text-foreground">{formatDoctorName(doctor.name)}</h2>
               <span
                 className={cn(
                   'rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
