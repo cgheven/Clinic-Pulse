@@ -28,6 +28,12 @@ async function ParameterContent({ id }: { id: string }) {
   const test = catalogRes.data.find((t) => t.id === id)
   if (!test) notFound()
 
+  // Every specialty already in use, so the picker offers the existing
+  // vocabulary rather than making the user retype names.
+  const knownSpecialties = Array.from(
+    new Set(catalogRes.data.flatMap((t) => t.specialties ?? []))
+  ).sort((a, b) => a.localeCompare(b))
+
   if (!paramsRes.success) {
     return (
       <div className="flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2.5">
@@ -37,7 +43,13 @@ async function ParameterContent({ id }: { id: string }) {
     )
   }
 
-  return <ParameterEditor test={test} initialParameters={paramsRes.data} />
+  return (
+    <ParameterEditor
+      test={test}
+      initialParameters={paramsRes.data}
+      knownSpecialties={knownSpecialties}
+    />
+  )
 }
 
 export default async function TestParametersPage({ params }: PageProps) {

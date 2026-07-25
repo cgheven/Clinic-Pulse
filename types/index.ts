@@ -238,6 +238,8 @@ export interface CpLabTest {
   specimen_type: string | null;
   methodology: string | null;
   department: string | null;
+  /** Referring specialties that commonly order this test. Many-to-many. */
+  specialties: string[];
 }
 
 // ─── cp_lab_test_parameters ───────────────────────────────────────────────────

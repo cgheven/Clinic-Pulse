@@ -24,6 +24,7 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-react'
+import { SpecialtyPicker } from '@/components/lab/specialty-picker'
 import {
   createTestParameter,
   updateTestParameter,
@@ -85,9 +86,15 @@ function formatRange(r: {
 interface ParameterEditorProps {
   test: CpLabTest
   initialParameters: LabParameterWithRanges[]
+  /** Specialty vocabulary already in use across the catalog. */
+  knownSpecialties: string[]
 }
 
-export function ParameterEditor({ test, initialParameters }: ParameterEditorProps) {
+export function ParameterEditor({
+  test,
+  initialParameters,
+  knownSpecialties,
+}: ParameterEditorProps) {
   const [params, setParams] = useState<LabParameterWithRanges[]>(initialParameters)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<LabParameterWithRanges | null>(null)
@@ -296,6 +303,16 @@ export function ParameterEditor({ test, initialParameters }: ParameterEditorProp
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Parameter
           </Button>
+        </div>
+
+        {/* Referring specialties — editable, because the seeded tags were an
+            editorial starting point rather than a validated standard. */}
+        <div className="border-t border-border/70 px-4 py-3">
+          <SpecialtyPicker
+            testId={test.id}
+            value={test.specialties ?? []}
+            knownSpecialties={knownSpecialties}
+          />
         </div>
       </div>
 

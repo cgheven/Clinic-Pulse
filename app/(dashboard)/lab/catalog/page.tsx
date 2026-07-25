@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react'
-import { getTestCatalog } from '@/app/actions/lab'
+import { getTestCatalogWithParameters } from '@/app/actions/lab'
 import { TestCatalogManager } from '@/components/lab/test-catalog-manager'
 
 // =============================================================================
@@ -11,7 +11,9 @@ import { TestCatalogManager } from '@/components/lab/test-catalog-manager'
 // =============================================================================
 
 export default async function LabCatalogPage() {
-  const result = await getTestCatalog()
+  // Parameters + ranges come down with the tests so the library is searchable
+  // and expandable without any further round-trips.
+  const result = await getTestCatalogWithParameters()
 
   if (!result.success) {
     return (

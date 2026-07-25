@@ -153,6 +153,7 @@ type CpLabTestRow = {
   specimen_type: string | null;
   methodology: string | null;
   department: string | null;
+  specialties: string[];
 };
 
 type CpLabTestLogRow = {
@@ -530,6 +531,11 @@ export type Database = {
       get_my_role: {
         Args: Record<string, never>;
         Returns: string;
+      };
+      /** Atomically replaces every reference range on a parameter. */
+      replace_parameter_ranges: {
+        Args: { p_parameter_id: string; p_ranges: unknown };
+        Returns: CpLabReferenceRangeRow[];
       };
       [key: string]: {
         Args: Record<string, unknown>;

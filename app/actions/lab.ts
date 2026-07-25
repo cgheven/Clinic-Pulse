@@ -227,7 +227,12 @@ export async function getTestCatalog(): Promise<ActionResult<CpLabTest[]>> {
     const supabase = await createClient()
     const { data, error } = await supabase
       .from('cp_lab_tests')
-      .select('id, name, category, price_paisas, duration_minutes, is_active, deleted_at')
+      // department/specimen_type/specialties are rendered by the parameter
+      // editor — omitting them here made them silently blank, since the rows
+      // are cast to CpLabTest and TypeScript can't see the missing columns.
+      .select(
+        'id, name, category, price_paisas, duration_minutes, is_active, created_at, deleted_at, department, specimen_type, methodology, specialties'
+      )
       .is('deleted_at', null)
       .order('category', { ascending: true })
       .order('name', { ascending: true })
@@ -291,14 +296,26 @@ export async function updateTest(id: string, rawData: unknown): Promise<ActionRe
     if (parsed.data.is_active !== undefined) updatePayload.is_active = parsed.data.is_active
 
     const supabase = await createClient()
-    const { error } = await supabase.from('cp_lab_tests').update(updatePayload).eq('id', id).is('deleted_at', null)
+    // .select().maybeSingle() so a zero-row match is detectable — PostgREST
+    // reports no error when the WHERE clause matches nothing, which would
+    // otherwise report success for an edit to an already-deleted test.
+    const { data, error } = await supabase
+      .from('cp_lab_tests')
+      .update(updatePayload)
+      .eq('id', id)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle()
+
     if (error) return { success: false, error: error.message }
+    if (!data) return { success: false, error: 'Test not found or has been deleted' }
 
     revalidateTag('lab-tests', 'default')
     revalidatePath('/lab/tests/new')
     revalidatePath('/lab/catalog')
     return { success: true, data: undefined }
   } catch (err) {
+    if (isRedirectError(err)) throw err
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
@@ -949,36 +966,28 @@ export async function updateTestParameter(
 
     if (updErr) return { success: false, error: updErr.message }
 
-    // Ranges are replaced wholesale — simpler and safer than diffing, and
-    // these rows are configuration, not patient data.
-    const { error: delErr } = await supabase
-      .from('cp_lab_reference_ranges')
-      .delete()
-      .eq('parameter_id', parameterId)
-    if (delErr) return { success: false, error: delErr.message }
-
-    let savedRanges: CpLabReferenceRange[] = []
-    if (ranges.length > 0) {
-      const { data: rangeRows, error: rangeErr2 } = await supabase
-        .from('cp_lab_reference_ranges')
-        .insert(
-          ranges.map((r) => ({
-            parameter_id: parameterId,
-            sex: r.sex,
-            age_min_years: r.age_min_years ?? null,
-            age_max_years: r.age_max_years ?? null,
-            low: r.low ?? null,
-            high: r.high ?? null,
-            text_value: r.text_value ?? null,
-            critical_low: r.critical_low ?? null,
-            critical_high: r.critical_high ?? null,
-            note: r.note ?? null,
-          }))
-        )
-        .select('*')
-      if (rangeErr2) return { success: false, error: rangeErr2.message }
-      savedRanges = (rangeRows ?? []) as unknown as CpLabReferenceRange[]
-    }
+    // Ranges are replaced wholesale via an RPC so the delete and re-insert
+    // happen in ONE transaction. Doing it as two client calls meant a failure
+    // between them wiped the parameter's ranges with no way to recover them.
+    const { data: rangeRows, error: rangeReplaceErr } = await supabase.rpc(
+      'replace_parameter_ranges',
+      {
+        p_parameter_id: parameterId,
+        p_ranges: ranges.map((r) => ({
+          sex: r.sex,
+          age_min_years: r.age_min_years ?? null,
+          age_max_years: r.age_max_years ?? null,
+          low: r.low ?? null,
+          high: r.high ?? null,
+          text_value: r.text_value ?? null,
+          critical_low: r.critical_low ?? null,
+          critical_high: r.critical_high ?? null,
+          note: r.note ?? null,
+        })),
+      }
+    )
+    if (rangeReplaceErr) return { success: false, error: rangeReplaceErr.message }
+    const savedRanges = (rangeRows ?? []) as unknown as CpLabReferenceRange[]
 
     revalidatePath(`/lab/catalog/${updated.test_id as string}`)
     return {
@@ -1043,6 +1052,157 @@ export async function reorderTestParameters(
     revalidatePath(`/lab/catalog/${testId}`)
     return { success: true, data: undefined }
   } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+/**
+ * The whole catalog with parameters and ranges attached, for the searchable
+ * test library. One round-trip rather than N+1 per test.
+ */
+export type LabTestWithParameters = CpLabTest & {
+  parameters: LabParameterWithRanges[]
+}
+
+export async function getTestCatalogWithParameters(): Promise<
+  ActionResult<LabTestWithParameters[]>
+> {
+  try {
+    await requireAuth()
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('cp_lab_tests')
+      .select(
+        `id, name, category, price_paisas, duration_minutes, is_active, created_at,
+         deleted_at, specimen_type, methodology, department, specialties,
+         cp_lab_test_parameters (
+           id, test_id, name, unit, group_name, sort_order, input_type, formula,
+           options, code, decimals, default_value, is_active, created_at, deleted_at,
+           cp_lab_reference_ranges ( * )
+         )`
+      )
+      .is('deleted_at', null)
+      .is('cp_lab_test_parameters.deleted_at', null)
+      .order('name', { ascending: true })
+      .order('sort_order', { ascending: true, referencedTable: 'cp_lab_test_parameters' })
+
+    if (error) return { success: false, error: error.message }
+
+    type ParamRow = CpLabTestParameter & {
+      cp_lab_reference_ranges: CpLabReferenceRange[] | null
+    }
+    type TestRow = CpLabTest & { cp_lab_test_parameters: ParamRow[] | null }
+
+    const tests: LabTestWithParameters[] = ((data ?? []) as unknown as TestRow[]).map((t) => {
+      const { cp_lab_test_parameters, ...test } = t
+      return {
+        ...test,
+        parameters: (cp_lab_test_parameters ?? []).map((p) => {
+          const { cp_lab_reference_ranges, ...param } = p
+          return { ...param, ranges: cp_lab_reference_ranges ?? [] }
+        }),
+      }
+    })
+
+    return { success: true, data: tests }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+/**
+ * requireAdmin()/requireAuth() enforce access by calling Next's redirect(),
+ * which THROWS. A generic `catch` swallows that control-flow signal and turns
+ * an auth redirect into an error string reading "NEXT_REDIRECT" — so the user
+ * is never redirected and sees a meaningless message. Re-throw it instead.
+ */
+function isRedirectError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const digest = (err as { digest?: unknown }).digest
+  if (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) return true
+  return err instanceof Error && err.message.startsWith('NEXT_REDIRECT')
+}
+
+// =============================================================================
+// Test specialties
+//
+// Referring specialties are a convenience filter, not clinical guidance. The
+// seeded tags were an editorial starting point, so the clinic needs to be able
+// to correct them without a database change.
+// =============================================================================
+
+// Strips zero-width characters (JS trim() follows Unicode WhiteSpace and does
+// NOT remove U+200B/FEFF) and collapses internal runs of whitespace, so
+// "Derm  atology" and "Dermatology\u200b" can't masquerade as new specialties.
+const cleanSpecialty = (raw: string) =>
+  raw
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const specialtiesSchema = z
+  .array(
+    z
+      .string()
+      .transform(cleanSpecialty)
+      .refine((v) => v.length >= 1, 'Specialty cannot be empty')
+      .refine((v) => v.length <= 60, 'Specialty name is too long')
+      // eslint-disable-next-line no-control-regex
+      .refine((v) => !/[\u0000-\u001F\u007F]/.test(v), 'Specialty contains invalid characters')
+  )
+  .max(30, 'Too many specialties')
+
+export async function updateTestSpecialties(
+  testId: string,
+  rawSpecialties: unknown
+): Promise<ActionResult<string[]>> {
+  try {
+    await requireAdmin()
+    const idParsed = z.string().uuid().safeParse(testId)
+    if (!idParsed.success) return { success: false, error: 'Invalid test ID' }
+
+    const parsed = specialtiesSchema.safeParse(rawSpecialties)
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
+    }
+
+    // De-duplicate case-insensitively but keep the caller's casing, then sort
+    // so the stored order is stable and chips don't jump around.
+    const seen = new Set<string>()
+    const cleaned: string[] = []
+    for (const s of parsed.data) {
+      const key = s.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      cleaned.push(s)
+    }
+    cleaned.sort((a, b) => a.localeCompare(b))
+
+    const supabase = await createClient()
+    // .select().maybeSingle() so a zero-row match is detectable: PostgREST
+    // returns no error when the WHERE clause matches nothing, so without this
+    // a soft-deleted test would report success with nothing written and the
+    // chips would render as saved.
+    const { data, error } = await supabase
+      .from('cp_lab_tests')
+      .update({ specialties: cleaned })
+      .eq('id', testId)
+      .is('deleted_at', null)
+      .select('specialties')
+      .maybeSingle()
+
+    if (error) return { success: false, error: error.message }
+    if (!data) return { success: false, error: 'Test not found or has been deleted' }
+
+    // Only the list path. Revalidating the detail route the user is currently
+    // on triggers a router refresh that re-fetches all 70 catalog rows and
+    // keeps every chip disabled — for a value the client already has.
+    revalidatePath('/lab/catalog')
+    // Return what the DB actually holds, not what we hoped to write.
+    return { success: true, data: (data.specialties ?? []) as string[] }
+  } catch (err) {
+    if (isRedirectError(err)) throw err
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }
 }
