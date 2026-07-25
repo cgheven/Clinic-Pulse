@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { cn, formatCurrencyPaisas } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
+import Link from 'next/link'
 import {
   Check,
   FlaskConical,
@@ -21,6 +22,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Settings2,
   X,
 } from 'lucide-react'
 import {
@@ -256,9 +258,17 @@ export function TestCatalogManager({ initialTests }: { initialTests: CpLabTest[]
                     !t.is_active && 'opacity-50'
                   )}
                 >
-                  {/* Name */}
+                  {/* Name — links through to the parameter editor */}
                   <div className="flex-1 min-w-0 pr-2">
-                    <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
+                    <Link
+                      href={`/lab/catalog/${t.id}`}
+                      className="group/name flex items-center gap-1.5"
+                    >
+                      <p className="truncate text-sm font-medium text-foreground transition-colors group-hover/name:text-primary">
+                        {t.name}
+                      </p>
+                      <Settings2 className="h-3 w-3 shrink-0 text-muted-foreground/40 transition-colors group-hover/name:text-primary" />
+                    </Link>
                   </div>
 
                   {/* Price (editable) */}

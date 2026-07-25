@@ -5,7 +5,7 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireAuth, requireAdmin } from '@/lib/auth'
 import { validateFinancialDate } from '@/lib/validate-date'
-import type { CpLabTest, CpLabChemical, CpLabMachinery, CpLabMaintenance, CpExpenseHead, CpLabTestLog, CpPatient, CpDoctor } from '@/types/index'
+import type { CpLabTest, CpLabChemical, CpLabMachinery, CpLabMaintenance, CpExpenseHead, CpLabTestLog, CpPatient, CpDoctor, CpLabTestParameter, CpLabReferenceRange, LabParameterWithRanges } from '@/types/index'
 
 export type ActionResult<T = undefined> =
   | { success: true; data: T }
@@ -737,6 +737,311 @@ export async function getPatientPendingLabTests(
     if (error) return { success: false, error: error.message }
 
     return { success: true, data: (data ?? []) as PendingLabTest[] }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+// =============================================================================
+// Lab test parameters + reference ranges
+//
+// A test (e.g. "Complete Blood Count") owns an ordered list of parameters
+// (analytes), and each parameter owns one or more reference ranges. Multiple
+// ranges per parameter is what allows sex- and age-specific normals.
+// =============================================================================
+
+const rangeSchema = z.object({
+  sex: z.enum(['any', 'male', 'female']).default('any'),
+  age_min_years: z.number().min(0).max(150).nullable().optional(),
+  age_max_years: z.number().min(0).max(150).nullable().optional(),
+  low: z.number().nullable().optional(),
+  high: z.number().nullable().optional(),
+  text_value: z.string().max(200).nullable().optional(),
+  critical_low: z.number().nullable().optional(),
+  critical_high: z.number().nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
+})
+
+const parameterSchema = z.object({
+  name: z.string().min(1, 'Parameter name is required').max(200),
+  unit: z.string().max(50).nullable().optional(),
+  group_name: z.string().max(120).nullable().optional(),
+  sort_order: z.number().int().min(0).default(0),
+  input_type: z.enum(['numeric', 'text', 'option', 'formula']).default('numeric'),
+  formula: z.string().max(500).nullable().optional(),
+  options: z.array(z.string().max(80)).nullable().optional(),
+  code: z
+    .string()
+    .max(40)
+    .regex(/^[a-z0-9_]+$/, 'Code must be lowercase letters, numbers or underscore')
+    .nullable()
+    .optional(),
+  decimals: z.number().int().min(0).max(6).default(2),
+  default_value: z.string().max(120).nullable().optional(),
+  ranges: z.array(rangeSchema).default([]),
+})
+
+/** Rejects ranges that are internally inconsistent before they reach the DB. */
+function validateRanges(ranges: z.infer<typeof rangeSchema>[]): string | null {
+  for (const r of ranges) {
+    if (r.low != null && r.high != null && r.low > r.high) {
+      return 'Range low cannot be greater than high'
+    }
+    if (
+      r.age_min_years != null &&
+      r.age_max_years != null &&
+      r.age_min_years > r.age_max_years
+    ) {
+      return 'Age from cannot be greater than age to'
+    }
+    const hasNumeric = r.low != null || r.high != null
+    if (!hasNumeric && !r.text_value) {
+      return 'Each range needs a low/high value or an expected text value'
+    }
+  }
+  return null
+}
+
+export async function getTestParameters(
+  testId: string
+): Promise<ActionResult<LabParameterWithRanges[]>> {
+  try {
+    await requireAuth()
+    const idParsed = z.string().uuid().safeParse(testId)
+    if (!idParsed.success) return { success: false, error: 'Invalid test ID' }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('cp_lab_test_parameters')
+      .select('*, cp_lab_reference_ranges(*)')
+      .eq('test_id', testId)
+      .is('deleted_at', null)
+      .order('sort_order', { ascending: true })
+
+    if (error) return { success: false, error: error.message }
+
+    type Row = CpLabTestParameter & { cp_lab_reference_ranges: CpLabReferenceRange[] | null }
+    const params: LabParameterWithRanges[] = ((data ?? []) as unknown as Row[]).map((row) => {
+      const { cp_lab_reference_ranges, ...rest } = row
+      return { ...rest, ranges: cp_lab_reference_ranges ?? [] }
+    })
+
+    return { success: true, data: params }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+export async function createTestParameter(
+  testId: string,
+  rawData: unknown
+): Promise<ActionResult<LabParameterWithRanges>> {
+  try {
+    await requireAdmin()
+    const idParsed = z.string().uuid().safeParse(testId)
+    if (!idParsed.success) return { success: false, error: 'Invalid test ID' }
+
+    const parsed = parameterSchema.safeParse(rawData)
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
+    }
+    const rangeErr = validateRanges(parsed.data.ranges)
+    if (rangeErr) return { success: false, error: rangeErr }
+
+    const supabase = await createClient()
+    const { ranges, ...param } = parsed.data
+
+    const { data: created, error: paramErr } = await supabase
+      .from('cp_lab_test_parameters')
+      .insert({
+        test_id: testId,
+        name: param.name,
+        unit: param.unit ?? null,
+        group_name: param.group_name ?? null,
+        sort_order: param.sort_order,
+        input_type: param.input_type,
+        formula: param.input_type === 'formula' ? param.formula ?? null : null,
+        options: param.input_type === 'option' ? param.options ?? null : null,
+        code: param.code ?? null,
+        decimals: param.decimals,
+        default_value: param.default_value ?? null,
+      })
+      .select('*')
+      .single()
+
+    if (paramErr) return { success: false, error: paramErr.message }
+
+    let savedRanges: CpLabReferenceRange[] = []
+    if (ranges.length > 0) {
+      const { data: rangeRows, error: rangeInsertErr } = await supabase
+        .from('cp_lab_reference_ranges')
+        .insert(
+          ranges.map((r) => ({
+            parameter_id: created.id as string,
+            sex: r.sex,
+            age_min_years: r.age_min_years ?? null,
+            age_max_years: r.age_max_years ?? null,
+            low: r.low ?? null,
+            high: r.high ?? null,
+            text_value: r.text_value ?? null,
+            critical_low: r.critical_low ?? null,
+            critical_high: r.critical_high ?? null,
+            note: r.note ?? null,
+          }))
+        )
+        .select('*')
+
+      if (rangeInsertErr) {
+        // Don't leave a parameter with no ranges behind.
+        await supabase.from('cp_lab_test_parameters').delete().eq('id', created.id)
+        return { success: false, error: rangeInsertErr.message }
+      }
+      savedRanges = (rangeRows ?? []) as unknown as CpLabReferenceRange[]
+    }
+
+    revalidatePath(`/lab/catalog/${testId}`)
+    return {
+      success: true,
+      data: { ...(created as unknown as CpLabTestParameter), ranges: savedRanges },
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+export async function updateTestParameter(
+  parameterId: string,
+  rawData: unknown
+): Promise<ActionResult<LabParameterWithRanges>> {
+  try {
+    await requireAdmin()
+    const idParsed = z.string().uuid().safeParse(parameterId)
+    if (!idParsed.success) return { success: false, error: 'Invalid parameter ID' }
+
+    const parsed = parameterSchema.safeParse(rawData)
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed' }
+    }
+    const rangeErr = validateRanges(parsed.data.ranges)
+    if (rangeErr) return { success: false, error: rangeErr }
+
+    const supabase = await createClient()
+    const { ranges, ...param } = parsed.data
+
+    const { data: updated, error: updErr } = await supabase
+      .from('cp_lab_test_parameters')
+      .update({
+        name: param.name,
+        unit: param.unit ?? null,
+        group_name: param.group_name ?? null,
+        sort_order: param.sort_order,
+        input_type: param.input_type,
+        formula: param.input_type === 'formula' ? param.formula ?? null : null,
+        options: param.input_type === 'option' ? param.options ?? null : null,
+        code: param.code ?? null,
+        decimals: param.decimals,
+        default_value: param.default_value ?? null,
+      })
+      .eq('id', parameterId)
+      .is('deleted_at', null)
+      .select('*')
+      .single()
+
+    if (updErr) return { success: false, error: updErr.message }
+
+    // Ranges are replaced wholesale — simpler and safer than diffing, and
+    // these rows are configuration, not patient data.
+    const { error: delErr } = await supabase
+      .from('cp_lab_reference_ranges')
+      .delete()
+      .eq('parameter_id', parameterId)
+    if (delErr) return { success: false, error: delErr.message }
+
+    let savedRanges: CpLabReferenceRange[] = []
+    if (ranges.length > 0) {
+      const { data: rangeRows, error: rangeErr2 } = await supabase
+        .from('cp_lab_reference_ranges')
+        .insert(
+          ranges.map((r) => ({
+            parameter_id: parameterId,
+            sex: r.sex,
+            age_min_years: r.age_min_years ?? null,
+            age_max_years: r.age_max_years ?? null,
+            low: r.low ?? null,
+            high: r.high ?? null,
+            text_value: r.text_value ?? null,
+            critical_low: r.critical_low ?? null,
+            critical_high: r.critical_high ?? null,
+            note: r.note ?? null,
+          }))
+        )
+        .select('*')
+      if (rangeErr2) return { success: false, error: rangeErr2.message }
+      savedRanges = (rangeRows ?? []) as unknown as CpLabReferenceRange[]
+    }
+
+    revalidatePath(`/lab/catalog/${updated.test_id as string}`)
+    return {
+      success: true,
+      data: { ...(updated as unknown as CpLabTestParameter), ranges: savedRanges },
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+export async function deleteTestParameter(
+  parameterId: string
+): Promise<ActionResult<undefined>> {
+  try {
+    await requireAdmin()
+    const idParsed = z.string().uuid().safeParse(parameterId)
+    if (!idParsed.success) return { success: false, error: 'Invalid parameter ID' }
+
+    const supabase = await createClient()
+
+    // Soft delete: recorded patient results reference this row, and the FK is
+    // ON DELETE RESTRICT precisely so results can never be orphaned.
+    const { data, error } = await supabase
+      .from('cp_lab_test_parameters')
+      .update({ deleted_at: new Date().toISOString(), is_active: false })
+      .eq('id', parameterId)
+      .is('deleted_at', null)
+      .select('test_id')
+      .single()
+
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath(`/lab/catalog/${data.test_id as string}`)
+    return { success: true, data: undefined }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
+  }
+}
+
+/** Persists a drag/arrow reorder as one batch. */
+export async function reorderTestParameters(
+  testId: string,
+  orderedIds: string[]
+): Promise<ActionResult<undefined>> {
+  try {
+    await requireAdmin()
+    const parsed = z.array(z.string().uuid()).safeParse(orderedIds)
+    if (!parsed.success) return { success: false, error: 'Invalid parameter list' }
+
+    const supabase = await createClient()
+    await Promise.all(
+      parsed.data.map((id, i) =>
+        supabase
+          .from('cp_lab_test_parameters')
+          .update({ sort_order: (i + 1) * 10 })
+          .eq('id', id)
+          .eq('test_id', testId)
+      )
+    )
+
+    revalidatePath(`/lab/catalog/${testId}`)
+    return { success: true, data: undefined }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unexpected error' }
   }

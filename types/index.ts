@@ -234,6 +234,82 @@ export interface CpLabTest {
   is_active: boolean;
   created_at: string;
   deleted_at: string | null;
+  // Added with the structured-parameter feature.
+  specimen_type: string | null;
+  methodology: string | null;
+  department: string | null;
+}
+
+// ─── cp_lab_test_parameters ───────────────────────────────────────────────────
+
+export type LabParameterInputType = "numeric" | "text" | "option" | "formula";
+
+export interface CpLabTestParameter {
+  id: string;
+  test_id: string;
+  name: string;
+  unit: string | null;
+  /** Section heading, e.g. "Differential Count". null = ungrouped. */
+  group_name: string | null;
+  sort_order: number;
+  input_type: LabParameterInputType;
+  /** Only for input_type='formula', e.g. "(hct / rbc) * 10" using sibling codes. */
+  formula: string | null;
+  /** Only for input_type='option', e.g. ["Negative","Trace","1+"]. */
+  options: string[] | null;
+  /** Stable short code other parameters' formulas refer to. */
+  code: string | null;
+  decimals: number;
+  default_value: string | null;
+  is_active: boolean;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+// ─── cp_lab_reference_ranges ──────────────────────────────────────────────────
+
+export type LabRangeSex = "any" | "male" | "female";
+
+export interface CpLabReferenceRange {
+  id: string;
+  parameter_id: string;
+  sex: LabRangeSex;
+  /** null = open-ended, so paediatric bands can be expressed. */
+  age_min_years: number | null;
+  age_max_years: number | null;
+  low: number | null;
+  high: number | null;
+  /** Expected qualitative result, e.g. "Negative". */
+  text_value: string | null;
+  critical_low: number | null;
+  critical_high: number | null;
+  note: string | null;
+  created_at: string;
+}
+
+// ─── cp_lab_result_values ─────────────────────────────────────────────────────
+
+export type LabResultFlag =
+  | "normal"
+  | "low"
+  | "high"
+  | "critical_low"
+  | "critical_high";
+
+export interface CpLabResultValue {
+  id: string;
+  test_log_id: string;
+  parameter_id: string;
+  value_numeric: number | null;
+  value_text: string | null;
+  flag: LabResultFlag | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A parameter with its ranges attached — what the editor and result grid use. */
+export interface LabParameterWithRanges extends CpLabTestParameter {
+  ranges: CpLabReferenceRange[];
 }
 
 // ─── cp_lab_test_logs ─────────────────────────────────────────────────────────

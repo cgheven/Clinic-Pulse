@@ -150,6 +150,9 @@ type CpLabTestRow = {
   is_active: boolean;
   created_at: string;
   deleted_at: string | null;
+  specimen_type: string | null;
+  methodology: string | null;
+  department: string | null;
 };
 
 type CpLabTestLogRow = {
@@ -399,6 +402,86 @@ type CpXrayPartnerSplitInsert = {
   created_at?: string;
 };
 
+type CpLabTestParameterRow = {
+  id: string;
+  test_id: string;
+  name: string;
+  unit: string | null;
+  group_name: string | null;
+  sort_order: number;
+  input_type: "numeric" | "text" | "option" | "formula";
+  formula: string | null;
+  options: string[] | null;
+  code: string | null;
+  decimals: number;
+  default_value: string | null;
+  is_active: boolean;
+  created_at: string;
+  deleted_at: string | null;
+};
+
+type CpLabTestParameterInsert = {
+  test_id: string;
+  name: string;
+  unit?: string | null;
+  group_name?: string | null;
+  sort_order?: number;
+  input_type?: "numeric" | "text" | "option" | "formula";
+  formula?: string | null;
+  options?: string[] | null;
+  code?: string | null;
+  decimals?: number;
+  default_value?: string | null;
+  is_active?: boolean;
+};
+
+type CpLabReferenceRangeRow = {
+  id: string;
+  parameter_id: string;
+  sex: "any" | "male" | "female";
+  age_min_years: number | null;
+  age_max_years: number | null;
+  low: number | null;
+  high: number | null;
+  text_value: string | null;
+  critical_low: number | null;
+  critical_high: number | null;
+  note: string | null;
+  created_at: string;
+};
+
+type CpLabReferenceRangeInsert = {
+  parameter_id: string;
+  sex?: "any" | "male" | "female";
+  age_min_years?: number | null;
+  age_max_years?: number | null;
+  low?: number | null;
+  high?: number | null;
+  text_value?: string | null;
+  critical_low?: number | null;
+  critical_high?: number | null;
+  note?: string | null;
+};
+
+type CpLabResultValueRow = {
+  id: string;
+  test_log_id: string;
+  parameter_id: string;
+  value_numeric: number | null;
+  value_text: string | null;
+  flag: "normal" | "low" | "high" | "critical_low" | "critical_high" | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type CpLabResultValueInsert = {
+  test_log_id: string;
+  parameter_id: string;
+  value_numeric?: number | null;
+  value_text?: string | null;
+  flag?: "normal" | "low" | "high" | "critical_low" | "critical_high" | null;
+};
+
 // Helper: every table must have Relationships for Supabase v2 TypeScript SDK
 type Tbl<R, I = Partial<R>, U = Partial<R>> = {
   Row: R;
@@ -421,6 +504,9 @@ export type Database = {
       cp_pharmacy_sale_items: Tbl<CpPharmacySaleItemRow>;
       cp_lab_tests: Tbl<CpLabTestRow>;
       cp_lab_test_logs: Tbl<CpLabTestLogRow>;
+      cp_lab_test_parameters: Tbl<CpLabTestParameterRow, CpLabTestParameterInsert>;
+      cp_lab_reference_ranges: Tbl<CpLabReferenceRangeRow, CpLabReferenceRangeInsert>;
+      cp_lab_result_values: Tbl<CpLabResultValueRow, CpLabResultValueInsert>;
       cp_lab_chemicals: Tbl<CpLabChemicalRow>;
       cp_lab_machinery: Tbl<CpLabMachineryRow>;
       cp_lab_maintenance: Tbl<CpLabMaintenanceRow>;
