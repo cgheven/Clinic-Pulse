@@ -20,13 +20,10 @@ export default async function LabChemicalsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Chemical Inventory</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Track reagents and consumables — adjust stock levels as needed
-        </p>
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Chemicals</h1>
       </div>
 
       <ChemicalInventory initialChemicals={result.data} />

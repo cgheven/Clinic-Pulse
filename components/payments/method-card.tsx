@@ -1,5 +1,4 @@
 import type { LucideIcon } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
 import { formatCurrencyPaisas } from '@/lib/utils'
 
 // =============================================================================
@@ -7,15 +6,10 @@ import { formatCurrencyPaisas } from '@/lib/utils'
 // =============================================================================
 
 interface MethodCardProps {
-  /** Lucide icon component to render */
   icon: LucideIcon
-  /** Payment method display name (e.g. "Cash", "JazzCash") */
   name: string
-  /** Total received via this method today — in paisas */
   total: number
-  /** Tailwind text colour class for the icon and amount */
   colorClass: string
-  /** Tailwind background colour class for the icon container */
   bgClass: string
 }
 
@@ -31,29 +25,25 @@ export function MethodCard({
   bgClass,
 }: MethodCardProps) {
   return (
-    <Card className="border-border bg-card transition-colors hover:border-primary/20">
-      <CardContent className="p-5">
-        <div className="flex items-center gap-4">
-          {/* Icon badge */}
-          <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${bgClass}`}
-          >
-            <Icon className={`h-5 w-5 ${colorClass}`} />
-          </div>
-
-          {/* Text */}
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {name}
-            </p>
-            <p
-              className={`mt-0.5 text-xl font-bold tabular-nums leading-tight ${colorClass}`}
-            >
-              {formatCurrencyPaisas(total)}
-            </p>
-          </div>
+    <div className="overflow-hidden rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-primary/20">
+      <div className="flex items-center gap-3">
+        {/* Icon badge */}
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bgClass}`}
+        >
+          <Icon className={`h-4 w-4 ${colorClass}`} />
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Text */}
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            {name}
+          </p>
+          <p className={`mt-0.5 text-base font-bold tabular-nums leading-tight ${colorClass}`}>
+            {formatCurrencyPaisas(total)}
+          </p>
+        </div>
+      </div>
+    </div>
   )
 }

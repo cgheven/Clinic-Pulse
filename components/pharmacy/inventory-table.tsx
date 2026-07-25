@@ -13,19 +13,8 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrencyPaisas } from '@/lib/utils'
 import type { CpPharmacyInventory } from '@/types/index'
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatPKR(paisas: number): string {
-  return `Rs. ${(paisas / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
 
 type StockStatus = 'critical' | 'low' | 'ok'
 
@@ -208,7 +197,7 @@ export function InventoryTable({
           <thead>
             <tr className="border-b border-border bg-muted/30">
               {/* Medicine Name */}
-              <th className="whitespace-nowrap px-4 py-3 text-left">
+              <th className="whitespace-nowrap px-4 py-2.5 text-left">
                 <button
                   onClick={() => toggleSort('name')}
                   className="flex items-center gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
@@ -218,12 +207,12 @@ export function InventoryTable({
               </th>
 
               {/* Unit */}
-              <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-muted-foreground">
+              <th className="whitespace-nowrap px-4 py-2.5 text-left font-semibold text-muted-foreground">
                 Unit
               </th>
 
               {/* Stock */}
-              <th className="whitespace-nowrap px-4 py-3 text-left">
+              <th className="whitespace-nowrap px-4 py-2.5 text-left">
                 <button
                   onClick={() => toggleSort('stock_qty')}
                   className="flex items-center gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
@@ -233,7 +222,7 @@ export function InventoryTable({
               </th>
 
               {/* Cost Price */}
-              <th className="hidden whitespace-nowrap px-4 py-3 text-right md:table-cell">
+              <th className="hidden whitespace-nowrap px-4 py-2.5 text-right md:table-cell">
                 <button
                   onClick={() => toggleSort('cost_price_paisas')}
                   className="flex w-full items-center justify-end gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
@@ -243,7 +232,7 @@ export function InventoryTable({
               </th>
 
               {/* Selling Price */}
-              <th className="whitespace-nowrap px-4 py-3 text-right">
+              <th className="whitespace-nowrap px-4 py-2.5 text-right">
                 <button
                   onClick={() => toggleSort('sale_price_paisas')}
                   className="flex w-full items-center justify-end gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
@@ -253,7 +242,7 @@ export function InventoryTable({
               </th>
 
               {/* Expiry */}
-              <th className="hidden whitespace-nowrap px-4 py-3 text-left lg:table-cell">
+              <th className="hidden whitespace-nowrap px-4 py-2.5 text-left lg:table-cell">
                 <button
                   onClick={() => toggleSort('expiry_date')}
                   className="flex items-center gap-1.5 font-semibold text-muted-foreground transition-colors hover:text-foreground"
@@ -263,7 +252,7 @@ export function InventoryTable({
               </th>
 
               {/* Actions */}
-              <th className="px-4 py-3 text-right font-semibold text-muted-foreground">
+              <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">
                 Actions
               </th>
             </tr>
@@ -285,7 +274,7 @@ export function InventoryTable({
                   )}
                 >
                   {/* Medicine name */}
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2.5">
                     <div>
                       <p className="font-medium text-foreground">{item.name}</p>
                       {item.generic_name && (
@@ -297,12 +286,12 @@ export function InventoryTable({
                   </td>
 
                   {/* Unit */}
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-4 py-2.5 text-muted-foreground">
                     <span className="capitalize">{item.unit}</span>
                   </td>
 
                   {/* Stock badge */}
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2.5">
                     <StockBadge item={item} />
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
                       Min: {item.reorder_level}
@@ -310,19 +299,19 @@ export function InventoryTable({
                   </td>
 
                   {/* Cost price */}
-                  <td className="hidden px-4 py-3 text-right text-muted-foreground md:table-cell">
-                    {formatPKR(item.cost_price_paisas)}
+                  <td className="hidden px-4 py-2.5 text-right text-muted-foreground md:table-cell">
+                    {formatCurrencyPaisas(item.cost_price_paisas)}
                   </td>
 
                   {/* Selling price */}
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-2.5 text-right">
                     <span className="font-semibold text-foreground">
-                      {formatPKR(item.sale_price_paisas)}
+                      {formatCurrencyPaisas(item.sale_price_paisas)}
                     </span>
                   </td>
 
                   {/* Expiry */}
-                  <td className="hidden px-4 py-3 lg:table-cell">
+                  <td className="hidden px-4 py-2.5 lg:table-cell">
                     {expiryDate ? (
                       <span
                         className={cn(
@@ -351,7 +340,7 @@ export function InventoryTable({
                   </td>
 
                   {/* Actions */}
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-2.5 text-right">
                     <Link
                       href={`/pharmacy/inventory/${item.id}`}
                       className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"

@@ -1,19 +1,8 @@
 'use client'
 
 import React from 'react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrencyPaisas } from '@/lib/utils'
-import { Receipt, TrendingDown } from 'lucide-react'
+import { TrendingDown, Receipt, LayoutGrid, Tag } from 'lucide-react'
 import type { ExpenseReport } from '@/app/actions/reports'
 
 interface ExpenseSummaryChartProps {
@@ -21,195 +10,201 @@ interface ExpenseSummaryChartProps {
 }
 
 const BAR_COLORS = [
-  '#f59e0b', // amber (primary)
-  '#3b82f6', // blue (info)
-  '#22c55e', // green (success)
-  '#ef4444', // red (destructive)
-  '#8b5cf6', // purple
-  '#f97316', // orange
-  '#06b6d4', // cyan
+  'bg-primary',
+  'bg-info',
+  'bg-success',
+  'bg-warning',
+  'bg-destructive',
+  'bg-secondary',
 ]
 
-interface TooltipProps {
-  active?: boolean
-  payload?: Array<{ value: number; name: string }>
-  label?: string
-}
-
-function CustomTooltip({ active, payload, label }: TooltipProps) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
-      <p className="text-xs font-semibold text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm font-bold text-foreground">
-        Rs. {payload[0]?.value?.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
-      </p>
-    </div>
-  )
-}
-
 export function ExpenseSummaryChart({ data }: ExpenseSummaryChartProps) {
+  const totalCategories = data.by_department.reduce(
+    (sum, d) => sum + d.by_head.length,
+    0
+  )
+  const largestDept = data.by_department[0]
+
   return (
-    <div className="space-y-6">
-      {/* Summary */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Total Expenses</p>
-              <div className="rounded-lg p-1.5 bg-destructive/10">
-                <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-foreground">
+    <div className="space-y-4">
+      {/* ── Stat chips ──────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+            <TrendingDown className="h-4 w-4 text-destructive" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Total Expenses
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
               {formatCurrencyPaisas(data.grand_total)}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Across {data.by_department.length} department{data.by_department.length !== 1 ? 's' : ''}
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Largest Expense Dept</p>
-              <div className="rounded-lg p-1.5 bg-warning/10">
-                <Receipt className="h-3.5 w-3.5 text-warning" />
-              </div>
-            </div>
-            {data.by_department[0] ? (
-              <>
-                <p className="text-xl font-bold text-foreground">
-                  {data.by_department[0].dept_name}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {formatCurrencyPaisas(data.by_department[0].total_amount)}
-                </p>
-              </>
-            ) : (
-              <p className="text-xl font-bold text-muted-foreground">—</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info/10">
+            <LayoutGrid className="h-4 w-4 text-info" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Departments
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {data.by_department.length}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-warning/10">
+            <Tag className="h-4 w-4 text-warning" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Categories
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">{totalCategories}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Receipt className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Largest Dept
+            </p>
+            <p className="truncate text-sm font-bold tabular-nums text-foreground">
+              {largestDept?.dept_name ?? '—'}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Bar chart */}
-      {data.chart_data.length > 0 && (
-        <Card className="border-border bg-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-foreground">
-              Expenses by Department (PKR)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart
-                data={data.chart_data}
-                margin={{ top: 4, right: 12, left: 12, bottom: 4 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border)"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) =>
-                    v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toString()
-                  }
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={60}>
-                  {data.chart_data.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
+      {/* ── Department breakdown panel ───────────────────────────────── */}
+      {data.by_department.length > 0 ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {data.by_department.map((dept, deptIdx) => {
+            const deptPct =
+              data.grand_total > 0
+                ? Math.round((dept.total_amount / data.grand_total) * 100)
+                : 0
 
-      {/* Department breakdown table */}
-      {data.by_department.map((dept) => (
-        <Card key={dept.department ?? dept.dept_name} className="border-border bg-card">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-foreground">
-                {dept.dept_name}
-              </CardTitle>
-              <p className="text-sm font-bold text-primary">
-                {formatCurrencyPaisas(dept.total_amount)}
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/20">
-                    <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Expense Head
-                    </th>
-                    <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Items
-                    </th>
-                    <th className="py-2.5 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {dept.by_head.map((h, i) => (
-                    <tr key={`${h.head_name}-${i}`} className="hover:bg-muted/10 transition-colors">
-                      <td className="py-2.5 pl-4 pr-3 text-foreground">{h.head_name}</td>
-                      <td className="px-3 py-2.5 text-right text-muted-foreground">{h.item_count}</td>
-                      <td className="py-2.5 pl-3 pr-4 text-right font-medium text-foreground">
-                        {formatCurrencyPaisas(h.total_amount)}
-                      </td>
-                    </tr>
-                  ))}
+            return (
+              <React.Fragment key={dept.department ?? dept.dept_name}>
+                {/* Dept section header */}
+                <div
+                  className={`flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2 ${deptIdx > 0 ? 'border-t border-border' : ''}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`h-2 w-2 rounded-full ${BAR_COLORS[deptIdx % BAR_COLORS.length]}`}
+                    />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {dept.dept_name}
+                    </span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {deptPct}%
+                    </span>
+                  </div>
+                  <span className="text-[12px] font-bold text-foreground">
+                    {formatCurrencyPaisas(dept.total_amount)}
+                  </span>
+                </div>
+
+                {/* Column headers */}
+                <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+                  <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Expense Head
+                  </span>
+                  <span className="hidden w-16 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+                    Items
+                  </span>
+                  <span className="w-28 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Amount
+                  </span>
+                  <span className="hidden w-20 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+                    % of Total
+                  </span>
+                </div>
+
+                {/* Expense head rows */}
+                <div className="divide-y divide-border/50">
+                  {dept.by_head.map((h, i) => {
+                    const headPct =
+                      data.grand_total > 0
+                        ? ((h.total_amount / data.grand_total) * 100).toFixed(1)
+                        : '0.0'
+                    return (
+                      <div
+                        key={`${h.head_name}-${i}`}
+                        className="flex items-center px-4 py-2.5 hover:bg-muted/20 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-foreground truncate">{h.head_name}</p>
+                          {/* Mobile: show item count inline */}
+                          <p className="text-[11px] text-muted-foreground sm:hidden">
+                            {h.item_count} item{h.item_count !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <span className="hidden w-16 shrink-0 text-right text-[12px] text-muted-foreground sm:block">
+                          {h.item_count}
+                        </span>
+                        <span className="w-28 shrink-0 text-right text-[12px] font-medium text-foreground">
+                          {formatCurrencyPaisas(h.total_amount)}
+                        </span>
+                        <span className="hidden w-20 shrink-0 text-right text-[12px] text-muted-foreground sm:block">
+                          {headPct}%
+                        </span>
+                      </div>
+                    )
+                  })}
+
                   {dept.by_head.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="py-4 text-center text-xs text-muted-foreground">
-                        No expenses recorded.
-                      </td>
-                    </tr>
+                    <div className="px-4 py-4 text-center">
+                      <p className="text-[12px] text-muted-foreground">No expenses recorded.</p>
+                    </div>
                   )}
-                </tbody>
-                {dept.by_head.length > 1 && (
-                  <tfoot>
-                    <tr className="border-t border-border bg-muted/10">
-                      <td colSpan={2} className="py-2.5 pl-4 pr-3 text-xs font-semibold text-muted-foreground">
-                        Subtotal
-                      </td>
-                      <td className="py-2.5 pl-3 pr-4 text-right text-xs font-bold text-foreground">
-                        {formatCurrencyPaisas(dept.total_amount)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                </div>
 
-      {data.by_department.length === 0 && (
-        <Card className="border-border bg-card">
-          <CardContent className="py-12 text-center">
-            <p className="text-sm text-muted-foreground">No expense records found for this period.</p>
-          </CardContent>
-        </Card>
+                {/* Dept subtotal (only when multiple heads) */}
+                {dept.by_head.length > 1 && (
+                  <div className="flex items-center border-t border-border/50 bg-muted/10 px-4 py-1.5">
+                    <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Subtotal
+                    </span>
+                    <span className="hidden w-16 shrink-0 sm:block" />
+                    <span className="w-28 shrink-0 text-right text-[12px] font-bold text-foreground">
+                      {formatCurrencyPaisas(dept.total_amount)}
+                    </span>
+                    <span className="hidden w-20 shrink-0 sm:block" />
+                  </div>
+                )}
+              </React.Fragment>
+            )
+          })}
+
+          {/* Grand total footer */}
+          {data.by_department.length > 1 && (
+            <div className="flex items-center border-t-2 border-border bg-muted/20 px-4 py-2">
+              <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Grand Total
+              </span>
+              <span className="hidden w-16 shrink-0 sm:block" />
+              <span className="w-28 shrink-0 text-right text-sm font-bold text-primary">
+                {formatCurrencyPaisas(data.grand_total)}
+              </span>
+              <span className="hidden w-20 shrink-0 sm:block" />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border bg-card px-4 py-10 text-center">
+          <p className="text-sm text-muted-foreground">No expense records found for this period.</p>
+        </div>
       )}
     </div>
   )

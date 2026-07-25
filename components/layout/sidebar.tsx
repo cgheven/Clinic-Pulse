@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
@@ -156,9 +157,14 @@ export function Sidebar({ userRole, user, onClose, mobile }: SidebarProps) {
           className="flex items-center gap-2.5 group"
           onClick={onClose}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 transition-all group-hover:bg-primary/15">
-            <Activity className="h-4 w-4 text-primary" />
-          </div>
+          <Image
+            src="/logo.jpeg"
+            alt="ClinicPulse"
+            width={32}
+            height={32}
+            className="rounded-lg"
+            priority
+          />
           <div>
             <p className="text-foreground font-bold text-sm tracking-tight leading-none">Pulse</p>
             <p className="text-primary/70 text-[10px] mt-0.5 font-semibold tracking-[0.15em] uppercase">Pulse of Your Business</p>

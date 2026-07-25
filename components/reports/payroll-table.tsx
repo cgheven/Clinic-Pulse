@@ -1,10 +1,9 @@
 'use client'
 
 import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyPaisas } from '@/lib/utils'
-import { Users, DollarSign, Briefcase } from 'lucide-react'
+import { Users, DollarSign, Briefcase, CreditCard } from 'lucide-react'
 import type { PayrollReport } from '@/app/actions/reports'
 
 interface PayrollTableProps {
@@ -12,190 +11,193 @@ interface PayrollTableProps {
 }
 
 export function PayrollTable({ data }: PayrollTableProps) {
-  // Group by department for sub-headers
-  const byDept = new Map<string, typeof data.entries>()
-  for (const e of data.entries) {
-    const key = e.department ?? 'Unassigned'
-    if (!byDept.has(key)) byDept.set(key, [])
-    byDept.get(key)!.push(e)
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Total Staff</p>
-              <div className="rounded-lg p-1.5 bg-info/10">
-                <Users className="h-3.5 w-3.5 text-info" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">{data.entries.length}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Active employees</p>
-          </CardContent>
-        </Card>
+    <div className="space-y-4">
+      {/* ── Stat chips ──────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info/10">
+            <Users className="h-4 w-4 text-info" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Total Staff
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {data.entries.length}
+            </p>
+          </div>
+        </div>
 
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Base Payroll</p>
-              <div className="rounded-lg p-1.5 bg-warning/10">
-                <Briefcase className="h-3.5 w-3.5 text-warning" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-warning/10">
+            <Briefcase className="h-4 w-4 text-warning" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Base Payroll
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
               {formatCurrencyPaisas(data.total_base)}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Sum of monthly salaries</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Total Deductions</p>
-              <div className="rounded-lg p-1.5 bg-destructive/10">
-                <DollarSign className="h-3.5 w-3.5 text-destructive" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+            <DollarSign className="h-4 w-4 text-destructive" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Deductions
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
               {formatCurrencyPaisas(data.total_deductions)}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Deductions applied</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Net Payroll</p>
-              <div className="rounded-lg p-1.5 bg-primary/10">
-                <DollarSign className="h-3.5 w-3.5 text-primary" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-primary">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <CreditCard className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Net Payroll
+            </p>
+            <p className="text-sm font-bold tabular-nums text-primary">
               {formatCurrencyPaisas(data.total_net)}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Working days: {data.working_days_config}
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      {/* Payroll table */}
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-foreground">
+      {/* ── Panel table ─────────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Section header */}
+        <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Payroll Detail
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/20">
-                  <th className="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Employee
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Department
-                  </th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Base Salary
-                  </th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Present / WD
-                  </th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Earned
-                  </th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Deductions
-                  </th>
-                  <th className="py-3 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Net Pay
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {data.entries.map((e) => (
-                  <tr key={e.staff_id} className="hover:bg-muted/10 transition-colors">
-                    <td className="py-3 pl-4 pr-3">
-                      <p className="font-medium text-foreground">{e.name}</p>
-                      <p className="text-xs text-muted-foreground">{e.staff_type}</p>
-                    </td>
-                    <td className="px-3 py-3">
-                      {e.department ? (
-                        <Badge variant="secondary" className="bg-secondary text-secondary-foreground text-xs">
-                          {e.department}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">
-                      {formatCurrencyPaisas(e.monthly_salary)}
-                    </td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">
-                      {e.present_days} / {e.working_days}
-                    </td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">
-                      {formatCurrencyPaisas(e.earned_salary)}
-                    </td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">
-                      {e.deductions > 0 ? (
-                        <span className="text-destructive">
-                          -{formatCurrencyPaisas(e.deductions)}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="py-3 pl-3 pr-4 text-right font-bold text-primary">
-                      {formatCurrencyPaisas(e.net_salary)}
-                    </td>
-                  </tr>
-                ))}
-                {data.entries.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      No active staff records found.
-                    </td>
-                  </tr>
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            {data.working_days_config} working days this month
+          </span>
+        </div>
+
+        {/* Column headers */}
+        <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+          <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+            Employee
+          </span>
+          <span className="hidden w-24 shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+            Department
+          </span>
+          <span className="hidden w-28 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+            Base Salary
+          </span>
+          <span className="hidden w-20 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+            Days
+          </span>
+          <span className="hidden w-28 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+            Earned
+          </span>
+          <span className="hidden w-24 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+            Deductions
+          </span>
+          <span className="w-28 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground">
+            Net Pay
+          </span>
+        </div>
+
+        {/* Data rows */}
+        <div className="divide-y divide-border/50">
+          {data.entries.map((e) => (
+            <div
+              key={e.staff_id}
+              className="flex items-center px-4 py-2.5 hover:bg-muted/20 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{e.name}</p>
+                {/* Mobile sub-label */}
+                <p className="text-[11px] text-muted-foreground sm:hidden">
+                  {e.staff_type}
+                  {e.department ? ` · ${e.department}` : ''}
+                  {' · '}
+                  {e.present_days}/{e.working_days} days
+                </p>
+                {/* Desktop type */}
+                <p className="hidden text-[11px] text-muted-foreground sm:block">{e.staff_type}</p>
+              </div>
+
+              <div className="hidden w-24 shrink-0 sm:block">
+                {e.department ? (
+                  <Badge
+                    variant="secondary"
+                    className="bg-secondary text-secondary-foreground text-[10px]"
+                  >
+                    {e.department}
+                  </Badge>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">—</span>
                 )}
-              </tbody>
-              {data.entries.length > 0 && (
-                <tfoot>
-                  <tr className="border-t-2 border-border bg-muted/10">
-                    <td colSpan={2} className="py-3 pl-4 pr-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Total
-                    </td>
-                    <td className="px-3 py-3 text-right text-xs font-semibold text-muted-foreground">
-                      {formatCurrencyPaisas(data.total_base)}
-                    </td>
-                    <td className="px-3 py-3" />
-                    <td className="px-3 py-3 text-right text-xs font-semibold text-muted-foreground">
-                      {formatCurrencyPaisas(data.total_earned)}
-                    </td>
-                    <td className="px-3 py-3 text-right text-xs font-semibold text-destructive">
-                      {data.total_deductions > 0 ? `-${formatCurrencyPaisas(data.total_deductions)}` : '—'}
-                    </td>
-                    <td className="py-3 pl-3 pr-4 text-right text-sm font-bold text-primary">
-                      {formatCurrencyPaisas(data.total_net)}
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+              </div>
+
+              <span className="hidden w-28 shrink-0 text-right text-[12px] text-muted-foreground sm:block">
+                {formatCurrencyPaisas(e.monthly_salary)}
+              </span>
+              <span className="hidden w-20 shrink-0 text-right text-[12px] text-muted-foreground sm:block">
+                {e.present_days} / {e.working_days}
+              </span>
+              <span className="hidden w-28 shrink-0 text-right text-[12px] text-muted-foreground sm:block">
+                {formatCurrencyPaisas(e.earned_salary)}
+              </span>
+              <span className="hidden w-24 shrink-0 text-right text-[12px] sm:block">
+                {e.deductions > 0 ? (
+                  <span className="text-destructive">
+                    -{formatCurrencyPaisas(e.deductions)}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </span>
+              <span className="w-28 shrink-0 text-right text-sm font-bold text-primary">
+                {formatCurrencyPaisas(e.net_salary)}
+              </span>
+            </div>
+          ))}
+
+          {data.entries.length === 0 && (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm text-muted-foreground">No active staff records found.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer totals */}
+        {data.entries.length > 0 && (
+          <div className="flex items-center border-t border-border bg-muted/20 px-4 py-2">
+            <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Total
+            </span>
+            <span className="hidden w-24 shrink-0 sm:block" />
+            <span className="hidden w-28 shrink-0 text-right text-[12px] font-semibold text-muted-foreground sm:block">
+              {formatCurrencyPaisas(data.total_base)}
+            </span>
+            <span className="hidden w-20 shrink-0 sm:block" />
+            <span className="hidden w-28 shrink-0 text-right text-[12px] font-semibold text-muted-foreground sm:block">
+              {formatCurrencyPaisas(data.total_earned)}
+            </span>
+            <span className="hidden w-24 shrink-0 text-right text-[12px] font-semibold text-destructive sm:block">
+              {data.total_deductions > 0
+                ? `-${formatCurrencyPaisas(data.total_deductions)}`
+                : '—'}
+            </span>
+            <span className="w-28 shrink-0 text-right text-sm font-bold text-primary">
+              {formatCurrencyPaisas(data.total_net)}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   )
 }

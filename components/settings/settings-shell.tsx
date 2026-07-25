@@ -35,11 +35,10 @@ type SectionKey = 'general' | 'revenue' | 'payments' | 'partners' | 'expenses' |
 
 interface NavItem {
   key: SectionKey
-  label: string       // full label — used in section header
-  tabLabel: string    // short label — used in the tab bar
+  label: string
+  tabLabel: string
   subtitle: string
   icon: React.ElementType
-  iconBg: string
   iconColor: string
 }
 
@@ -58,7 +57,6 @@ const NAV_GROUPS: NavGroup[] = [
         tabLabel: 'General',
         subtitle: 'Clinic name, contact information, working days and currency preferences.',
         icon: Building2,
-        iconBg: 'bg-primary/10',
         iconColor: 'text-primary',
       },
     ],
@@ -70,18 +68,16 @@ const NAV_GROUPS: NavGroup[] = [
         key: 'revenue',
         label: 'Revenue Splits',
         tabLabel: 'Revenue',
-        subtitle: 'Configure how revenue is split between doctors, clinic and staff across departments.',
+        subtitle: 'Configure how revenue is split between doctors, clinic and staff.',
         icon: PieChart,
-        iconBg: 'bg-info/10',
         iconColor: 'text-info',
       },
       {
         key: 'payments',
         label: 'Payment Methods',
         tabLabel: 'Payments',
-        subtitle: 'Enable or disable accepted payment methods across all clinic departments.',
+        subtitle: 'Enable or disable accepted payment methods across all departments.',
         icon: CreditCard,
-        iconBg: 'bg-success/10',
         iconColor: 'text-success',
       },
     ],
@@ -93,9 +89,8 @@ const NAV_GROUPS: NavGroup[] = [
         key: 'partners',
         label: 'X-Ray Partners',
         tabLabel: 'X-Ray',
-        subtitle: 'Manage X-ray revenue-sharing partners and their default split percentages.',
+        subtitle: 'Manage X-ray revenue-sharing partners and split percentages.',
         icon: Users,
-        iconBg: 'bg-purple-500/10',
         iconColor: 'text-purple-500',
       },
       {
@@ -104,7 +99,6 @@ const NAV_GROUPS: NavGroup[] = [
         tabLabel: 'Expenses',
         subtitle: 'Configure expense categories used across all departments.',
         icon: Receipt,
-        iconBg: 'bg-orange-500/10',
         iconColor: 'text-orange-500',
       },
     ],
@@ -118,7 +112,6 @@ const NAV_GROUPS: NavGroup[] = [
         tabLabel: 'Doctors',
         subtitle: 'Configure earning models, commission rates and monthly salaries per doctor.',
         icon: Stethoscope,
-        iconBg: 'bg-cyan-500/10',
         iconColor: 'text-cyan-500',
       },
       {
@@ -127,7 +120,6 @@ const NAV_GROUPS: NavGroup[] = [
         tabLabel: 'Staff',
         subtitle: 'Define available staff designation types for the clinic.',
         icon: UserCog,
-        iconBg: 'bg-amber-500/10',
         iconColor: 'text-amber-500',
       },
     ],
@@ -153,6 +145,31 @@ interface SettingsShellProps {
 }
 
 // =============================================================================
+// Panel wrapper helpers
+// =============================================================================
+
+function SectionPanel({
+  title,
+  children,
+  noPad = false,
+}: {
+  title: string
+  children: React.ReactNode
+  noPad?: boolean
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border bg-muted/20 px-4 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {title}
+        </span>
+      </div>
+      {noPad ? children : <div className="px-4 py-4">{children}</div>}
+    </div>
+  )
+}
+
+// =============================================================================
 // Main shell
 // =============================================================================
 
@@ -168,23 +185,19 @@ export function SettingsShell({
   staffTypes,
 }: SettingsShellProps) {
   const [active, setActive] = useState<SectionKey>('general')
-  const activeItem = ALL_NAV_ITEMS.find((i) => i.key === active)!
+  ALL_NAV_ITEMS.find((i) => i.key === active)
 
   return (
-    <div className="flex flex-col">
+    <div className="space-y-3">
 
-      {/* ── Tab bar ─────────────────────────────────────────────────────────────
-          Underline-style, horizontal scroll, grouped with thin dividers.
-          Inspired by Stripe / Linear settings navigation.
-      ─────────────────────────────────────────────────────────────────────── */}
-      <div className="border-b border-border mb-8">
+      {/* ── Tab bar ───────────────────────────────────────────────────────────── */}
+      <div className="border-b border-border">
         <nav
           className="flex overflow-x-auto scrollbar-none"
           aria-label="Settings sections"
         >
           {NAV_GROUPS.map((group, gi) => (
             <React.Fragment key={group.label}>
-              {/* Group divider — subtle vertical rule between category clusters */}
               {gi > 0 && (
                 <div
                   aria-hidden="true"
@@ -201,9 +214,7 @@ export function SettingsShell({
                     aria-selected={isActive}
                     role="tab"
                     className={cn(
-                      // Layout
                       'relative flex items-center gap-2 whitespace-nowrap px-4 pb-3.5 pt-1 text-sm font-medium',
-                      // Bottom border — -mb-px to overlap the container's border-b
                       'border-b-2 -mb-px transition-colors duration-150',
                       isActive
                         ? 'border-primary text-primary'
@@ -225,75 +236,56 @@ export function SettingsShell({
         </nav>
       </div>
 
-      {/* ── Section header ───────────────────────────────────────────────────── */}
-      {activeItem && (
-        <div className="mb-6 flex items-center gap-3">
-          <div
-            className={cn(
-              'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
-              activeItem.iconBg
-            )}
-          >
-            <activeItem.icon className={cn('h-4.5 w-4.5', activeItem.iconColor)} />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-foreground leading-tight">
-              {activeItem.label}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5 leading-snug max-w-xl">
-              {activeItem.subtitle}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ── Section content ──────────────────────────────────────────────────── */}
+
       {active === 'general' && (
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <SectionPanel title="General Settings">
           {generalSettings ? (
             <GeneralSettingsForm initialData={generalSettings} />
           ) : (
             <p className="text-sm text-destructive">Failed to load settings.</p>
           )}
-        </div>
+        </SectionPanel>
       )}
 
       {active === 'revenue' && (
-        <RevenueSplitsTab
-          opdSplit={opdSplit}
-          labSplit={labSplit}
-          pharmacySplit={pharmacySplit}
-        />
+        <SectionPanel title="Revenue Splits">
+          <RevenueSplitsTab
+            opdSplit={opdSplit}
+            labSplit={labSplit}
+            pharmacySplit={pharmacySplit}
+          />
+        </SectionPanel>
       )}
 
       {active === 'payments' && (
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <SectionPanel title="Payment Methods" noPad>
           <PaymentMethodsManager initialMethods={paymentMethods} />
-        </div>
+        </SectionPanel>
       )}
 
       {active === 'partners' && (
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <SectionPanel title="X-Ray Partners">
           <PartnersManager initialPartners={xrayPartners} />
-        </div>
+        </SectionPanel>
       )}
 
       {active === 'expenses' && (
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <SectionPanel title="Expense Heads">
           <ExpenseHeadsManager initialHeads={expenseHeads} />
-        </div>
+        </SectionPanel>
       )}
 
       {active === 'doctors' && (
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <SectionPanel title="Doctor Settings">
           <DoctorSettingsManager initialDoctors={doctors} />
-        </div>
+        </SectionPanel>
       )}
 
       {active === 'staff' && (
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <SectionPanel title="Staff Types">
           <StaffTypesManager initialTypes={staffTypes} />
-        </div>
+        </SectionPanel>
       )}
     </div>
   )

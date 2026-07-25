@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowLeft, Zap } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ArrowLeft } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { RevenueForm } from '@/components/xray/revenue-form'
@@ -18,7 +18,6 @@ export default async function NewXrayRevenuePage() {
   const today = getTodayPKT()
   const supabase = await createClient()
 
-  // Load active payment methods for the form
   const { data: methodsData } = await supabase
     .from('cp_payment_methods')
     .select('*')
@@ -28,42 +27,29 @@ export default async function NewXrayRevenuePage() {
   const paymentMethods = (methodsData ?? []) as CpPaymentMethod[]
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
-      {/* ── Back navigation ─────────────────────────────────────────────────── */}
-      <Link
-        href="/xray/revenue"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Revenue Log
-      </Link>
-
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
+    <div className="mx-auto max-w-xl space-y-4">
+      {/* ── Back + title ────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-          <Zap className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Record X-Ray Revenue</h1>
-          <p className="text-sm text-muted-foreground">
-            Log a new X-ray service entry
-          </p>
-        </div>
+        <Link
+          href="/xray/revenue"
+          className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Revenue Log
+        </Link>
+        <span className="text-muted-foreground/40">/</span>
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Record Revenue</h1>
       </div>
 
-      {/* ── Form card ────────────────────────────────────────────────────────── */}
+      {/* ── Unified form card ───────────────────────────────────────────────────── */}
       <Card className="border-border bg-card">
-        <CardHeader className="border-b border-border pb-4">
-          <CardTitle className="text-base">Service Details</CardTitle>
-          <CardDescription>
-            Enter the patient, service type, amount and payment information.
-          </CardDescription>
+        <CardHeader className="border-b border-border pb-3 pt-4">
+          <CardTitle className="text-sm font-semibold text-muted-foreground">
+            Service Details
+          </CardTitle>
         </CardHeader>
         <CardContent className="pt-5">
-          <RevenueForm
-            paymentMethods={paymentMethods}
-            defaultDate={today}
-          />
+          <RevenueForm paymentMethods={paymentMethods} defaultDate={today} />
         </CardContent>
       </Card>
     </div>

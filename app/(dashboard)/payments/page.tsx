@@ -3,9 +3,9 @@ import {
   AlertTriangle,
   Banknote,
   Building2,
-  CreditCard,
   Smartphone,
   Wallet,
+  TrendingUp,
 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import {
@@ -64,7 +64,7 @@ const METHOD_CARDS = [
   },
   {
     key: 'bank_transfer' as const,
-    name: 'Bank Transfer',
+    name: 'Bank',
     Icon: Building2,
     colorClass: 'text-violet-400',
     bgClass: 'bg-violet-500/10',
@@ -78,7 +78,6 @@ const METHOD_CARDS = [
 export default async function PaymentsPage({ searchParams }: PageProps) {
   await requireAuth()
 
-  // Resolve the date from the URL — fall back to today in PKT
   const params = await searchParams
   const today  = getTodayPKT()
   const date   =
@@ -88,7 +87,6 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
 
   const isToday = date === today
 
-  // Fetch all three data sets in parallel
   const [dailyResult, deptResult, trendResult] = await Promise.all([
     getDailyPayments(date),
     getPaymentsByDepartment(date),
@@ -99,41 +97,84 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
   const dept  = deptResult.success  ? deptResult.data  : null
   const trend = trendResult.success ? trendResult.data  : null
 
+  const mobileTotal = daily
+    ? daily.totals.jazzcash + daily.totals.easypaisa
+    : null
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <CreditCard className="h-5 w-5 text-primary" />
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Payments</h1>
+        <DateSelector currentDate={date} />
+      </div>
+
+      {/* ── Stat Chips ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {/* Total Collected */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <TrendingUp className="h-4 w-4 text-primary" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Payments</h1>
-            <p className="text-sm text-muted-foreground">
-              Daily receipts by method &amp; department
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              {isToday ? 'Today Total' : 'Total'}
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {daily ? formatCurrencyPaisas(daily.grand_total) : '—'}
             </p>
           </div>
         </div>
 
-        {/* Date selector — client component; navigates via URL */}
-        <DateSelector currentDate={date} />
+        {/* Cash */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Banknote className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Cash
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {daily ? formatCurrencyPaisas(daily.totals.cash) : '—'}
+            </p>
+          </div>
+        </div>
+
+        {/* Mobile Pay */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info/10">
+            <Smartphone className="h-4 w-4 text-info" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Mobile Pay
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {mobileTotal != null ? formatCurrencyPaisas(mobileTotal) : '—'}
+            </p>
+          </div>
+        </div>
+
+        {/* Bank */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
+            <Building2 className="h-4 w-4 text-violet-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Bank
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {daily ? formatCurrencyPaisas(daily.totals.bank_transfer) : '—'}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* ── Grand total banner ───────────────────────────────────────────────── */}
-      {daily && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-primary/60">
-            Total Received &mdash; {isToday ? 'Today' : date}
-          </p>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-primary">
-            {formatCurrencyPaisas(daily.grand_total)}
-          </p>
-        </div>
-      )}
-
-      {/* ── Payment method cards grid ────────────────────────────────────────── */}
+      {/* ── Payment method breakdown ─────────────────────────────────────────── */}
       {daily ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {METHOD_CARDS.map(({ key, name, Icon, colorClass, bgClass }) => (
             <MethodCard
               key={key}

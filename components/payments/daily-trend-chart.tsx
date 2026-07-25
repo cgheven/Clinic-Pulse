@@ -1,225 +1,99 @@
 'use client'
 
-import { format, parseISO } from 'date-fns'
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrencyPaisas } from '@/lib/utils'
 import type { DailyTrendPoint } from '@/app/actions/payments'
 
-// =============================================================================
-// Constants
-// =============================================================================
+const METHODS = ['cash', 'jazzcash', 'easypaisa', 'bank_transfer'] as const
+type Method = (typeof METHODS)[number]
 
-/** Amber-led palette that respects the dark luxury theme */
-const METHOD_COLORS: Record<string, string> = {
-  cash:          '#f59e0b', // amber-500  (primary)
-  jazzcash:      '#3b82f6', // blue-500   (info)
-  easypaisa:     '#22c55e', // green-500  (success)
-  bank_transfer: '#a78bfa', // violet-400
+const METHOD_COLORS: Record<Method, string> = {
+  cash:          'bg-amber-500',
+  jazzcash:      'bg-blue-500',
+  easypaisa:     'bg-green-500',
+  bank_transfer: 'bg-violet-400',
 }
 
-const METHOD_LABELS: Record<string, string> = {
+const METHOD_LABELS: Record<Method, string> = {
   cash:          'Cash',
   jazzcash:      'JazzCash',
   easypaisa:     'Easypaisa',
   bank_transfer: 'Bank Transfer',
 }
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatAxisTick(value: number): string {
-  if (value === 0) return '0'
-  const pkr = value / 100
-  if (pkr >= 100_000) return `${(pkr / 100_000).toFixed(1)}L`
-  if (pkr >= 1_000)   return `${(pkr / 1_000).toFixed(0)}k`
-  return String(Math.round(pkr))
-}
-
 function shortDate(dateStr: string): string {
-  try {
-    return format(parseISO(dateStr), 'dd MMM')
-  } catch {
-    return dateStr
-  }
+  const d = new Date(`${dateStr}T00:00:00`)
+  return d.toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })
 }
-
-function longDate(dateStr: string): string {
-  try {
-    return format(parseISO(dateStr), 'EEEE, dd MMM yyyy')
-  } catch {
-    return dateStr
-  }
-}
-
-// =============================================================================
-// Custom Tooltip
-// =============================================================================
-
-interface TooltipPayloadEntry {
-  dataKey: string
-  value: number
-  color: string
-}
-
-interface CustomTooltipProps {
-  active?: boolean
-  payload?: TooltipPayloadEntry[]
-  label?: string
-}
-
-function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
-  if (!active || !payload?.length || !label) return null
-
-  const total = payload.reduce((s, p) => s + (p.value ?? 0), 0)
-
-  return (
-    <div className="rounded-xl border border-border bg-card/95 p-3 shadow-xl backdrop-blur-sm">
-      <p className="mb-2 text-xs font-semibold text-foreground">{longDate(label)}</p>
-      <div className="space-y-1">
-        {[...payload].reverse().map((entry) => (
-          <div key={entry.dataKey} className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-[11px] text-muted-foreground">
-                {METHOD_LABELS[entry.dataKey] ?? entry.dataKey}
-              </span>
-            </div>
-            <span className="text-[11px] font-semibold tabular-nums text-foreground">
-              {formatCurrencyPaisas(entry.value)}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 border-t border-border pt-2 flex items-center justify-between">
-        <span className="text-[11px] font-bold text-muted-foreground">Total</span>
-        <span className="text-xs font-bold tabular-nums text-primary">
-          {formatCurrencyPaisas(total)}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-// =============================================================================
-// Props
-// =============================================================================
 
 interface DailyTrendChartProps {
   data: DailyTrendPoint[]
 }
 
-// =============================================================================
-// Component
-// =============================================================================
-
 export function DailyTrendChart({ data }: DailyTrendChartProps) {
   const hasData = data.some((d) => d.total > 0)
+  const maxTotal = Math.max(...data.map((d) => d.total), 1)
+  const visible = data.slice(-14)
 
   return (
-    <Card className="border-border bg-card">
-      <CardHeader className="border-b border-border pb-3 pt-4">
-        <CardTitle className="text-sm font-semibold text-foreground">
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           30-Day Payment Trend
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Stacked by payment method — completed transactions only
-        </p>
-      </CardHeader>
+        </span>
+        <div className="hidden items-center gap-3 sm:flex">
+          {METHODS.map((m) => (
+            <span key={m} className="flex items-center gap-1">
+              <span className={`h-2 w-2 rounded-full ${METHOD_COLORS[m]} opacity-70`} />
+              <span className="text-[10px] text-muted-foreground">{METHOD_LABELS[m]}</span>
+            </span>
+          ))}
+        </div>
+      </div>
 
-      <CardContent className="pb-3 pt-4">
-        {!hasData ? (
-          <div className="flex h-[280px] items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              No payment data in the last 30 days.
-            </p>
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart
-              data={data}
-              margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
-            >
-              {/* Gradient fills */}
-              <defs>
-                {Object.entries(METHOD_COLORS).map(([key, color]) => (
-                  <linearGradient
-                    key={key}
-                    id={`cpGrad-${key}`}
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
+      {!hasData ? (
+        <div className="flex h-32 items-center justify-center">
+          <p className="text-sm text-muted-foreground">No payment data in the last 30 days.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-border/50 px-4 py-1">
+          {visible.map((point) => {
+            const barWidthPct = (point.total / maxTotal) * 100
+            return (
+              <div key={point.date} className="flex items-center gap-3 py-1.5">
+                <span className="w-[52px] shrink-0 text-[11px] text-muted-foreground">
+                  {shortDate(point.date)}
+                </span>
+
+                {/* Stacked bar */}
+                <div className="flex min-w-0 flex-1 h-3.5 overflow-hidden rounded-sm bg-muted/30">
+                  <div
+                    className="flex h-full overflow-hidden rounded-sm transition-all duration-500"
+                    style={{ width: `${barWidthPct}%` }}
                   >
-                    <stop offset="5%"  stopColor={color} stopOpacity={0.30} />
-                    <stop offset="95%" stopColor={color} stopOpacity={0.02} />
-                  </linearGradient>
-                ))}
-              </defs>
+                    {METHODS.map((m) => {
+                      const pct =
+                        point.total > 0 ? ((point[m] ?? 0) / point.total) * 100 : 0
+                      return pct > 0 ? (
+                        <div
+                          key={m}
+                          className={`h-full ${METHOD_COLORS[m]} opacity-70`}
+                          style={{ width: `${pct}%` }}
+                          title={`${METHOD_LABELS[m]}: ${formatCurrencyPaisas(point[m] ?? 0)}`}
+                        />
+                      ) : null
+                    })}
+                  </div>
+                </div>
 
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="#1e1e2d"
-                vertical={false}
-              />
-
-              <XAxis
-                dataKey="date"
-                tickFormatter={shortDate}
-                tick={{ fill: '#7c7c9a', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-                minTickGap={40}
-              />
-
-              <YAxis
-                tickFormatter={formatAxisTick}
-                tick={{ fill: '#7c7c9a', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                width={68}
-              />
-
-              <Tooltip content={<CustomTooltip />} />
-
-              <Legend
-                iconType="circle"
-                iconSize={8}
-                wrapperStyle={{ fontSize: '11px', paddingTop: '14px' }}
-                formatter={(name: string) => METHOD_LABELS[name] ?? name}
-              />
-
-              {/* Stacked areas — rendered in reverse so the legend order makes sense */}
-              {Object.entries(METHOD_COLORS).map(([key, color]) => (
-                <Area
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stackId="payments"
-                  stroke={color}
-                  strokeWidth={1.5}
-                  fill={`url(#cpGrad-${key})`}
-                  activeDot={{ r: 4, strokeWidth: 0 }}
-                />
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </CardContent>
-    </Card>
+                <span className="w-[72px] shrink-0 text-right text-[11px] font-semibold tabular-nums text-foreground">
+                  {formatCurrencyPaisas(point.total)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrencyPaisas } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import { recordSale } from '@/app/actions/pharmacy'
 import type { CpPharmacyInventory } from '@/types/index'
@@ -42,17 +42,6 @@ interface SaleLineItem {
 interface SaleFormProps {
   inventory: InventoryOption[]
   paymentMethods: Array<{ method: string; label: string }>
-}
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatPKR(paisas: number): string {
-  return `Rs. ${(paisas / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
 }
 
 function lineTotal(item: SaleLineItem): number {
@@ -161,7 +150,7 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
       if (result.success) {
         toast({
           title: 'Sale recorded',
-          description: `Total: ${formatPKR(result.data.total_paisas)}.`,
+          description: `Total: ${formatCurrencyPaisas(result.data.total_paisas)}.`,
         })
         router.push('/pharmacy/sales')
       } else {
@@ -175,7 +164,7 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Line items */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -229,14 +218,14 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Grand Total</p>
-            <p className="text-2xl font-bold text-primary">{formatPKR(grandTotal)}</p>
+            <p className="text-lg font-bold text-primary sm:text-xl">{formatCurrencyPaisas(grandTotal)}</p>
           </div>
 
           <div className="text-right">
             <p className="text-xs text-muted-foreground">{lines.length} item(s)</p>
             <p className="text-xs text-muted-foreground">
               Discount:{' '}
-              {formatPKR(lines.reduce((s, l) => s + l.discount_amount, 0))}
+              {formatCurrencyPaisas(lines.reduce((s, l) => s + l.discount_amount, 0))}
             </p>
           </div>
         </div>
@@ -302,7 +291,7 @@ export function SaleForm({ inventory, paymentMethods }: SaleFormProps) {
           ) : (
             <>
               <ShoppingCart className="h-4 w-4" />
-              Record Sale — {formatPKR(grandTotal)}
+              Record Sale — {formatCurrencyPaisas(grandTotal)}
             </>
           )}
         </Button>
@@ -451,7 +440,7 @@ function LineItemRow({
         <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center">
           <div className="text-right">
             <p className="text-[10px] text-muted-foreground md:hidden">Total</p>
-            <p className="font-semibold text-foreground">{formatPKR(total)}</p>
+            <p className="font-semibold text-foreground">{formatCurrencyPaisas(total)}</p>
           </div>
 
           {canRemove && (

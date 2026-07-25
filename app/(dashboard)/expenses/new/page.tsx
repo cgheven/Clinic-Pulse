@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ChevronLeft, Receipt } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
@@ -44,27 +44,17 @@ export default async function NewExpensePage() {
   const paymentMethods = (methodsData.data ?? []) as CpPaymentMethod[]
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-4">
       {/* ── Back nav ─────────────────────────────────────────────────────────── */}
-      <Link
-        href="/expenses"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Back to Expenses
-      </Link>
-
-      {/* ── Page header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-          <Receipt className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Record Expense</h1>
-          <p className="text-sm text-muted-foreground">
-            Add a new cross-department expense entry
-          </p>
-        </div>
+        <Link
+          href="/expenses"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+          aria-label="Back to Expenses"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">New Expense</h1>
       </div>
 
       {/* ── Form ─────────────────────────────────────────────────────────────── */}

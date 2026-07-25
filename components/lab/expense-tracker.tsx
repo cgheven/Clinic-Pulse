@@ -19,8 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn, formatCurrencyPaisas, formatDate } from '@/lib/utils'
+import { cn, formatCurrencyPaisas, formatDate, getTodayPKT } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import { Loader2, Plus, Receipt, TrendingDown } from 'lucide-react'
 import type { LabExpenseEntry, LabExpenseResult } from '@/app/actions/lab'
@@ -46,17 +45,13 @@ interface AddExpenseForm {
   expense_date: string
   expense_head_id: string
   custom_head: string
-  amount: string // PKR string
+  amount: string
   description: string
   payment_method_id: string
 }
 
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0]!
-}
-
 const DEFAULT_FORM: AddExpenseForm = {
-  expense_date: todayISO(),
+  expense_date: getTodayPKT(),
   expense_head_id: '',
   custom_head: '',
   amount: '',
@@ -88,7 +83,6 @@ export function ExpenseTracker({
 
   function validate(): boolean {
     const newErrors: Partial<Record<keyof AddExpenseForm, string>> = {}
-
     if (!form.expense_date) newErrors.expense_date = 'Date is required'
     if (!form.amount || parseFloat(form.amount) <= 0) {
       newErrors.amount = 'Enter a valid amount'
@@ -96,7 +90,6 @@ export function ExpenseTracker({
     if (!form.expense_head_id && !form.custom_head.trim()) {
       newErrors.custom_head = 'Select an expense head or enter a custom one'
     }
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -108,7 +101,7 @@ export function ExpenseTracker({
 
     setIsPending(true)
     startTransition(async () => {
-      const result = await addLabExpense({
+      const res = await addLabExpense({
         expense_date: form.expense_date,
         expense_head_id: form.expense_head_id || undefined,
         custom_head: form.custom_head || undefined,
@@ -119,11 +112,11 @@ export function ExpenseTracker({
 
       setIsPending(false)
 
-      if (result.success) {
+      if (res.success) {
         toast({ title: 'Expense recorded', description: 'Lab expense added successfully.' })
         setShowDialog(false)
-        setForm(DEFAULT_FORM)
-        // Reload result — simple optimistic add
+        setForm({ ...DEFAULT_FORM, expense_date: getTodayPKT() })
+
         const headName =
           expenseHeads.find((h) => h.id === form.expense_head_id)?.name ??
           (form.custom_head || 'Other')
@@ -156,7 +149,7 @@ export function ExpenseTracker({
           },
         }))
       } else {
-        toast({ title: 'Failed', description: result.error, variant: 'destructive' })
+        toast({ title: 'Failed', description: res.error, variant: 'destructive' })
       }
     })
   }
@@ -164,127 +157,132 @@ export function ExpenseTracker({
   const sortedHeads = Object.entries(result.byHead).sort(([, a], [, b]) => b - a)
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            Total Expenses ({month})
-          </p>
-          <p className="text-2xl font-bold text-destructive">
-            {formatCurrencyPaisas(result.totalAmount)}
-          </p>
+    <div className="space-y-3">
+      {/* Summary strip */}
+      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+            <TrendingDown className="h-4 w-4 text-destructive" />
+          </div>
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 mb-0.5 leading-none">
+              Total Expenses ({month})
+            </p>
+            <p className="text-sm font-bold tabular-nums text-destructive leading-tight">
+              {formatCurrencyPaisas(result.totalAmount)}
+            </p>
+          </div>
         </div>
-        <Button
-          onClick={() => setShowDialog(true)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
+        <Button size="sm" onClick={() => setShowDialog(true)}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
           Add Expense
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* By head breakdown */}
-        <Card className="border-border bg-card lg:col-span-1">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-foreground">
+      <div className="grid gap-3 lg:grid-cols-3">
+        {/* By category breakdown */}
+        <div className="overflow-hidden rounded-xl border border-border bg-card lg:col-span-1">
+          <div className="border-b border-border bg-muted/20 px-4 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               By Category
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+            </span>
+          </div>
+          <div className="p-3 space-y-1.5">
             {sortedHeads.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No expenses this month</p>
+              <p className="text-[12px] text-muted-foreground py-2">No expenses this month</p>
             ) : (
               sortedHeads.map(([head, amount]) => (
-                <div key={head} className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground truncate max-w-[60%]">
-                    {head}
-                  </span>
-                  <span className="text-xs font-medium text-foreground">
+                <div key={head} className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] text-muted-foreground truncate">{head}</span>
+                  <span className="text-[12px] font-medium text-foreground shrink-0">
                     {formatCurrencyPaisas(Number(amount))}
                   </span>
                 </div>
               ))
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Expense table */}
-        <Card className="border-border bg-card lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-foreground">
+        {/* Expense log panel */}
+        <div className="overflow-hidden rounded-xl border border-border bg-card lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Expense Log
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {result.entries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
-                <Receipt className="h-7 w-7 opacity-30" />
-                <p className="text-sm">No expenses recorded this month</p>
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {result.entries.length} entries
+            </span>
+          </div>
+
+          {result.entries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
+              <Receipt className="h-7 w-7 opacity-30" />
+              <p className="text-sm">No expenses recorded this month</p>
+            </div>
+          ) : (
+            <>
+              {/* Column headers */}
+              <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+                <span className="w-24 shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Date
+                </span>
+                <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Head
+                </span>
+                <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground hidden sm:block">
+                  Description
+                </span>
+                <span className="w-28 text-right text-[10px] uppercase tracking-wide text-muted-foreground shrink-0">
+                  Amount
+                </span>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/20">
-                      <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Date
-                      </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Head
-                      </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
-                        Description
-                      </th>
-                      <th className="py-2.5 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Amount
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {result.entries.map((e: LabExpenseEntry) => (
-                      <tr key={e.id} className="hover:bg-muted/10 transition-colors">
-                        <td className="py-3 pl-4 pr-3 text-xs text-muted-foreground">
-                          {formatDate(e.expense_date)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="text-sm font-medium text-foreground">
-                            {e.expense_head_name ?? 'Other'}
-                          </span>
-                          {e.payment_method_name && (
-                            <p className="text-[10px] text-muted-foreground">
-                              via {e.payment_method_name}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-xs text-muted-foreground hidden sm:table-cell">
-                          {e.description ?? '—'}
-                        </td>
-                        <td className="py-3 pl-3 pr-4 text-right font-medium text-destructive">
-                          {formatCurrencyPaisas(e.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t border-border bg-muted/20">
-                      <td
-                        colSpan={3}
-                        className="py-2.5 pl-4 pr-3 text-xs font-semibold text-muted-foreground"
-                      >
-                        Total
-                      </td>
-                      <td className="py-2.5 pl-3 pr-4 text-right text-sm font-bold text-destructive">
-                        {formatCurrencyPaisas(result.totalAmount)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+
+              {/* Data rows */}
+              <div className="divide-y divide-border/50">
+                {result.entries.map((e: LabExpenseEntry) => (
+                  <div
+                    key={e.id}
+                    className="flex items-center px-4 py-2.5 hover:bg-muted/20 transition-colors"
+                  >
+                    <div className="w-24 shrink-0">
+                      <span className="text-[12px] text-muted-foreground">
+                        {formatDate(e.expense_date)}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0 pr-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {e.expense_head_name ?? 'Other'}
+                      </p>
+                      {e.payment_method_name && (
+                        <p className="text-[10px] text-muted-foreground">
+                          via {e.payment_method_name}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-1 hidden sm:block min-w-0 pr-2">
+                      <span className="text-[12px] text-muted-foreground truncate block">
+                        {e.description ?? '—'}
+                      </span>
+                    </div>
+                    <div className="w-28 text-right shrink-0">
+                      <span className="text-sm font-medium text-destructive">
+                        {formatCurrencyPaisas(e.amount)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+
+              {/* Footer total */}
+              <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-2">
+                <span className="text-[11px] font-semibold text-muted-foreground">Total</span>
+                <span className="text-sm font-bold text-destructive">
+                  {formatCurrencyPaisas(result.totalAmount)}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Add expense dialog */}
@@ -338,7 +336,7 @@ export function ExpenseTracker({
               </Select>
             </div>
 
-            {/* Custom head (shown when no head selected) */}
+            {/* Custom head */}
             {!form.expense_head_id && (
               <div className="space-y-1.5">
                 <Label htmlFor="exp-custom" className="text-xs text-muted-foreground">
@@ -428,7 +426,6 @@ export function ExpenseTracker({
             <Button
               onClick={handleSubmit}
               disabled={isPending}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {isPending ? (
                 <>

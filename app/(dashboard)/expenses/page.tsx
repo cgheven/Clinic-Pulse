@@ -2,19 +2,17 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import {
   Plus,
-  Receipt,
   ChevronLeft,
   ChevronRight,
   TrendingDown,
-  Building2,
   Tag,
+  Hash,
+  Building2,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import {
-  getExpenses,
-  getExpenseSummary,
-} from '@/app/actions/expenses'
+import { getExpenses, getExpenseSummary } from '@/app/actions/expenses'
 import { ExpenseTable } from '@/components/expenses/expense-table'
 import { getTodayPKT, formatCurrencyPaisas } from '@/lib/utils'
 import type { CpExpenseHead, CpPaymentMethod } from '@/types/index'
@@ -30,9 +28,7 @@ export const metadata: Metadata = {
 function offsetMonth(monthStr: string, months: number): string {
   const [year, mon] = monthStr.split('-').map(Number) as [number, number]
   const d = new Date(year, mon - 1 + months, 1)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 function formatMonthLabel(monthStr: string): string {
@@ -63,7 +59,6 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const today = getTodayPKT()
   const todayMonth = today.slice(0, 7)
 
-  // Sanitise month
   const monthParam = params.month ?? todayMonth
   const selectedMonth = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : todayMonth
   const prevMonth = offsetMonth(selectedMonth, -1)
@@ -79,13 +74,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
 
   const supabase = await createClient()
 
-  // ── Fetch all data in parallel ─────────────────────────────────────────────
-  const [
-    expensesResult,
-    summaryResult,
-    headsData,
-    methodsData,
-  ] = await Promise.all([
+  const [expensesResult, summaryResult, headsData, methodsData] = await Promise.all([
     getExpenses({
       month: selectedMonth,
       department: departmentId || null,
@@ -113,30 +102,90 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
 
   const totalAmount = expenses.reduce((sum, e) => sum + e.amount_paisas, 0)
 
+  const todayTotal = isCurrentMonth
+    ? expenses
+        .filter((e) => e.expense_date === today)
+        .reduce((s, e) => s + e.amount_paisas, 0)
+    : null
+
+  const topCategory = summary?.by_category[0] ?? null
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ── Page Header ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Receipt className="h-5 w-5 text-primary" />
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Expenses</h1>
+        {canAdd && (
+          <Button size="sm" asChild>
+            <Link href="/expenses/new">
+              <Plus className="h-4 w-4" />
+              Add Expense
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      {/* ── Stat Chips ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {/* Today */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <TrendingDown className="h-4 w-4 text-primary" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Expenses</h1>
-            <p className="text-sm text-muted-foreground">
-              Cross-department expense tracking and allocation
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Today
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {todayTotal != null ? formatCurrencyPaisas(todayTotal) : '—'}
             </p>
           </div>
         </div>
 
-        {canAdd && (
-          <Link href="/expenses/new">
-            <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30">
-              <Plus className="h-4 w-4" />
-              New Expense
-            </button>
-          </Link>
-        )}
+        {/* Month Total */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-warning/10">
+            <TrendingDown className="h-4 w-4 text-warning" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              This Month
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {summary ? formatCurrencyPaisas(summary.grand_total) : '—'}
+            </p>
+          </div>
+        </div>
+
+        {/* Top Category */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info/10">
+            <Tag className="h-4 w-4 text-info" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Top Category
+            </p>
+            <p className="truncate text-sm font-bold tabular-nums text-foreground">
+              {topCategory ? topCategory.head_name : '—'}
+            </p>
+          </div>
+        </div>
+
+        {/* Count */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-success/10">
+            <Hash className="h-4 w-4 text-success" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Count
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {expenses.length}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* ── Month Navigator ──────────────────────────────────────────────────── */}
@@ -177,77 +226,6 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
           </Link>
         )}
       </div>
-
-      {/* ── Summary Cards ────────────────────────────────────────────────────── */}
-      {summary && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          {/* Grand Total */}
-          <div className="rounded-xl border border-border bg-card px-4 py-4">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <TrendingDown className="h-4 w-4 text-primary" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                Total
-              </p>
-            </div>
-            <p className="mt-2 text-2xl font-bold text-primary">
-              {formatCurrencyPaisas(summary.grand_total)}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {summary.by_category.length} categories
-            </p>
-          </div>
-
-          {/* Top Category */}
-          <div className="rounded-xl border border-border bg-card px-4 py-4">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10">
-                <Tag className="h-4 w-4 text-warning" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                Top Category
-              </p>
-            </div>
-            {summary.by_category[0] ? (
-              <>
-                <p className="mt-2 text-lg font-bold text-foreground">
-                  {formatCurrencyPaisas(summary.by_category[0].total)}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {summary.by_category[0].head_name}
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground/50">No data</p>
-            )}
-          </div>
-
-          {/* Top Department */}
-          <div className="rounded-xl border border-border bg-card px-4 py-4">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-info/10">
-                <Building2 className="h-4 w-4 text-info" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                Top Department
-              </p>
-            </div>
-            {summary.by_department[0] ? (
-              <>
-                <p className="mt-2 text-lg font-bold text-foreground">
-                  {formatCurrencyPaisas(summary.by_department[0].total)}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {summary.by_department[0].department_name}
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground/50">No data</p>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Expense Table ─────────────────────────────────────────────────────── */}
       <ExpenseTable

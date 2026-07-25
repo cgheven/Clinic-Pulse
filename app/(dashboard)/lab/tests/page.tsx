@@ -8,15 +8,12 @@ import { TestLogTable } from '@/components/lab/test-log-table'
 import { toast } from '@/hooks/use-toast'
 import { getDailyTestLog } from '@/app/actions/lab'
 import type { DailyTestLogResult } from '@/app/actions/lab'
+import { getTodayPKT } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react'
 
 // =============================================================================
 // Helpers
 // =============================================================================
-
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0]!
-}
 
 function offsetDate(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00')
@@ -29,7 +26,7 @@ function offsetDate(dateStr: string, days: number): string {
 // =============================================================================
 
 export default function LabTestsPage() {
-  const [date, setDate] = useState(todayISO())
+  const [date, setDate] = useState(getTodayPKT())
   const [result, setResult] = useState<DailyTestLogResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [, startTransition] = useTransition()
@@ -66,48 +63,42 @@ export default function LabTestsPage() {
 
   function handleNext() {
     const nd = offsetDate(date, 1)
-    if (nd <= todayISO()) handleDateChange(nd)
+    if (nd <= getTodayPKT()) handleDateChange(nd)
   }
 
-  const isToday = date === todayISO()
+  const isToday = date === getTodayPKT()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Daily Test Log</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Filter by date to view all tests performed
-          </p>
-        </div>
-        <Link
-          href="/lab/tests/new"
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Record Test
-        </Link>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Daily Test Log</h1>
+        <Button size="sm" asChild>
+          <Link href="/lab/tests/new">
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Record Test
+          </Link>
+        </Button>
       </div>
 
       {/* Date controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           variant="outline"
           size="icon"
           onClick={handlePrev}
-          className="border-border h-9 w-9"
+          className="h-8 w-8 shrink-0 border-border"
           title="Previous day"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
 
         <Input
           type="date"
           value={date}
-          max={todayISO()}
+          max={getTodayPKT()}
           onChange={(e) => handleDateChange(e.target.value)}
-          className="w-44"
+          className="w-40 h-8 text-sm"
         />
 
         <Button
@@ -115,20 +106,20 @@ export default function LabTestsPage() {
           size="icon"
           onClick={handleNext}
           disabled={isToday}
-          className="border-border h-9 w-9"
+          className="h-8 w-8 shrink-0 border-border"
           title="Next day"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-3.5 w-3.5" />
         </Button>
 
         <Button
+          size="sm"
           onClick={() => fetchLog(date)}
           disabled={isLoading || !date}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
               Loading…
             </>
           ) : (
@@ -138,19 +129,20 @@ export default function LabTestsPage() {
 
         {!isToday && (
           <Button
+            size="sm"
             variant="ghost"
-            onClick={() => handleDateChange(todayISO())}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => handleDateChange(getTodayPKT())}
+            className="text-[12px] text-muted-foreground hover:text-foreground"
           >
-            Go to Today
+            Today
           </Button>
         )}
       </div>
 
       {/* Results */}
       {isLoading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       )}
 
@@ -159,15 +151,16 @@ export default function LabTestsPage() {
       )}
 
       {!isLoading && !result && hasFetched && (
-        <div className="rounded-xl border border-dashed border-border bg-card py-16 text-center">
-          <p className="text-muted-foreground">No data for this date.</p>
+        <div className="rounded-xl border border-dashed border-border bg-card py-12 text-center">
+          <p className="text-sm text-muted-foreground">No data for this date.</p>
         </div>
       )}
 
       {!isLoading && !hasFetched && (
-        <div className="rounded-xl border border-dashed border-border bg-card py-16 text-center">
-          <p className="text-muted-foreground text-sm">
-            Select a date and click <span className="font-medium text-foreground">View Tests</span> to load the log.
+        <div className="rounded-xl border border-dashed border-border bg-card py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            Select a date and click{' '}
+            <span className="font-medium text-foreground">View Tests</span> to load the log.
           </p>
         </div>
       )}

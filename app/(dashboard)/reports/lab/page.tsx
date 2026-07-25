@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, FlaskConical, AlertTriangle } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import { getLabDailyReport } from '@/app/actions/reports'
 import { ReportsTabNav } from '@/components/reports/reports-tab-nav'
@@ -55,24 +54,18 @@ export default async function LabReportPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-0">
-      {/* ── Tab navigation ──────────────────────────────────────────────────── */}
       <ReportsTabNav />
 
-      <div className="space-y-6 p-6">
-        {/* ── Page header ─────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <FlaskConical className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Laboratory Daily Report
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                All lab tests performed — results, payment breakdown, and revenue summary
-              </p>
-            </div>
+      <div className="space-y-4 p-4">
+        {/* ── Compact header ──────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-bold text-foreground sm:text-xl">
+              Laboratory Daily Report
+            </h1>
+            <p className="text-[12px] text-muted-foreground">
+              All lab tests — results, payment breakdown, and revenue summary
+            </p>
           </div>
 
           {result.success && (
@@ -83,7 +76,7 @@ export default async function LabReportPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* ── Date navigation ─────────────────────────────────────────────── */}
+        {/* ── Date navigation ──────────────────────────────────────────── */}
         <div className="flex items-center gap-2">
           <Link
             href={`/reports/lab?date=${prevDate}`}
@@ -124,7 +117,7 @@ export default async function LabReportPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* ── Error banner ────────────────────────────────────────────────── */}
+        {/* ── Error banner ─────────────────────────────────────────────── */}
         {!result.success && (
           <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
             <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
@@ -132,17 +125,15 @@ export default async function LabReportPage({ searchParams }: PageProps) {
           </div>
         )}
 
-        {/* ── Report content ──────────────────────────────────────────────── */}
+        {/* ── Report content ────────────────────────────────────────────── */}
         {result.success ? (
           <LabDailyReportTable data={result.data} />
         ) : (
-          <Card className="border-border bg-card">
-            <CardContent className="py-12 text-center">
-              <p className="text-sm text-muted-foreground">
-                No lab test data available for this date.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-border bg-card px-4 py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              No lab test data available for this date.
+            </p>
+          </div>
         )}
       </div>
     </div>

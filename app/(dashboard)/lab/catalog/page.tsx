@@ -14,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn, formatCurrencyPaisas } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import {
@@ -46,8 +45,8 @@ interface NewTestForm {
   test_name: string
   test_code: string
   category: string
-  price: string // PKR
-  cost: string // PKR
+  price: string
+  cost: string
   reference_range: string
   unit: string
   turnaround_time: string
@@ -80,7 +79,6 @@ export default function LabCatalogPage() {
   const [isAdding, setIsAdding] = useState(false)
   const [, startTransition] = useTransition()
 
-  // Edit state per row
   const [editValues, setEditValues] = useState<
     Record<string, Partial<{ price: string; cost: string; is_active: boolean }>>
   >({})
@@ -107,7 +105,6 @@ export default function LabCatalogPage() {
     (t.category ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
-  // Group by category
   const byCategory: Record<string, TestRow[]> = {}
   for (const t of filtered) {
     const cat = t.category ?? 'Uncategorized'
@@ -139,9 +136,7 @@ export default function LabCatalogPage() {
   function startEdit(t: TestRow) {
     setEditValues((prev) => ({
       ...prev,
-      [t.id]: {
-        price: (t.price_paisas / 100).toFixed(2),
-      },
+      [t.id]: { price: (t.price_paisas / 100).toFixed(2) },
     }))
     setTests((prev) => prev.map((r) => (r.id === t.id ? { ...r, isEditing: true } : r)))
   }
@@ -166,19 +161,12 @@ export default function LabCatalogPage() {
 
     setTests((prev) => prev.map((t) => (t.id === id ? { ...t, isSaving: true } : t)))
     startTransition(async () => {
-      const res = await updateTest(id, {
-        price_paisas: Math.round(price * 100),
-      })
+      const res = await updateTest(id, { price_paisas: Math.round(price * 100) })
       if (res.success) {
         setTests((prev) =>
           prev.map((t) =>
             t.id === id
-              ? {
-                  ...t,
-                  price_paisas: Math.round(price * 100),
-                  isEditing: false,
-                  isSaving: false,
-                }
+              ? { ...t, price_paisas: Math.round(price * 100), isEditing: false, isSaving: false }
               : t
           )
         )
@@ -237,225 +225,174 @@ export default function LabCatalogPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Test Catalog</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {tests.length} tests — manage pricing and availability
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowAddDialog(true)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">
+          Test Catalog
+          <span className="ml-2 text-[12px] font-normal text-muted-foreground">
+            {tests.length} tests
+          </span>
+        </h1>
+        <Button size="sm" onClick={() => setShowAddDialog(true)}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
           Add Test
         </Button>
       </div>
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, code, or category…"
-          className="pl-9"
+          placeholder="Search by name or category…"
+          className="pl-9 h-8 text-sm"
         />
       </div>
 
       {/* Catalog grouped by category */}
       {Object.keys(byCategory).length === 0 ? (
-        <Card className="border-border bg-card">
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-16">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="flex flex-col items-center justify-center gap-2 py-12">
             <FlaskConical className="h-8 w-8 opacity-20 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               {search ? 'No tests match your search' : 'No tests in catalog yet'}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : (
         Object.entries(byCategory).map(([category, catTests]) => (
-          <div key={category}>
-            <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {category}
-            </h2>
-            <Card className="border-border bg-card">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/20">
-                        <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Test Name
-                        </th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Code
-                        </th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">
-                          Reference
-                        </th>
-                        <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Price
-                        </th>
-                        <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
-                          Cost
-                        </th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Active
-                        </th>
-                        <th className="py-2.5 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Edit
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {catTests.map((t) => (
-                        <tr
-                          key={t.id}
-                          className={cn(
-                            'transition-colors hover:bg-muted/10',
-                            !t.is_active && 'opacity-50'
-                          )}
+          <div key={category} className="overflow-hidden rounded-xl border border-border bg-card">
+            {/* Section header */}
+            <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {category}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                {catTests.length} test{catTests.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {/* Column headers */}
+            <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+              <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground">Name</span>
+              <span className="w-20 text-[10px] uppercase tracking-wide text-muted-foreground hidden sm:block">Code</span>
+              <span className="w-36 text-[10px] uppercase tracking-wide text-muted-foreground hidden md:block">Reference</span>
+              <span className="w-28 text-right text-[10px] uppercase tracking-wide text-muted-foreground">Price</span>
+              <span className="w-14 text-center text-[10px] uppercase tracking-wide text-muted-foreground">Active</span>
+              <span className="w-16 text-right text-[10px] uppercase tracking-wide text-muted-foreground">Edit</span>
+            </div>
+            {/* Data rows */}
+            <div className="divide-y divide-border/50">
+              {catTests.map((t) => (
+                <div
+                  key={t.id}
+                  className={cn(
+                    'flex items-center px-4 py-2.5 hover:bg-muted/20 transition-colors',
+                    !t.is_active && 'opacity-50'
+                  )}
+                >
+                  {/* Name */}
+                  <div className="flex-1 min-w-0 pr-2">
+                    <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
+                  </div>
+
+                  {/* Code */}
+                  <div className="w-20 hidden sm:block">
+                    {t.test_code ? (
+                      <Badge variant="secondary" className="text-[10px] bg-muted">
+                        {t.test_code}
+                      </Badge>
+                    ) : (
+                      <span className="text-[12px] text-muted-foreground">—</span>
+                    )}
+                  </div>
+
+                  {/* Reference range */}
+                  <div className="w-36 hidden md:block">
+                    <span className="text-[12px] text-muted-foreground truncate block">
+                      {t.reference_range ?? '—'}
+                    </span>
+                  </div>
+
+                  {/* Price (editable) */}
+                  <div className="w-28 flex justify-end">
+                    {t.isEditing ? (
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editValues[t.id]?.price ?? ''}
+                        onChange={(e) =>
+                          setEditValues((prev) => ({
+                            ...prev,
+                            [t.id]: { ...prev[t.id], price: e.target.value },
+                          }))
+                        }
+                        className="h-7 w-24 text-right text-sm"
+                      />
+                    ) : (
+                      <span className="text-sm font-medium text-foreground">
+                        {formatCurrencyPaisas(t.price_paisas)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Active toggle */}
+                  <div className="w-14 flex justify-center">
+                    <Switch
+                      checked={t.is_active}
+                      onCheckedChange={(v) => handleToggleActive(t.id, v)}
+                      disabled={t.isSaving || t.isEditing}
+                      aria-label={`Toggle ${t.name}`}
+                    />
+                  </div>
+
+                  {/* Edit actions */}
+                  <div className="w-16 flex items-center justify-end gap-1">
+                    {t.isEditing ? (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => saveEdit(t.id)}
+                          disabled={t.isSaving}
+                          className="h-7 w-7 text-success hover:bg-success/10"
+                          title="Save"
                         >
-                          {/* Name */}
-                          <td className="py-3 pl-4 pr-3">
-                            <div>
-                              <p className="font-medium text-foreground">{t.name}</p>
-                            </div>
-                          </td>
-
-                          {/* Code */}
-                          <td className="px-3 py-3">
-                            {t.test_code ? (
-                              <Badge variant="secondary" className="text-[10px] bg-muted">
-                                {t.test_code}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-
-                          {/* Reference range */}
-                          <td className="px-3 py-3 text-xs text-muted-foreground hidden md:table-cell">
-                            {t.reference_range ?? '—'}
-                          </td>
-
-                          {/* Price (editable) */}
-                          <td className="px-3 py-3 text-right">
-                            {t.isEditing ? (
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={editValues[t.id]?.price ?? ''}
-                                onChange={(e) =>
-                                  setEditValues((prev) => ({
-                                    ...prev,
-                                    [t.id]: {
-                                      ...prev[t.id],
-                                      price: e.target.value,
-                                    },
-                                  }))
-                                }
-                                className="h-7 w-24 text-right text-sm"
-                              />
-                            ) : (
-                              <span className="font-medium text-foreground">
-                                {formatCurrencyPaisas(t.price_paisas)}
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Cost (editable) */}
-                          <td className="px-3 py-3 text-right hidden lg:table-cell">
-                            {t.isEditing ? (
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={editValues[t.id]?.cost ?? ''}
-                                onChange={(e) =>
-                                  setEditValues((prev) => ({
-                                    ...prev,
-                                    [t.id]: {
-                                      ...prev[t.id],
-                                      cost: e.target.value,
-                                    },
-                                  }))
-                                }
-                                className="h-7 w-24 text-right text-sm"
-                              />
-                            ) : (
-                              <span className="text-muted-foreground">
-                                {formatCurrencyPaisas(0)}
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Active toggle */}
-                          <td className="px-3 py-3">
-                            <Switch
-                              checked={t.is_active}
-                              onCheckedChange={(v) => handleToggleActive(t.id, v)}
-                              disabled={t.isSaving || t.isEditing}
-                              aria-label={`Toggle ${t.name}`}
-                            />
-                          </td>
-
-                          {/* Edit actions */}
-                          <td className="py-3 pl-3 pr-4">
-                            <div className="flex items-center justify-end gap-1">
-                              {t.isEditing ? (
-                                <>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => saveEdit(t.id)}
-                                    disabled={t.isSaving}
-                                    className="h-7 w-7 text-success hover:bg-success/10"
-                                    title="Save"
-                                  >
-                                    {t.isSaving ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <Check className="h-3.5 w-3.5" />
-                                    )}
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => cancelEdit(t.id)}
-                                    disabled={t.isSaving}
-                                    className="h-7 w-7 text-muted-foreground hover:bg-muted"
-                                    title="Cancel"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={() => startEdit(t)}
-                                  disabled={t.isSaving}
-                                  className="h-7 w-7 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                  title="Edit pricing"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          {t.isSaving ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => cancelEdit(t.id)}
+                          disabled={t.isSaving}
+                          className="h-7 w-7 text-muted-foreground hover:bg-muted"
+                          title="Cancel"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => startEdit(t)}
+                        disabled={t.isSaving}
+                        className="h-7 w-7 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Edit pricing"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
           </div>
         ))
       )}
@@ -630,11 +567,7 @@ export default function LabCatalogPage() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleAddTest}
-              disabled={isAdding}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
+            <Button onClick={handleAddTest} disabled={isAdding}>
               {isAdding ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

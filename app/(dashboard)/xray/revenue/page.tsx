@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { requireAuth } from '@/lib/auth'
 import { getDailyRevenue } from '@/app/actions/xray'
 import { DailySummary } from '@/components/xray/daily-summary'
@@ -34,7 +34,18 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-4">
-      {/* ── Header: date nav + action ──────────────────────────────────────── */}
+      {/* ── Page header ────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Revenue Log</h1>
+        <Link href="/xray/revenue/new">
+          <Button size="sm">
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Record Revenue
+          </Button>
+        </Link>
+      </div>
+
+      {/* ── Date navigation ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
         {/* Prev */}
         <Link
@@ -61,7 +72,9 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
         <Link
           href={`/xray/revenue?date=${nextDate}`}
           className={`rounded-lg border border-border bg-card p-2 text-muted-foreground transition-colors ${
-            isToday ? 'opacity-30 pointer-events-none' : 'hover:border-primary/30 hover:text-foreground'
+            isToday
+              ? 'opacity-30 pointer-events-none'
+              : 'hover:border-primary/30 hover:text-foreground'
           }`}
           aria-label="Next day"
           aria-disabled={isToday}
@@ -79,25 +92,14 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
             Today
           </Link>
         )}
-
-        <div className="h-5 w-px bg-border" />
-
-        {/* Record Revenue */}
-        <Link
-          href="/xray/revenue/new"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Record Revenue
-        </Link>
       </div>
 
-      {/* ── Daily summary ────────────────────────────────────────────────────── */}
+      {/* ── Daily summary panel ─────────────────────────────────────────────────── */}
       {dailyData ? (
         <DailySummary data={dailyData} showAddLink={false} />
       ) : (
-        <Card className="border-border bg-card">
-          <CardContent className="py-10 text-center">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="py-10 text-center">
             <p className="text-sm text-muted-foreground">
               {result.success
                 ? 'No revenue recorded for this date.'
@@ -110,8 +112,8 @@ export default async function XrayRevenuePage({ searchParams }: PageProps) {
               <Plus className="h-3.5 w-3.5" />
               Record X-Ray Revenue
             </Link>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   )

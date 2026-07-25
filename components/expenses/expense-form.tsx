@@ -12,7 +12,7 @@ import {
   FileText,
   DollarSign,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -150,18 +150,7 @@ export function ExpenseForm({
 
   return (
     <Card className="border-border bg-card">
-      <CardHeader className="border-b border-border pb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-            <Receipt className="h-4.5 w-4.5 text-primary" />
-          </div>
-          <CardTitle className="text-base font-semibold text-foreground">
-            New Expense
-          </CardTitle>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-6">
+      <CardContent className="pt-5">
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Row 1: Date + Amount */}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -314,6 +303,7 @@ export function ExpenseForm({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => router.back()}
               disabled={isPending}
               className="border-border"
@@ -322,6 +312,7 @@ export function ExpenseForm({
             </Button>
             <Button
               type="submit"
+              size="sm"
               disabled={isPending}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >

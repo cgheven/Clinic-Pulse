@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Receipt } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { getXrayExpenses } from '@/app/actions/xray'
@@ -27,7 +27,6 @@ export default async function XrayExpensesPage({ searchParams }: PageProps) {
   const today = getTodayPKT()
   const todayMonth = today.slice(0, 7) // YYYY-MM
 
-  // Sanitise month param
   const monthParam = params.month ?? todayMonth
   const isValidMonth = /^\d{4}-\d{2}$/.test(monthParam)
   const selectedMonth = isValidMonth ? monthParam : todayMonth
@@ -38,7 +37,6 @@ export default async function XrayExpensesPage({ searchParams }: PageProps) {
 
   const supabase = await createClient()
 
-  // Load reference data + expenses in parallel
   const [expensesResult, methodsData, headsData] = await Promise.all([
     getXrayExpenses(selectedMonth),
     supabase
@@ -59,25 +57,15 @@ export default async function XrayExpensesPage({ searchParams }: PageProps) {
 
   const expensesData = expensesResult.success ? expensesResult.data : null
 
-  // Determine if the user can add expenses
-  const canAdd = authUser.profile.role === 'admin' || authUser.profile.role === 'accountant'
+  const canAdd =
+    authUser.profile.role === 'admin' || authUser.profile.role === 'accountant'
 
   return (
-    <div className="space-y-6">
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/10">
-          <Receipt className="h-5 w-5 text-warning" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">X-Ray Expenses</h1>
-          <p className="text-sm text-muted-foreground">
-            Shared department costs split across active partners
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      {/* ── Page header ─────────────────────────────────────────────────────────── */}
+      <h1 className="text-lg font-bold text-foreground sm:text-xl">X-Ray Expenses</h1>
 
-      {/* ── Month navigation ─────────────────────────────────────────────────── */}
+      {/* ── Month navigation ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
         <Link
           href={`/xray/expenses?month=${prevMonth}`}
@@ -87,7 +75,7 @@ export default async function XrayExpensesPage({ searchParams }: PageProps) {
           <ChevronLeft className="h-4 w-4" />
         </Link>
 
-        <div className="flex flex-1 items-center justify-center gap-3">
+        <div className="flex flex-1 items-center justify-center gap-2">
           <span className="text-sm font-semibold text-foreground">
             {formatMonthLabel(selectedMonth)}
           </span>
@@ -116,7 +104,7 @@ export default async function XrayExpensesPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      {/* ── Expense split component ──────────────────────────────────────────── */}
+      {/* ── Expense split component ─────────────────────────────────────────────── */}
       {expensesData ? (
         <ExpenseSplit
           initialData={expensesData}
@@ -142,7 +130,6 @@ export default async function XrayExpensesPage({ searchParams }: PageProps) {
 // Helpers
 // =============================================================================
 
-/** Shift a YYYY-MM string by `months` months */
 function offsetMonth(monthStr: string, months: number): string {
   const [year, mon] = monthStr.split('-').map(Number) as [number, number]
   const d = new Date(year, mon - 1 + months, 1)
@@ -151,7 +138,6 @@ function offsetMonth(monthStr: string, months: number): string {
   return `${y}-${m}`
 }
 
-/** Format YYYY-MM as "June 2026" */
 function formatMonthLabel(monthStr: string): string {
   const [year, mon] = monthStr.split('-').map(Number) as [number, number]
   return new Date(year, mon - 1, 1).toLocaleDateString('en-PK', {

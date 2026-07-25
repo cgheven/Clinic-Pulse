@@ -97,15 +97,10 @@ export default function PharmacyInventoryPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Manage medicines and stock levels
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Inventory</h1>
 
         <Button asChild size="sm">
           <Link href="/pharmacy/inventory/new">

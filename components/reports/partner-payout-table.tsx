@@ -1,7 +1,6 @@
 'use client'
 
 import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyPaisas, formatBasisPoints } from '@/lib/utils'
 import { Scan, Users, TrendingDown, Building2 } from 'lucide-react'
@@ -11,215 +10,227 @@ interface PartnerPayoutTableProps {
   data: PartnerPayoutReport
 }
 
+const SPLIT_COLORS = ['bg-primary', 'bg-info', 'bg-success', 'bg-warning', 'bg-destructive']
+
 export function PartnerPayoutTable({ data }: PartnerPayoutTableProps) {
+  const clinicPct =
+    data.total_xray_revenue > 0
+      ? ((data.clinic_share / data.total_xray_revenue) * 100).toFixed(1)
+      : '0.0'
+
   return (
-    <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">X-Ray Revenue</p>
-              <div className="rounded-lg p-1.5 bg-primary/10">
-                <Scan className="h-3.5 w-3.5 text-primary" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">
+    <div className="space-y-4">
+      {/* ── Stat chips ──────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Scan className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              X-Ray Revenue
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
               {formatCurrencyPaisas(data.total_xray_revenue)}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Gross revenue for period</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Partners</p>
-              <div className="rounded-lg p-1.5 bg-info/10">
-                <Users className="h-3.5 w-3.5 text-info" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">{data.entries.length}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Active partners</p>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info/10">
+            <Users className="h-4 w-4 text-info" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Partners
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">{data.entries.length}</p>
+          </div>
+        </div>
 
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Total Payouts</p>
-              <div className="rounded-lg p-1.5 bg-destructive/10">
-                <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-foreground">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+            <TrendingDown className="h-4 w-4 text-destructive" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Total Payout
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
               {formatCurrencyPaisas(data.total_payout)}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">To all partners</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Clinic Share</p>
-              <div className="rounded-lg p-1.5 bg-success/10">
-                <Building2 className="h-3.5 w-3.5 text-success" />
-              </div>
-            </div>
-            <p className="text-xl font-bold text-primary">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-success/10">
+            <Building2 className="h-4 w-4 text-success" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Clinic Share
+            </p>
+            <p className="text-sm font-bold tabular-nums text-success">
               {formatCurrencyPaisas(data.clinic_share)}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">After partner payouts</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      {/* Revenue split visual */}
+      {/* ── Revenue split bar ───────────────────────────────────────────── */}
       {data.total_xray_revenue > 0 && (
-        <Card className="border-border bg-card">
-          <CardContent className="p-4">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Revenue Split</p>
-            <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Revenue Split
+            </span>
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
               {data.entries.map((e, i) => {
-                const pct = data.total_xray_revenue > 0
-                  ? (e.payout_amount / data.total_xray_revenue) * 100
-                  : 0
-                const hues = ['bg-primary', 'bg-info', 'bg-success', 'bg-warning', 'bg-destructive']
+                const pct =
+                  data.total_xray_revenue > 0
+                    ? (e.payout_amount / data.total_xray_revenue) * 100
+                    : 0
                 return (
                   <div
                     key={e.partner_id}
-                    className={`${hues[i % hues.length]} h-full transition-all`}
+                    className={`${SPLIT_COLORS[i % SPLIT_COLORS.length]} h-full transition-all`}
                     style={{ width: `${pct.toFixed(1)}%` }}
                     title={`${e.partner_name}: ${pct.toFixed(1)}%`}
                   />
                 )
               })}
-              {/* Clinic share */}
               <div
-                className="bg-secondary h-full flex-1"
-                title={`Clinic: ${data.total_xray_revenue > 0 ? ((data.clinic_share / data.total_xray_revenue) * 100).toFixed(1) : 0}%`}
+                className="h-full flex-1 bg-emerald-500/40"
+                title={`Clinic: ${clinicPct}%`}
               />
             </div>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {data.entries.map((e, i) => {
-                const hues = ['bg-primary', 'bg-info', 'bg-success', 'bg-warning', 'bg-destructive']
-                return (
-                  <div key={e.partner_id} className="flex items-center gap-1.5">
-                    <div className={`h-2 w-2 rounded-full ${hues[i % hues.length]}`} />
-                    <span className="text-xs text-muted-foreground">{e.partner_name}</span>
-                  </div>
-                )
-              })}
+            <div className="flex flex-wrap gap-3">
+              {data.entries.map((e, i) => (
+                <div key={e.partner_id} className="flex items-center gap-1.5">
+                  <div className={`h-2 w-2 rounded-full ${SPLIT_COLORS[i % SPLIT_COLORS.length]}`} />
+                  <span className="text-[11px] text-muted-foreground">
+                    {e.partner_name} ({formatBasisPoints(e.split_pct)})
+                  </span>
+                </div>
+              ))}
               <div className="flex items-center gap-1.5">
-                <div className="h-2 w-2 rounded-full bg-secondary" />
-                <span className="text-xs text-muted-foreground">Clinic</span>
+                <div className="h-2 w-2 rounded-full bg-emerald-500/40" />
+                <span className="text-[11px] text-muted-foreground">Clinic ({clinicPct}%)</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Partner payout table */}
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-foreground">
+      {/* ── Panel table ─────────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Section header */}
+        <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Partner Payout Detail
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/20">
-                  <th className="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Partner
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Type
-                  </th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Entries
-                  </th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Split %
-                  </th>
-                  <th className="py-3 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Payout Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {data.entries.map((e) => (
-                  <tr key={e.partner_id} className="hover:bg-muted/10 transition-colors">
-                    <td className="py-3 pl-4 pr-3">
-                      <p className="font-medium text-foreground">{e.partner_name}</p>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Badge variant="secondary" className="bg-secondary text-secondary-foreground text-xs">
-                        Partner
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">
-                      —
-                    </td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">
-                      {formatBasisPoints(e.split_pct)}
-                    </td>
-                    <td className="py-3 pl-3 pr-4 text-right font-bold text-primary">
-                      {formatCurrencyPaisas(e.payout_amount)}
-                    </td>
-                  </tr>
-                ))}
-                {/* Clinic share row */}
-                <tr className="bg-success/5 hover:bg-success/10 transition-colors">
-                  <td className="py-3 pl-4 pr-3">
-                    <p className="font-medium text-success">Clinic Share</p>
-                  </td>
-                  <td className="px-3 py-3">
-                    <Badge variant="secondary" className="bg-success/10 text-success border-success/20 text-xs">
-                      Retained
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-3 text-right text-muted-foreground">—</td>
-                  <td className="px-3 py-3 text-right text-muted-foreground">
-                    {data.total_xray_revenue > 0
-                      ? `${((data.clinic_share / data.total_xray_revenue) * 100).toFixed(1)}%`
-                      : '—'}
-                  </td>
-                  <td className="py-3 pl-3 pr-4 text-right font-bold text-success">
-                    {formatCurrencyPaisas(data.clinic_share)}
-                  </td>
-                </tr>
-                {data.entries.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      No partner payout data for this month.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              {data.entries.length > 0 && (
-                <tfoot>
-                  <tr className="border-t-2 border-border bg-muted/10">
-                    <td colSpan={2} className="py-3 pl-4 pr-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Grand Total
-                    </td>
-                    <td className="px-3 py-3" />
-                    <td className="px-3 py-3" />
-                    <td className="py-3 pl-3 pr-4 text-right text-sm font-bold text-foreground">
-                      {formatCurrencyPaisas(data.total_xray_revenue)}
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+          </span>
+        </div>
+
+        {/* Column headers */}
+        <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+          <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+            Partner
+          </span>
+          <span className="hidden w-20 shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+            Type
+          </span>
+          <span className="hidden w-20 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+            Split %
+          </span>
+          <span className="w-32 shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground">
+            Payout
+          </span>
+        </div>
+
+        {/* Partner rows */}
+        <div className="divide-y divide-border/50">
+          {data.entries.map((e, i) => (
+            <div
+              key={e.partner_id}
+              className="flex items-center px-4 py-2.5 hover:bg-muted/20 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <div className={`h-2 w-2 shrink-0 rounded-full ${SPLIT_COLORS[i % SPLIT_COLORS.length]}`} />
+                  <p className="text-sm font-medium text-foreground truncate">{e.partner_name}</p>
+                </div>
+                {/* Mobile: show split % inline */}
+                <p className="text-[11px] text-muted-foreground sm:hidden">
+                  Split: {formatBasisPoints(e.split_pct)}
+                </p>
+              </div>
+              <div className="hidden w-20 shrink-0 sm:block">
+                <Badge
+                  variant="secondary"
+                  className="bg-secondary text-secondary-foreground text-[10px]"
+                >
+                  Partner
+                </Badge>
+              </div>
+              <span className="hidden w-20 shrink-0 text-right text-[12px] text-muted-foreground sm:block">
+                {formatBasisPoints(e.split_pct)}
+              </span>
+              <span className="w-32 shrink-0 text-right text-sm font-bold text-primary">
+                {formatCurrencyPaisas(e.payout_amount)}
+              </span>
+            </div>
+          ))}
+
+          {/* Clinic share row */}
+          <div className="flex items-center bg-success/5 px-4 py-2.5 hover:bg-success/10 transition-colors">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-500/40" />
+                <p className="text-sm font-medium text-success">Clinic Share</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground sm:hidden">{clinicPct}% retained</p>
+            </div>
+            <div className="hidden w-20 shrink-0 sm:block">
+              <Badge
+                variant="secondary"
+                className="bg-success/10 text-success border-success/20 text-[10px]"
+              >
+                Retained
+              </Badge>
+            </div>
+            <span className="hidden w-20 shrink-0 text-right text-[12px] text-muted-foreground sm:block">
+              {clinicPct}%
+            </span>
+            <span className="w-32 shrink-0 text-right text-sm font-bold text-success">
+              {formatCurrencyPaisas(data.clinic_share)}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+
+          {data.entries.length === 0 && (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                No partner payout data for this month.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Grand total footer */}
+        {data.entries.length > 0 && (
+          <div className="flex items-center border-t border-border bg-muted/20 px-4 py-2">
+            <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Grand Total
+            </span>
+            <span className="hidden w-20 shrink-0 sm:block" />
+            <span className="hidden w-20 shrink-0 sm:block" />
+            <span className="w-32 shrink-0 text-right text-sm font-bold text-foreground">
+              {formatCurrencyPaisas(data.total_xray_revenue)}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

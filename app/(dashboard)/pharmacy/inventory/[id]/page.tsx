@@ -1,23 +1,16 @@
 import React from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Package, TrendingUp, RotateCcw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { MedicineEditForm } from './medicine-edit-form'
 import { StockAdjustForm } from './stock-adjust-form'
 import { getInventoryItem } from '@/app/actions/pharmacy'
+import { formatCurrencyPaisas } from '@/lib/utils'
 
 // =============================================================================
 // Helpers
 // =============================================================================
-
-function formatPKR(paisas: number): string {
-  return `Rs. ${(paisas / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
 
 type StockStatus = 'critical' | 'low' | 'ok'
 
@@ -44,101 +37,111 @@ export default async function MedicineDetailPage({ params }: PageProps) {
   const medicine = result.data
   const status = getStockStatus(medicine.stock_qty, medicine.reorder_level)
 
-  const stockBadgeClass =
+  const statusColor =
     status === 'critical'
-      ? 'border-red-500/30 bg-red-500/15 text-red-400'
+      ? { bg: 'bg-red-500/10', icon: 'text-red-400', dot: 'bg-red-400' }
       : status === 'low'
-        ? 'border-amber-500/30 bg-amber-500/15 text-amber-400'
-        : 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
+        ? { bg: 'bg-amber-500/10', icon: 'text-amber-400', dot: 'bg-amber-400' }
+        : { bg: 'bg-emerald-500/10', icon: 'text-emerald-400', dot: 'bg-emerald-400' }
+
+  const statusLabel =
+    status === 'critical' ? 'Critical' : status === 'low' ? 'Low' : 'In Stock'
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
           href="/pharmacy/inventory"
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-4 w-4" />
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">{medicine.name}</h1>
-            {!medicine.is_active && (
-              <Badge variant="secondary">Inactive</Badge>
-            )}
+            <h1 className="text-lg font-bold text-foreground sm:text-xl">{medicine.name}</h1>
+            {!medicine.is_active && <Badge variant="secondary">Inactive</Badge>}
           </div>
           {medicine.generic_name && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{medicine.generic_name}</p>
+            <p className="text-[12px] text-muted-foreground">{medicine.generic_name}</p>
           )}
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: Overview + Adjustment */}
-        <div className="space-y-6 lg:col-span-2">
-          {/* Stock overview */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card className="border-border bg-card">
-              <CardContent className="pt-5">
-                <p className="text-xs font-medium text-muted-foreground">Current Stock</p>
-                <div className="mt-1 flex items-end gap-2">
-                  <p className="text-3xl font-bold text-foreground">{medicine.stock_qty}</p>
-                  <p className="mb-1 text-sm text-muted-foreground capitalize">
-                    {medicine.unit}
-                  </p>
-                </div>
-                <span
-                  className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${stockBadgeClass}`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      status === 'critical'
-                        ? 'bg-red-400'
-                        : status === 'low'
-                          ? 'bg-amber-400'
-                          : 'bg-emerald-400'
-                    }`}
-                  />
-                  {status === 'critical' ? 'Critical' : status === 'low' ? 'Low' : 'In Stock'}
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card">
-              <CardContent className="pt-5">
-                <p className="text-xs font-medium text-muted-foreground">Sale Price</p>
-                <p className="mt-1 text-xl font-bold text-foreground">
-                  {formatPKR(medicine.sale_price_paisas)}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">per {medicine.unit}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card">
-              <CardContent className="pt-5">
-                <p className="text-xs font-medium text-muted-foreground">Reorder Level</p>
-                <p className="mt-1 text-xl font-bold text-foreground">
-                  {medicine.reorder_level}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground capitalize">
-                  {medicine.unit}
-                </p>
-                {medicine.expiry_date && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Exp:{' '}
-                    {new Date(medicine.expiry_date).toLocaleDateString('en-PK', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+      {/* Stat chips */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {/* Current Stock */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${statusColor.bg}`}
+          >
+            <Package className={`h-4 w-4 ${statusColor.icon}`} />
           </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Current Stock
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {medicine.stock_qty}{' '}
+              <span className="text-[11px] font-normal capitalize text-muted-foreground">
+                {medicine.unit}
+              </span>
+            </p>
+            <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium">
+              <span className={`h-1.5 w-1.5 rounded-full ${statusColor.dot}`} />
+              <span className={statusColor.icon}>{statusLabel}</span>
+            </span>
+          </div>
+        </div>
 
-          {/* Stock Adjustment */}
+        {/* Sale Price */}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Sale Price
+            </p>
+            <p className="truncate text-sm font-bold tabular-nums text-foreground">
+              {formatCurrencyPaisas(medicine.sale_price_paisas)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">per {medicine.unit}</p>
+          </div>
+        </div>
+
+        {/* Reorder Level */}
+        <div className="col-span-2 flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5 sm:col-span-1">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+            <RotateCcw className="h-4 w-4 text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Reorder Level
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {medicine.reorder_level}{' '}
+              <span className="text-[11px] font-normal capitalize text-muted-foreground">
+                {medicine.unit}
+              </span>
+            </p>
+            {medicine.expiry_date && (
+              <p className="text-[10px] text-muted-foreground">
+                Exp:{' '}
+                {new Date(medicine.expiry_date).toLocaleDateString('en-PK', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Left: Stock Adjustment */}
+        <div className="lg:col-span-2">
           <StockAdjustForm medicineId={medicine.id} medicineName={medicine.name} />
         </div>
 

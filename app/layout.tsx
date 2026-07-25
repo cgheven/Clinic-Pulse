@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   description:
     "ClinicPulse — Complete medical center management system for OPD, pharmacy, laboratory, and X-ray departments.",
   robots: { index: false, follow: false },
+  icons: {
+    icon: "/logo.jpeg",
+    apple: "/logo.jpeg",
+  },
 };
 
 export const viewport: Viewport = {

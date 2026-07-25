@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrencyPaisas, formatDate } from '@/lib/utils'
 import type { DeptPaymentRow } from '@/app/actions/payments'
 
@@ -28,7 +27,7 @@ const COLUMNS: Column[] = [
 
 interface DeptBreakdownTableProps {
   rows: DeptPaymentRow[]
-  date: string  // YYYY-MM-DD — shown as a subtitle
+  date: string
 }
 
 // =============================================================================
@@ -36,7 +35,6 @@ interface DeptBreakdownTableProps {
 // =============================================================================
 
 export function DeptBreakdownTable({ rows, date }: DeptBreakdownTableProps) {
-  // Column-level totals (sum across all departments)
   const columnTotals: Record<ColumnKey, number> = {
     cash:          rows.reduce((s, r) => s + r.cash, 0),
     jazzcash:      rows.reduce((s, r) => s + r.jazzcash, 0),
@@ -46,93 +44,91 @@ export function DeptBreakdownTable({ rows, date }: DeptBreakdownTableProps) {
   }
 
   return (
-    <Card className="overflow-hidden border-border bg-card">
-      <CardHeader className="border-b border-border pb-3 pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-sm font-semibold text-foreground">
-            Department Breakdown
-          </CardTitle>
-          <span className="text-xs text-muted-foreground">
-            {formatDate(date)}
-          </span>
-        </div>
-      </CardHeader>
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Section header */}
+      <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Department Breakdown
+        </span>
+        <span className="text-[12px] text-muted-foreground">
+          {formatDate(date)}
+        </span>
+      </div>
 
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            {/* ── Table head ──────────────────────────────────────────────── */}
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-muted-foreground">
-                  Department
-                </th>
-                {COLUMNS.map((col) => (
-                  <th
-                    key={col.key}
-                    className={`py-2.5 px-3 text-right text-xs font-semibold ${
-                      col.isTotal ? 'text-primary' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            {/* ── Table body ──────────────────────────────────────────────── */}
-            <tbody className="divide-y divide-border">
-              {rows.map((row) => (
-                <tr
-                  key={row.department}
-                  className="transition-colors hover:bg-muted/10"
+      {/* Scrollable table */}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          {/* Column headers */}
+          <thead>
+            <tr className="border-b border-border/50">
+              <th className="py-1.5 pl-4 pr-3 text-left text-[10px] uppercase tracking-wide text-muted-foreground/60">
+                Department
+              </th>
+              {COLUMNS.map((col) => (
+                <th
+                  key={col.key}
+                  className={`px-3 py-1.5 text-right text-[10px] uppercase tracking-wide ${
+                    col.isTotal ? 'text-primary/70' : 'text-muted-foreground/60'
+                  }`}
                 >
-                  <td className="py-3 pl-4 pr-3 font-medium text-foreground">
-                    {row.label}
-                  </td>
-                  {COLUMNS.map((col) => {
-                    const value = row[col.key]
-                    const isEmpty = value === 0 && !col.isTotal
-                    return (
-                      <td
-                        key={col.key}
-                        className={`py-3 px-3 text-right tabular-nums ${
-                          col.isTotal
-                            ? 'font-bold text-primary'
-                            : isEmpty
-                            ? 'text-muted-foreground/30'
-                            : 'text-foreground'
-                        }`}
-                      >
-                        {isEmpty ? '—' : formatCurrencyPaisas(value)}
-                      </td>
-                    )
-                  })}
-                </tr>
+                  {col.label}
+                </th>
               ))}
-            </tbody>
+            </tr>
+          </thead>
 
-            {/* ── Totals footer ───────────────────────────────────────────── */}
-            <tfoot>
-              <tr className="border-t-2 border-border bg-muted/20">
-                <td className="py-3 pl-4 pr-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Total
+          {/* Body rows */}
+          <tbody className="divide-y divide-border/50">
+            {rows.map((row) => (
+              <tr
+                key={row.department}
+                className="transition-colors hover:bg-muted/20"
+              >
+                <td className="py-2.5 pl-4 pr-3 font-medium text-foreground">
+                  {row.label}
                 </td>
-                {COLUMNS.map((col) => (
-                  <td
-                    key={col.key}
-                    className={`py-3 px-3 text-right tabular-nums font-bold ${
-                      col.isTotal ? 'text-primary text-base' : 'text-foreground text-sm'
-                    }`}
-                  >
-                    {formatCurrencyPaisas(columnTotals[col.key])}
-                  </td>
-                ))}
+                {COLUMNS.map((col) => {
+                  const value = row[col.key]
+                  const isEmpty = value === 0 && !col.isTotal
+                  return (
+                    <td
+                      key={col.key}
+                      className={`px-3 py-2.5 text-right tabular-nums ${
+                        col.isTotal
+                          ? 'font-bold text-primary'
+                          : isEmpty
+                          ? 'text-muted-foreground/30'
+                          : 'text-foreground'
+                      }`}
+                    >
+                      {isEmpty ? '—' : formatCurrencyPaisas(value)}
+                    </td>
+                  )
+                })}
               </tr>
-            </tfoot>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
+            ))}
+          </tbody>
+
+          {/* Totals footer */}
+          <tfoot>
+            <tr className="border-t-2 border-primary/20 bg-muted/10">
+              <td className="py-2.5 pl-4 pr-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Total
+              </td>
+              {COLUMNS.map((col) => (
+                <td
+                  key={col.key}
+                  className={`px-3 py-2.5 text-right tabular-nums font-bold ${
+                    col.isTotal ? 'text-primary' : 'text-foreground'
+                  }`}
+                >
+                  {formatCurrencyPaisas(columnTotals[col.key])}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
   )
 }

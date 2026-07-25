@@ -46,7 +46,14 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <div className="pb-10">
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-lg font-bold text-foreground sm:text-xl">Settings</h1>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Configure clinic, financial and operational preferences.
+          </p>
+        </div>
+
         <SettingsShell
           generalSettings={generalResult.success ? generalResult.data : null}
           pharmacySplit={

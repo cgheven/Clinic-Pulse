@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Loader2, Package } from 'lucide-react'
+import { ChevronLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,8 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
 import { createInventoryItem } from '@/app/actions/pharmacy'
 
@@ -110,39 +108,37 @@ export default function AddMedicinePage() {
     })
   }
 
+  // ── Margin calculation ─────────────────────────────────────────────────────
+  const cost = parseFloat(form.cost_price_paisas) || 0
+  const selling = parseFloat(form.sale_price_paisas) || 0
+  const margin = selling - cost
+  const marginPct = cost > 0 ? ((margin / cost) * 100).toFixed(1) : null
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
           href="/pharmacy/inventory"
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-4 w-4" />
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Add Medicine</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Add a new medicine to the pharmacy inventory
-          </p>
-        </div>
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Add Medicine</h1>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main form */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Basic Info */}
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                    <Package className="h-4 w-4 text-primary" />
-                  </div>
-                  <CardTitle className="text-base">Basic Information</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Main form — unified panel */}
+          <div className="lg:col-span-2">
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              {/* Basic Information */}
+              <div className="border-b border-border bg-muted/20 px-4 py-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Basic Information
+                </span>
+              </div>
+              <div className="space-y-4 p-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor="name">
@@ -170,50 +166,54 @@ export default function AddMedicinePage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="unit">
-                    Unit <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={form.unit}
-                    onValueChange={(v) => set('unit', v)}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger id="unit">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UNIT_OPTIONS.map((u) => (
-                        <SelectItem key={u} value={u} className="capitalize">
-                          {u}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="unit">
+                      Unit <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      value={form.unit}
+                      onValueChange={(v) => set('unit', v)}
+                      disabled={isPending}
+                    >
+                      <SelectTrigger id="unit">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNIT_OPTIONS.map((u) => (
+                          <SelectItem key={u} value={u} className="capitalize">
+                            {u}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="expiry_date">Expiry Date</Label>
-                  <Input
-                    id="expiry_date"
-                    type="date"
-                    value={form.expiry_date}
-                    onChange={(e) => set('expiry_date', e.target.value)}
-                    disabled={isPending}
-                  />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="expiry_date">Expiry Date</Label>
+                    <Input
+                      id="expiry_date"
+                      type="date"
+                      value={form.expiry_date}
+                      onChange={(e) => set('expiry_date', e.target.value)}
+                      disabled={isPending}
+                    />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
-          {/* Right sidebar: Pricing & Stock */}
-          <div className="space-y-6">
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">Pricing</CardTitle>
-                <p className="text-xs text-muted-foreground">All prices in PKR</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
+          {/* Right sidebar — Pricing & Stock unified panel */}
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              {/* Pricing section */}
+              <div className="border-b border-border bg-muted/20 px-4 py-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Pricing
+                </span>
+              </div>
+              <div className="space-y-4 p-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="cost_price">Cost Price / Unit</Label>
                   <div className="relative">
@@ -258,77 +258,64 @@ export default function AddMedicinePage() {
 
                 {/* Margin preview */}
                 {form.cost_price_paisas && form.sale_price_paisas && (
-                  <>
-                    <Separator className="bg-border" />
-                    <div className="rounded-lg bg-muted/30 px-3 py-2.5">
-                      <p className="text-xs text-muted-foreground">Gross Margin</p>
-                      {(() => {
-                        const cost = parseFloat(form.cost_price_paisas) || 0
-                        const selling = parseFloat(form.sale_price_paisas) || 0
-                        const margin = selling - cost
-                        const marginPct = cost > 0 ? ((margin / cost) * 100).toFixed(1) : '—'
-                        return (
-                          <p
-                            className={`mt-0.5 text-sm font-semibold ${margin >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
-                          >
-                            Rs. {margin.toFixed(2)} ({marginPct}%)
-                          </p>
-                        )
-                      })()}
-                    </div>
-                  </>
+                  <div className="rounded-lg bg-muted/30 px-3 py-2.5">
+                    <p className="text-[12px] text-muted-foreground">Gross Margin</p>
+                    <p
+                      className={`mt-0.5 text-sm font-semibold ${margin >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                    >
+                      Rs. {margin.toFixed(2)}
+                      {marginPct !== null && ` (${marginPct}%)`}
+                    </p>
+                  </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card className="border-border bg-card">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">Stock</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="stock_qty">
-                    Opening Stock <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="stock_qty"
-                    type="number"
-                    min="0"
-                    value={form.stock_qty}
-                    onChange={(e) => set('stock_qty', e.target.value)}
-                    disabled={isPending}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Units currently in stock
-                  </p>
+              {/* Stock section */}
+              <div className="border-t border-border">
+                <div className="border-b border-border bg-muted/20 px-4 py-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Stock
+                  </span>
                 </div>
+                <div className="space-y-4 p-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="stock_qty">
+                      Opening Stock <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="stock_qty"
+                      type="number"
+                      min="0"
+                      value={form.stock_qty}
+                      onChange={(e) => set('stock_qty', e.target.value)}
+                      disabled={isPending}
+                    />
+                    <p className="text-[12px] text-muted-foreground">Units currently in stock</p>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="reorder_level">
-                    Reorder Level <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="reorder_level"
-                    type="number"
-                    min="0"
-                    value={form.reorder_level}
-                    onChange={(e) => set('reorder_level', e.target.value)}
-                    disabled={isPending}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Alert when stock falls to or below this level
-                  </p>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reorder_level">
+                      Reorder Level <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="reorder_level"
+                      type="number"
+                      min="0"
+                      value={form.reorder_level}
+                      onChange={(e) => set('reorder_level', e.target.value)}
+                      disabled={isPending}
+                    />
+                    <p className="text-[12px] text-muted-foreground">
+                      Alert when stock falls to or below this level
+                    </p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Submit */}
             <div className="flex flex-col gap-2">
-              <Button
-                type="submit"
-                disabled={isPending}
-                className="w-full"
-              >
+              <Button type="submit" disabled={isPending} className="w-full">
                 {isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -341,6 +328,7 @@ export default function AddMedicinePage() {
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={isPending}
                 onClick={() => router.back()}
                 className="w-full"

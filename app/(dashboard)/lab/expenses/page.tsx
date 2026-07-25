@@ -6,13 +6,14 @@ import { getExpenseHeadsForLab } from '@/app/actions/lab'
 import type { LabExpenseResult } from '@/app/actions/lab'
 import { getActivePaymentMethods } from '@/app/actions/opd'
 import type { CpExpenseHead, CpPaymentMethod } from '@/types/index'
+import { getTodayPKT } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'Lab Expenses',
 }
 
 function currentMonthISO(): string {
-  const d = new Date()
+  const d = new Date(getTodayPKT() + 'T00:00:00')
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
   return `${y}-${m}`
@@ -39,7 +40,6 @@ export default async function LabExpensesPage() {
   const expenseHeads = headsRes.success ? headsRes.data : []
   const paymentMethods = pmRes.success ? (pmRes.data as unknown as CpPaymentMethod[]) : []
 
-  // Transform ExpenseWithRelations[] into LabExpenseResult for the ExpenseTracker component
   const labExpenseResult: LabExpenseResult = {
     entries: expensesRes.data.map((e) => ({
       id: e.id,
@@ -66,13 +66,10 @@ export default async function LabExpensesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Lab Expenses</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Track and record laboratory-specific expenditures
-        </p>
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Lab Expenses</h1>
       </div>
 
       <ExpenseTracker

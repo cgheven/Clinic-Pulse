@@ -2,18 +2,14 @@
 
 import React, { useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import {
-  ChevronRight,
   Receipt,
   Filter,
   X,
-  Building2,
   Tag,
   CreditCard,
   TrendingDown,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -48,14 +44,13 @@ interface ExpenseTableProps {
   departments?: unknown[]
   expenseHeads: CpExpenseHead[]
   paymentMethods: CpPaymentMethod[]
-  /** Active filter values (from URL params) */
   filters: {
     month: string
     department_id: string
     head_id: string
     payment_method_id: string
   }
-  totalAmount: number // paisas
+  totalAmount: number
 }
 
 // =============================================================================
@@ -72,8 +67,6 @@ export function ExpenseTable({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-
-  // ─── Filter navigation ───────────────────────────────────────────────────────
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -95,202 +88,169 @@ export function ExpenseTable({
   }, [router, pathname, filters.month])
 
   const hasActiveFilters =
-    !!filters.department_id ||
-    !!filters.head_id ||
-    !!filters.payment_method_id
-
-  // ─── Render ──────────────────────────────────────────────────────────────────
+    !!filters.department_id || !!filters.head_id || !!filters.payment_method_id
 
   return (
-    <div className="space-y-4">
-      {/* ── Filter bar ──────────────────────────────────────────────────────── */}
-      <Card className="border-border bg-card">
-        <CardContent className="py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
-              Filters
-            </div>
+    <div className="space-y-3">
+      {/* ── Filter strip ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Filter className="h-3.5 w-3.5" />
+          Filters
+        </div>
 
-            {/* Department filter */}
-            <div className="flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5 text-muted-foreground/60" />
-              <Select
-                value={filters.department_id || '__all__'}
-                onValueChange={(v) =>
-                  updateFilter('department_id', v === '__all__' ? '' : v)
-                }
-              >
-                <SelectTrigger className="h-8 w-[160px] text-xs border-border">
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Departments</SelectItem>
-                  {DEPARTMENT_OPTIONS.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Department filter */}
+        <Select
+          value={filters.department_id || '__all__'}
+          onValueChange={(v) =>
+            updateFilter('department_id', v === '__all__' ? '' : v)
+          }
+        >
+          <SelectTrigger className="h-7 w-auto min-w-[130px] border-border text-[12px]">
+            <SelectValue placeholder="All Depts" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Departments</SelectItem>
+            {DEPARTMENT_OPTIONS.map((d) => (
+              <SelectItem key={d.value} value={d.value}>
+                {d.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            {/* Category filter */}
-            <div className="flex items-center gap-1.5">
-              <Tag className="h-3.5 w-3.5 text-muted-foreground/60" />
-              <Select
-                value={filters.head_id || '__all__'}
-                onValueChange={(v) =>
-                  updateFilter('head_id', v === '__all__' ? '' : v)
-                }
-              >
-                <SelectTrigger className="h-8 w-[160px] text-xs border-border">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Categories</SelectItem>
-                  {expenseHeads
-                    .filter((h) => h.is_active && !h.deleted_at)
-                    .map((h) => (
-                      <SelectItem key={h.id} value={h.id}>
-                        {h.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Category filter */}
+        <Select
+          value={filters.head_id || '__all__'}
+          onValueChange={(v) =>
+            updateFilter('head_id', v === '__all__' ? '' : v)
+          }
+        >
+          <SelectTrigger className="h-7 w-auto min-w-[130px] border-border text-[12px]">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Categories</SelectItem>
+            {expenseHeads
+              .filter((h) => h.is_active && !h.deleted_at)
+              .map((h) => (
+                <SelectItem key={h.id} value={h.id}>
+                  {h.name}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
 
-            {/* Payment Method filter */}
-            <div className="flex items-center gap-1.5">
-              <CreditCard className="h-3.5 w-3.5 text-muted-foreground/60" />
-              <Select
-                value={filters.payment_method_id || '__all__'}
-                onValueChange={(v) =>
-                  updateFilter('payment_method_id', v === '__all__' ? '' : v)
-                }
-              >
-                <SelectTrigger className="h-8 w-[160px] text-xs border-border">
-                  <SelectValue placeholder="All Methods" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Methods</SelectItem>
-                  {paymentMethods
-                    .filter((m) => m.is_enabled)
-                    .map((m) => (
-                      <SelectItem key={m.method} value={m.method}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Payment Method filter */}
+        <Select
+          value={filters.payment_method_id || '__all__'}
+          onValueChange={(v) =>
+            updateFilter('payment_method_id', v === '__all__' ? '' : v)
+          }
+        >
+          <SelectTrigger className="h-7 w-auto min-w-[120px] border-border text-[12px]">
+            <SelectValue placeholder="All Methods" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Methods</SelectItem>
+            {paymentMethods
+              .filter((m) => m.is_enabled)
+              .map((m) => (
+                <SelectItem key={m.method} value={m.method}>
+                  {m.label}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
 
-            {/* Clear filters */}
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAllFilters}
-                className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
-              >
-                <X className="mr-1 h-3.5 w-3.5" />
-                Clear
-              </Button>
-            )}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearAllFilters}
+            className="h-7 px-2 text-[12px] text-muted-foreground hover:text-destructive"
+          >
+            <X className="mr-1 h-3.5 w-3.5" />
+            Clear
+          </Button>
+        )}
 
-            {/* Results summary */}
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {expenses.length} {expenses.length === 1 ? 'record' : 'records'}
-              </span>
-              {expenses.length > 0 && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                  {formatCurrencyPaisas(totalAmount)}
-                </span>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[12px] text-muted-foreground">
+            {expenses.length} {expenses.length === 1 ? 'record' : 'records'}
+          </span>
+          {expenses.length > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              {formatCurrencyPaisas(totalAmount)}
+            </span>
+          )}
+        </div>
+      </div>
 
-      {/* ── Table ───────────────────────────────────────────────────────────── */}
+      {/* ── Panel Table ───────────────────────────────────────────────────────── */}
       {expenses.length === 0 ? (
-        <Card className="border-dashed border-border bg-card">
-          <CardContent className="flex flex-col items-center justify-center py-12">
+        <div className="overflow-hidden rounded-xl border border-dashed border-border bg-card">
+          <div className="flex flex-col items-center justify-center py-12">
             <Receipt className="mb-3 h-8 w-8 text-muted-foreground/30" />
-            <p className="text-sm font-medium text-muted-foreground">
-              No expenses found
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground/60">
+            <p className="text-sm font-medium text-muted-foreground">No expenses found</p>
+            <p className="mt-1 text-[12px] text-muted-foreground/60">
               {hasActiveFilters
                 ? 'Try adjusting the filters above.'
                 : 'No expenses recorded for this period.'}
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden border-border bg-card">
-          <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Expense Records
-            </CardTitle>
-          </CardHeader>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/20">
-                  <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                    Date
-                  </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                    Description
-                  </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                    Category
-                  </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                    Department
-                  </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                    Method
-                  </th>
-                  <th className="py-2.5 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                    Amount
-                  </th>
-                  <th className="py-2.5 pr-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground/70 sr-only">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-border">
-                {expenses.map((expense) => (
-                  <ExpenseRow key={expense.id} expense={expense} />
-                ))}
-              </tbody>
-
-              {/* Footer totals */}
-              <tfoot>
-                <tr className="border-t-2 border-primary/20 bg-muted/10">
-                  <td
-                    colSpan={5}
-                    className="py-3 pl-4 pr-3 text-xs font-semibold text-muted-foreground"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <TrendingDown className="h-3.5 w-3.5 text-primary" />
-                      Total Expenses
-                    </div>
-                  </td>
-                  <td className="py-3 pl-3 pr-4 text-right text-sm font-bold text-primary">
-                    {formatCurrencyPaisas(totalAmount)}
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
           </div>
-        </Card>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          {/* Section header */}
+          <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Expense Records
+            </span>
+            <span className="text-[12px] text-muted-foreground">
+              {expenses.length} entries
+            </span>
+          </div>
+
+          {/* Column headers */}
+          <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+            <span className="w-[90px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/60">
+              Date
+            </span>
+            <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground/60">
+              Description
+            </span>
+            <span className="hidden w-[110px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/60 sm:block">
+              Category
+            </span>
+            <span className="hidden w-[90px] shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground/60 sm:block">
+              Method
+            </span>
+            <span className="w-[80px] shrink-0 text-right text-[10px] uppercase tracking-wide text-muted-foreground/60">
+              Amount
+            </span>
+          </div>
+
+          {/* Data rows */}
+          <div className="divide-y divide-border/50">
+            {expenses.map((expense) => (
+              <ExpenseRow key={expense.id} expense={expense} />
+            ))}
+          </div>
+
+          {/* Footer total */}
+          <div className="flex items-center border-t-2 border-primary/20 bg-muted/10 px-4 py-2.5">
+            <div className="flex flex-1 items-center gap-1.5">
+              <TrendingDown className="h-3.5 w-3.5 text-primary" />
+              <span className="text-[11px] font-semibold text-muted-foreground">
+                Total Expenses
+              </span>
+            </div>
+            <span className="text-sm font-bold text-primary">
+              {formatCurrencyPaisas(totalAmount)}
+            </span>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -301,63 +261,58 @@ export function ExpenseTable({
 // =============================================================================
 
 function ExpenseRow({ expense }: { expense: ExpenseWithRelations }) {
-  const categoryLabel =
-    expense.expense_head_name ?? expense.head_name ?? '—'
+  const categoryLabel = expense.expense_head_name ?? expense.head_name ?? '—'
+  const deptLabel = expense.department_name ?? 'General'
 
   return (
-    <tr className="group transition-colors hover:bg-muted/20">
-      {/* Date */}
-      <td className="py-3 pl-4 pr-3 text-xs text-muted-foreground whitespace-nowrap">
-        {formatDate(expense.expense_date, 'dd MMM yyyy')}
-      </td>
-
-      {/* Description */}
-      <td className="px-3 py-3 max-w-[220px]">
-        <p className="truncate text-sm text-foreground">{expense.description}</p>
-      </td>
-
-      {/* Category */}
-      <td className="px-3 py-3">
-        <span className="inline-flex items-center rounded-full border border-border bg-muted/30 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-          {categoryLabel}
+    <div className="group flex items-center px-4 py-2.5 transition-colors hover:bg-muted/20">
+      {/* Date — always visible */}
+      <div className="w-[90px] shrink-0">
+        <span className="text-[12px] text-muted-foreground whitespace-nowrap">
+          {formatDate(expense.expense_date, 'dd MMM')}
         </span>
-      </td>
+        <span className="mt-0.5 block text-[11px] text-muted-foreground/50 sm:hidden">
+          {deptLabel}
+        </span>
+      </div>
 
-      {/* Department */}
-      <td className="px-3 py-3 text-xs text-muted-foreground">
-        {expense.department_name ? (
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-            {expense.department_name}
-          </span>
-        ) : (
-          <span className="text-muted-foreground/50">General</span>
-        )}
-      </td>
+      {/* Description — always visible; sub-text on mobile */}
+      <div className="flex-1 min-w-0 pr-3">
+        <p className="truncate text-sm text-foreground">{expense.description}</p>
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground/60 sm:hidden">
+          {categoryLabel}
+          {expense.payment_method_name ? ` · ${expense.payment_method_name}` : ''}
+        </p>
+      </div>
 
-      {/* Payment Method */}
-      <td className="px-3 py-3 text-xs text-muted-foreground">
-        {expense.payment_method_name ?? (
-          <span className="text-muted-foreground/50">—</span>
-        )}
-      </td>
+      {/* Category — hidden on mobile */}
+      <div className="hidden w-[110px] shrink-0 sm:block">
+        <Badge
+          variant="outline"
+          className="rounded-full border-border bg-muted/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+        >
+          {categoryLabel}
+        </Badge>
+      </div>
 
-      {/* Amount */}
-      <td className="py-3 pl-3 pr-4 text-right">
-        <span className="text-sm font-semibold text-foreground">
+      {/* Method — hidden on mobile */}
+      <div className="hidden w-[90px] shrink-0 sm:block">
+        <span className="text-[12px] text-muted-foreground">
+          {expense.payment_method_name ?? (
+            <span className="text-muted-foreground/40">—</span>
+          )}
+        </span>
+      </div>
+
+      {/* Amount — always visible */}
+      <div className="w-[80px] shrink-0 text-right">
+        <span className={cn(
+          'text-sm font-semibold tabular-nums',
+          expense.is_voided ? 'text-muted-foreground/40 line-through' : 'text-foreground'
+        )}>
           {formatCurrencyPaisas(expense.amount_paisas)}
         </span>
-      </td>
-
-      {/* Detail arrow */}
-      <td className="py-3 pr-3 text-right">
-        <Link
-          href={`/expenses/${expense.id}`}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground group-hover:text-muted-foreground"
-          aria-label={`View expense details`}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Link>
-      </td>
-    </tr>
+      </div>
+    </div>
   )
 }

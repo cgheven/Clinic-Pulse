@@ -2,7 +2,6 @@
 
 import React, { useState, useTransition } from 'react'
 import { Plus, Receipt, Loader2, Users, AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -128,7 +127,6 @@ export function ExpenseSplit({
           description: `Rs. ${parseFloat(form.amount_pkr).toLocaleString('en-PK')} added.`,
         })
 
-        // Optimistically append the new expense to local state
         const headName =
           expenseHeads.find((h) => h.id === form.expense_head_id)?.name ??
           (form.custom_head || null)
@@ -177,35 +175,24 @@ export function ExpenseSplit({
   const { expenses, total_amount, active_partner_count, per_partner_total } = data
 
   return (
-    <div className="space-y-5">
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground/70">
-            Shared Expenses
-          </p>
-          <p className="mt-0.5 text-3xl font-bold text-foreground">
-            {formatCurrencyPaisas(total_amount)}
-          </p>
-          {active_partner_count > 0 && (
-            <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Users className="h-3.5 w-3.5" />
-              <span>
-                {formatCurrencyPaisas(per_partner_total)} per partner
-                {active_partner_count > 0 ? ` (÷ ${active_partner_count})` : ''}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {canAdd && (
-          <Button
-            onClick={() => setShowDialog(true)}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Record Expense
-          </Button>
+    <div className="space-y-4">
+      {/* ── Summary stat chips ───────────────────────────────────────────────── */}
+      <div className={cn('grid gap-2', active_partner_count > 0 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2')}>
+        <StatChip
+          icon={Receipt}
+          iconBg="bg-warning/10"
+          iconColor="text-warning"
+          label="Total Expenses"
+          value={formatCurrencyPaisas(total_amount)}
+        />
+        {active_partner_count > 0 && (
+          <StatChip
+            icon={Users}
+            iconBg="bg-info/10"
+            iconColor="text-info"
+            label={`Per Partner (÷${active_partner_count})`}
+            value={formatCurrencyPaisas(per_partner_total)}
+          />
         )}
       </div>
 
@@ -219,75 +206,72 @@ export function ExpenseSplit({
         </div>
       )}
 
-      {/* ── Expenses table ───────────────────────────────────────────────────── */}
-      {expenses.length === 0 ? (
-        <Card className="border-dashed border-border bg-card">
-          <CardContent className="flex flex-col items-center justify-center py-10">
-            <Receipt className="mb-2 h-7 w-7 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No expenses recorded this month.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden border-border bg-card">
-          <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Expense Log
-            </CardTitle>
-          </CardHeader>
+      {/* ── Expense panel table ──────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Section header */}
+        <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Expense Log
+          </span>
+          {canAdd && (
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]" onClick={() => setShowDialog(true)}>
+              <Plus className="mr-1 h-3 w-3" />
+              Add Expense
+            </Button>
+          )}
+        </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-muted-foreground">
-                    Date
-                  </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">
-                    Category
-                  </th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">
-                    Description
-                  </th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">
-                    Amount
-                  </th>
-                  <th className="py-2.5 pl-3 pr-4 text-right text-xs font-semibold text-muted-foreground">
-                    Per Partner
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {expenses.map((expense) => (
-                  <ExpenseRow
-                    key={expense.id}
-                    expense={expense}
-                    showPerPartner={active_partner_count > 0}
-                  />
-                ))}
-              </tbody>
-              {/* Totals footer */}
-              <tfoot>
-                <tr className="border-t border-border bg-muted/20">
-                  <td
-                    colSpan={3}
-                    className="py-2.5 pl-4 pr-3 text-xs font-semibold text-muted-foreground"
-                  >
-                    Total
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-sm font-bold text-primary">
-                    {formatCurrencyPaisas(total_amount)}
-                  </td>
-                  {active_partner_count > 0 && (
-                    <td className="py-2.5 pl-3 pr-4 text-right text-sm font-bold text-muted-foreground">
-                      {formatCurrencyPaisas(per_partner_total)}
-                    </td>
-                  )}
-                </tr>
-              </tfoot>
-            </table>
+        {expenses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <Receipt className="h-7 w-7 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground">No expenses recorded this month.</p>
           </div>
-        </Card>
-      )}
+        ) : (
+          <>
+            {/* Column headers */}
+            <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+              <span className="w-[68px] shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Date
+              </span>
+              <span className="flex-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Description
+              </span>
+              <span className="hidden sm:block w-[110px] shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Category
+              </span>
+              <span className="w-[90px] shrink-0 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                Amount
+              </span>
+            </div>
+
+            {/* Rows */}
+            <div className="divide-y divide-border/50">
+              {expenses.map((expense) => (
+                <ExpenseRow
+                  key={expense.id}
+                  expense={expense}
+                  showPerPartner={active_partner_count > 0}
+                />
+              ))}
+            </div>
+
+            {/* Footer total */}
+            <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-2.5">
+              <div>
+                <span className="text-xs font-semibold text-muted-foreground">Total</span>
+                {active_partner_count > 0 && (
+                  <span className="ml-2 text-[11px] text-muted-foreground">
+                    · {formatCurrencyPaisas(per_partner_total)} per partner
+                  </span>
+                )}
+              </div>
+              <span className="text-sm font-bold tabular-nums text-primary">
+                {formatCurrencyPaisas(total_amount)}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* ── Add Expense Dialog ───────────────────────────────────────────────── */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -343,9 +327,7 @@ export function ExpenseSplit({
             {/* Custom category */}
             {!form.expense_head_id && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">
-                  Custom Category
-                </Label>
+                <Label className="text-xs text-muted-foreground">Custom Category</Label>
                 <Input
                   value={form.custom_head}
                   onChange={(e) => setField('custom_head', e.target.value)}
@@ -460,7 +442,7 @@ export function ExpenseSplit({
 }
 
 // =============================================================================
-// ExpenseRow sub-component
+// ExpenseRow — flex-based panel row
 // =============================================================================
 
 function ExpenseRow({
@@ -470,34 +452,77 @@ function ExpenseRow({
   expense: XrayExpenseWithSplit
   showPerPartner: boolean
 }) {
-  const categoryLabel =
-    expense.expense_head_name ?? expense.head_name ?? '—'
+  const categoryLabel = expense.expense_head_name ?? expense.head_name ?? '—'
 
   return (
-    <tr className="transition-colors hover:bg-muted/20">
-      <td className="py-3 pl-4 pr-3 text-xs text-muted-foreground whitespace-nowrap">
+    <div className="flex items-center px-4 py-2.5 hover:bg-muted/20 transition-colors">
+      {/* Date */}
+      <span className="w-[68px] shrink-0 text-[12px] text-muted-foreground">
         {formatDate(expense.expense_date, 'dd MMM')}
-      </td>
-      <td className="px-3 py-3">
+      </span>
+
+      {/* Description + mobile category */}
+      <div className="flex-1 min-w-0">
+        {expense.description ? (
+          <p className="truncate text-sm text-foreground">{expense.description}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground/40">—</p>
+        )}
+        <span className="sm:hidden inline-block rounded-full bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {categoryLabel}
+        </span>
+      </div>
+
+      {/* Category (desktop) */}
+      <div className="hidden sm:block w-[110px] shrink-0">
         <span className="inline-block rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
           {categoryLabel}
         </span>
-      </td>
-      <td className="px-3 py-3">
-        {expense.description ? (
-          <span className="text-xs text-foreground">{expense.description}</span>
-        ) : (
-          <span className="text-xs text-muted-foreground/50">—</span>
+      </div>
+
+      {/* Amount */}
+      <div className="w-[90px] shrink-0 text-right">
+        <p className="text-sm font-medium tabular-nums text-foreground">
+          {formatCurrencyPaisas(expense.amount_paisas)}
+        </p>
+        {showPerPartner && (
+          <p className="text-[11px] text-muted-foreground">
+            {formatCurrencyPaisas(expense.per_partner_amount)} ea
+          </p>
         )}
-      </td>
-      <td className="px-3 py-3 text-right text-sm font-medium text-foreground">
-        {formatCurrencyPaisas(expense.amount_paisas)}
-      </td>
-      {showPerPartner && (
-        <td className="py-3 pl-3 pr-4 text-right text-sm font-medium text-muted-foreground">
-          {formatCurrencyPaisas(expense.per_partner_amount)}
-        </td>
-      )}
-    </tr>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// StatChip
+// =============================================================================
+
+function StatChip({
+  icon: Icon,
+  iconBg,
+  iconColor,
+  label,
+  value,
+}: {
+  icon: React.ElementType
+  iconBg: string
+  iconColor: string
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconBg}`}>
+        <Icon className={`h-4 w-4 ${iconColor}`} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+          {label}
+        </p>
+        <p className="text-sm font-bold tabular-nums text-foreground">{value}</p>
+      </div>
+    </div>
   )
 }

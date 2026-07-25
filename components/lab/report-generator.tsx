@@ -4,14 +4,17 @@ import React, { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn, formatCurrencyPaisas, formatBasisPoints } from '@/lib/utils'
+import { cn, formatCurrencyPaisas, formatBasisPoints, getTodayPKT } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import {
   Download,
   FileText,
   Loader2,
   TrendingUp,
+  FlaskConical,
+  DollarSign,
+  Users,
+  Building2,
 } from 'lucide-react'
 import { generateLabReport } from '@/app/actions/lab'
 import type { LabReportData } from '@/app/actions/lab'
@@ -43,101 +46,131 @@ function formatDisplayDate(dateStr: string): string {
 // =============================================================================
 
 function ReportPreview({ data }: { data: LabReportData }) {
+  const chips = [
+    {
+      label: 'Total Tests',
+      value: data.totalTests.toString(),
+      icon: FlaskConical,
+      iconBg: 'bg-primary/10',
+      iconColor: 'text-primary',
+    },
+    {
+      label: 'Total Revenue',
+      value: formatCurrencyPaisas(data.totalRevenue),
+      icon: DollarSign,
+      iconBg: 'bg-success/10',
+      iconColor: 'text-success',
+    },
+    {
+      label: `Doctor (${formatBasisPoints(data.doctorSplitPct)})`,
+      value: formatCurrencyPaisas(data.doctorSplitAmount),
+      icon: Users,
+      iconBg: 'bg-info/10',
+      iconColor: 'text-info',
+    },
+    {
+      label: `Clinic (${formatBasisPoints(data.clinicSplitPct)})`,
+      value: formatCurrencyPaisas(data.clinicSplitAmount),
+      icon: Building2,
+      iconBg: 'bg-success/10',
+      iconColor: 'text-success',
+    },
+  ]
+
   return (
-    <div className="space-y-4">
-      {/* Summary cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border bg-muted/20">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Total Tests</p>
-            <p className="text-2xl font-bold text-foreground">{data.totalTests}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-muted/20">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Total Revenue</p>
-            <p className="text-xl font-bold text-primary">
-              {formatCurrencyPaisas(data.totalRevenue)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-muted/20">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">
-              Doctor Split ({formatBasisPoints(data.doctorSplitPct)})
-            </p>
-            <p className="text-xl font-bold text-info">
-              {formatCurrencyPaisas(data.doctorSplitAmount)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-muted/20">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">
-              Clinic Split ({formatBasisPoints(data.clinicSplitPct)})
-            </p>
-            <p className="text-xl font-bold text-success">
-              {formatCurrencyPaisas(data.clinicSplitAmount)}
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-3">
+      {/* Stat chips */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {chips.map((c) => {
+          const Icon = c.icon
+          return (
+            <div
+              key={c.label}
+              className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5"
+            >
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${c.iconBg}`}
+              >
+                <Icon className={`h-4 w-4 ${c.iconColor}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 mb-0.5 leading-none">
+                  {c.label}
+                </p>
+                <p className="text-sm font-bold tabular-nums text-foreground leading-tight">
+                  {c.value}
+                </p>
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Preview table */}
       {data.entries.length > 0 && (
-        <Card className="border-border bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Test Log Preview
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/20">
-                    <th className="py-2 pl-4 pr-3 text-left text-xs font-semibold text-muted-foreground">
-                      Test
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-                      Patient
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-                      Result
-                    </th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">
-                      Price
-                    </th>
-                    <th className="py-2 pl-3 pr-4 text-left text-xs font-semibold text-muted-foreground">
-                      Payment
-                    </th>
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {data.entries.length} entries
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50">
+                  <th className="py-1.5 pl-4 pr-3 text-left text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Test
+                  </th>
+                  <th className="px-3 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Patient
+                  </th>
+                  <th className="px-3 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
+                    Result
+                  </th>
+                  <th className="px-3 py-1.5 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Price
+                  </th>
+                  <th className="py-1.5 pl-3 pr-4 text-left text-[10px] font-medium uppercase tracking-wide text-muted-foreground hidden sm:table-cell">
+                    Payment
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {data.entries.map((e) => (
+                  <tr key={e.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="py-2.5 pl-4 pr-3 text-sm font-medium text-foreground">
+                      {e.test?.name ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-[12px] text-muted-foreground">
+                      {e.patient?.name ?? 'Walk-in'}
+                    </td>
+                    <td className="px-3 py-2.5 text-[12px] text-muted-foreground hidden sm:table-cell">
+                      {e.result ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-sm font-medium text-foreground">
+                      {formatCurrencyPaisas(e.price_paisas)}
+                    </td>
+                    <td className="py-2.5 pl-3 pr-4 text-[12px] text-muted-foreground hidden sm:table-cell">
+                      {(
+                        {
+                          cash: 'Cash',
+                          jazzcash: 'JazzCash',
+                          easypaisa: 'EasyPaisa',
+                          bank_transfer: 'Bank Transfer',
+                        } as Record<string, string>
+                      )[e.payment_method ?? ''] ??
+                        e.payment_method ??
+                        '—'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {data.entries.map((e) => (
-                    <tr key={e.id} className="hover:bg-muted/10">
-                      <td className="py-2.5 pl-4 pr-3 text-foreground">
-                        {e.test?.name ?? '—'}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">
-                        {e.patient?.name ?? 'Walk-in'}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">
-                        {e.result ?? '—'}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-medium text-foreground">
-                        {formatCurrencyPaisas(e.price_paisas)}
-                      </td>
-                      <td className="py-2.5 pl-3 pr-4 text-muted-foreground">
-                        {({ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' } as Record<string, string>)[e.payment_method ?? ''] ?? e.payment_method ?? '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -148,14 +181,12 @@ function ReportPreview({ data }: { data: LabReportData }) {
 // =============================================================================
 
 async function downloadPDF(data: LabReportData) {
-  // Dynamic import to avoid SSR issues
   const { jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.getWidth()
 
-  // ─── Header ────────────────────────────────────────────────────────────────
   doc.setFontSize(18)
   doc.setTextColor(40, 40, 40)
   doc.text(data.clinicName, pageW / 2, 18, { align: 'center' })
@@ -168,17 +199,24 @@ async function downloadPDF(data: LabReportData) {
   doc.setTextColor(120, 120, 120)
   doc.text(formatDisplayDate(data.date), pageW / 2, 33, { align: 'center' })
 
-  // Separator line
   doc.setDrawColor(200, 200, 200)
   doc.line(14, 37, pageW - 14, 37)
 
-  // ─── Table ─────────────────────────────────────────────────────────────────
   const rows = data.entries.map((e) => [
     e.test?.name ?? '—',
     e.patient?.name ?? 'Walk-in',
     e.result ?? '—',
     `Rs. ${(e.price_paisas / 100).toFixed(2)}`,
-    ({ cash: 'Cash', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa', bank_transfer: 'Bank Transfer' } as Record<string, string>)[e.payment_method ?? ''] ?? e.payment_method ?? '—',
+    (
+      {
+        cash: 'Cash',
+        jazzcash: 'JazzCash',
+        easypaisa: 'EasyPaisa',
+        bank_transfer: 'Bank Transfer',
+      } as Record<string, string>
+    )[e.payment_method ?? ''] ??
+      e.payment_method ??
+      '—',
   ])
 
   autoTable(doc, {
@@ -187,22 +225,19 @@ async function downloadPDF(data: LabReportData) {
     body: rows,
     theme: 'grid',
     headStyles: {
-      fillColor: [245, 158, 11], // amber-500
+      fillColor: [245, 158, 11],
       textColor: [10, 10, 15],
       fontStyle: 'bold',
       fontSize: 9,
     },
     bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
     alternateRowStyles: { fillColor: [248, 248, 248] },
-    columnStyles: {
-      3: { halign: 'right' },
-    },
+    columnStyles: { 3: { halign: 'right' } },
     margin: { left: 14, right: 14 },
   })
 
-  // ─── Footer ────────────────────────────────────────────────────────────────
-  const finalY = (doc as unknown as { lastAutoTable: { finalY: number } })
-    .lastAutoTable.finalY + 8
+  const finalY =
+    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
 
   doc.setDrawColor(200, 200, 200)
   doc.line(14, finalY, pageW - 14, finalY)
@@ -235,7 +270,6 @@ async function downloadPDF(data: LabReportData) {
     doc.setFont('helvetica', 'normal')
   })
 
-  // Page number
   const pageCount = doc.getNumberOfPages()
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i)
@@ -257,9 +291,7 @@ async function downloadPDF(data: LabReportData) {
 // =============================================================================
 
 export function ReportGenerator({ initialDate }: ReportGeneratorProps) {
-  const [date, setDate] = useState(
-    initialDate ?? new Date().toISOString().split('T')[0]!
-  )
+  const [date, setDate] = useState(initialDate ?? getTodayPKT())
   const [reportData, setReportData] = useState<LabReportData | null>(null)
   const [isFetching, setIsFetching] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -307,17 +339,17 @@ export function ReportGenerator({ initialDate }: ReportGeneratorProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Date picker + generate */}
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <FileText className="h-4 w-4 text-primary" />
+    <div className="space-y-4">
+      {/* Generator panel */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex items-center gap-2 border-b border-border bg-muted/20 px-4 py-2">
+          <FileText className="h-3.5 w-3.5 text-primary" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Generate Lab Report
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          </span>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="space-y-1.5">
               <Label htmlFor="report-date" className="text-xs text-muted-foreground">
                 Report Date
@@ -330,51 +362,54 @@ export function ReportGenerator({ initialDate }: ReportGeneratorProps) {
                   setDate(e.target.value)
                   setReportData(null)
                 }}
-                className="w-48"
+                className="w-44 h-8 text-sm"
               />
             </div>
 
-            <Button
-              onClick={handleGenerate}
-              disabled={isFetching || !date}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {isFetching ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading…
-                </>
-              ) : (
-                <>
-                  <TrendingUp className="mr-1.5 h-4 w-4" />
-                  Generate
-                </>
-              )}
-            </Button>
-
-            {reportData && reportData.totalTests > 0 && (
+            <div className="flex items-center gap-2">
               <Button
-                variant="outline"
-                onClick={handleDownload}
-                disabled={isDownloading}
-                className="border-border hover:bg-muted"
+                size="sm"
+                onClick={handleGenerate}
+                disabled={isFetching || !date}
               >
-                {isDownloading ? (
+                {isFetching ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating PDF…
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Loading…
                   </>
                 ) : (
                   <>
-                    <Download className="mr-1.5 h-4 w-4" />
-                    Download PDF
+                    <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
+                    Generate
                   </>
                 )}
               </Button>
-            )}
+
+              {reportData && reportData.totalTests > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="border-border"
+                >
+                  {isDownloading ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      Generating PDF…
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-1.5 h-3.5 w-3.5" />
+                      Download PDF
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Preview */}
       {reportData && <ReportPreview data={reportData} />}

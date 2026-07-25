@@ -8,33 +8,17 @@ import {
   PlusCircle,
   ArrowRight,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { LowStockAlert } from '@/components/pharmacy/low-stock-alert'
 import { getDailySales, getLowStockItems } from '@/app/actions/pharmacy'
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-function formatPKR(paisas: number): string {
-  return `Rs. ${(paisas / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0]!
-}
+import { formatCurrencyPaisas, getTodayPKT } from '@/lib/utils'
 
 // =============================================================================
 // Page
 // =============================================================================
 
 export default async function PharmacyDashboardPage() {
-  const today = todayISO()
+  const today = getTodayPKT()
 
   const [salesResult, lowStockResult] = await Promise.all([
     getDailySales(today),
@@ -46,21 +30,10 @@ export default async function PharmacyDashboardPage() {
   const criticalCount = lowStockItems.filter((i) => i.stock_status === 'critical').length
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Pharmacy</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {new Date().toLocaleDateString('en-PK', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </p>
-        </div>
-
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Pharmacy</h1>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm">
             <Link href="/pharmacy/inventory/new">
@@ -78,204 +51,167 @@ export default async function PharmacyDashboardPage() {
       </div>
 
       {/* Low stock alert */}
-      {lowStockItems.length > 0 && (
-        <LowStockAlert items={lowStockItems} />
-      )}
+      {lowStockItems.length > 0 && <LowStockAlert items={lowStockItems} />}
 
-      {/* KPI cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Today's Sales */}
-        <Card className="border-border bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Today&apos;s Sales
-            </CardTitle>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <ShoppingCart className="h-4 w-4 text-primary" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-foreground">
-              {formatPKR(salesData?.total_paisas ?? 0)}
+      {/* Stat chips */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <TrendingUp className="h-4 w-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Today Sales
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {salesData?.sale_count ?? 0} transaction
-              {(salesData?.sale_count ?? 0) !== 1 ? 's' : ''} today
+            <p className="truncate text-sm font-bold tabular-nums text-foreground">
+              {formatCurrencyPaisas(salesData?.total_paisas ?? 0)}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Low Stock */}
-        <Card className="border-border bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Low Stock Items
-            </CardTitle>
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                criticalCount > 0 ? 'bg-red-500/10' : 'bg-amber-500/10'
-              }`}
-            >
-              <AlertTriangle
-                className={`h-4 w-4 ${criticalCount > 0 ? 'text-red-400' : 'text-amber-400'}`}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-foreground">{lowStockItems.length}</p>
-            <div className="mt-1 flex items-center gap-2">
-              {criticalCount > 0 && (
-                <Badge variant="destructive" className="text-[10px]">
-                  {criticalCount} critical
-                </Badge>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {lowStockItems.length === 0 ? 'All items well stocked' : 'need restocking'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Avg per sale */}
-        <Card className="border-border bg-card sm:col-span-2 lg:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Avg per Sale
-            </CardTitle>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
-              <TrendingUp className="h-4 w-4 text-blue-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-foreground">
-              {salesData && salesData.sale_count > 0
-                ? formatPKR(Math.round(salesData.total_paisas / salesData.sale_count))
-                : formatPKR(0)}
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+            <ShoppingCart className="h-4 w-4 text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Transactions
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">per transaction today</p>
-          </CardContent>
-        </Card>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {salesData?.sale_count ?? 0}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+            <AlertTriangle className="h-4 w-4 text-amber-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Low Stock
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">
+              {lowStockItems.length}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+            <AlertTriangle className="h-4 w-4 text-red-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+              Critical
+            </p>
+            <p className="text-sm font-bold tabular-nums text-foreground">{criticalCount}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Today's recent sales */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent sales table */}
-        <Card className="border-border bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base font-semibold">Recent Sales</CardTitle>
-            <Link
-              href={`/pharmacy/sales?date=${today}`}
-              className="flex items-center gap-1 text-xs text-primary hover:underline"
-            >
-              View all <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </CardHeader>
-          <CardContent className="p-0">
-            {!salesData || salesData.sales.length === 0 ? (
-              <div className="py-10 text-center">
-                <ShoppingCart className="mx-auto h-8 w-8 text-muted-foreground/30" />
-                <p className="mt-2 text-sm text-muted-foreground">No sales recorded today</p>
-                <Link
-                  href="/pharmacy/sales/new"
-                  className="mt-2 inline-block text-xs text-primary hover:underline"
-                >
-                  Record first sale
-                </Link>
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {salesData.sales.slice(0, 8).map((sale) => (
-                  <div
-                    key={sale.id}
-                    className="flex items-center justify-between gap-3 px-5 py-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {sale.items.length === 1
-                          ? (sale.items[0]?.inventory?.name ?? 'Unknown')
-                          : `${sale.items.length} items`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {sale.items.reduce((s, i) => s + i.qty, 0)} unit(s)
-                        {sale.patient && ` · ${sale.patient.name}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-foreground">
-                        {formatPKR(sale.total_paisas)}
-                      </p>
-                      <p className="text-xs capitalize text-muted-foreground">
-                        {sale.payment_method ?? 'cash'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Quick link pill strip */}
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href="/pharmacy/sales/new"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+        >
+          <ShoppingCart className="h-3.5 w-3.5" />
+          Record Sale
+        </Link>
+        <Link
+          href="/pharmacy/inventory"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+        >
+          <Package className="h-3.5 w-3.5" />
+          View Inventory
+        </Link>
+        <Link
+          href="/pharmacy/inventory/new"
+          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+        >
+          <PlusCircle className="h-3.5 w-3.5" />
+          Add Medicine
+        </Link>
+        <Link
+          href={`/pharmacy/sales?date=${today}`}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+        >
+          <TrendingUp className="h-3.5 w-3.5" />
+          Today&apos;s Sales Log
+        </Link>
+      </div>
 
-        {/* Quick links */}
-        <div className="space-y-4">
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2">
-              {[
-                {
-                  href: '/pharmacy/sales/new',
-                  icon: ShoppingCart,
-                  label: 'Record New Sale',
-                  desc: 'Add medicines to a sale',
-                  color: 'text-primary',
-                  bg: 'bg-primary/10',
-                },
-                {
-                  href: '/pharmacy/inventory',
-                  icon: Package,
-                  label: 'View Inventory',
-                  desc: 'Browse all medicines',
-                  color: 'text-blue-400',
-                  bg: 'bg-blue-500/10',
-                },
-                {
-                  href: '/pharmacy/inventory/new',
-                  icon: PlusCircle,
-                  label: 'Add Medicine',
-                  desc: 'Add a new medicine to inventory',
-                  color: 'text-emerald-400',
-                  bg: 'bg-emerald-500/10',
-                },
-                {
-                  href: `/pharmacy/sales?date=${today}`,
-                  icon: TrendingUp,
-                  label: "Today's Sales Log",
-                  desc: 'Full daily sales report',
-                  color: 'text-amber-400',
-                  bg: 'bg-amber-500/10',
-                },
-              ].map(({ href, icon: Icon, label, desc, color, bg }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-primary/30 hover:bg-muted/30"
-                >
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${bg}`}
-                  >
-                    <Icon className={`h-4 w-4 ${color}`} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">{label}</p>
-                    <p className="text-xs text-muted-foreground">{desc}</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
+      {/* Today's recent sales — panel table */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Section header */}
+        <div className="flex items-center justify-between border-b border-border bg-muted/20 px-4 py-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Recent Sales
+          </span>
+          <Link
+            href={`/pharmacy/sales?date=${today}`}
+            className="flex items-center gap-1 text-[12px] text-primary hover:underline"
+          >
+            View all <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
+
+        {/* Column headers */}
+        {salesData && salesData.sales.length > 0 && (
+          <div className="flex items-center border-b border-border/50 px-4 py-1.5">
+            <span className="flex-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Medicine
+            </span>
+            <span className="hidden w-[80px] text-right text-[10px] uppercase tracking-wide text-muted-foreground sm:block">
+              Method
+            </span>
+            <span className="w-[110px] text-right text-[10px] uppercase tracking-wide text-muted-foreground">
+              Amount
+            </span>
+          </div>
+        )}
+
+        {/* Rows */}
+        {!salesData || salesData.sales.length === 0 ? (
+          <div className="py-8 text-center">
+            <ShoppingCart className="mx-auto h-7 w-7 text-muted-foreground/30" />
+            <p className="mt-2 text-[12px] text-muted-foreground">No sales recorded today</p>
+            <Link
+              href="/pharmacy/sales/new"
+              className="mt-1 inline-block text-[12px] text-primary hover:underline"
+            >
+              Record first sale
+            </Link>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {salesData.sales.slice(0, 8).map((sale) => (
+              <div
+                key={sale.id}
+                className="flex items-center px-4 py-2.5 transition-colors hover:bg-muted/20"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {sale.items.length === 1
+                      ? (sale.items[0]?.inventory?.name ?? 'Unknown')
+                      : `${sale.items.length} items`}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground">
+                    {sale.items.reduce((s, i) => s + i.qty, 0)} unit(s)
+                    {sale.patient && ` · ${sale.patient.name}`}
+                  </p>
+                </div>
+                <span className="hidden w-[80px] text-right text-[12px] capitalize text-muted-foreground sm:block">
+                  {sale.payment_method ?? 'cash'}
+                </span>
+                <span className="w-[110px] text-right text-sm font-semibold text-foreground">
+                  {formatCurrencyPaisas(sale.total_paisas)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
