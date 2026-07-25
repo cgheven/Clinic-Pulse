@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -176,11 +177,10 @@ export function RevenueForm({ paymentMethods, defaultDate, onSuccess }: RevenueF
           <Label htmlFor="revenue_date" className="text-xs text-muted-foreground">
             Date <span className="text-destructive">*</span>
           </Label>
-          <Input
+          <DateInput
             id="revenue_date"
-            type="date"
             value={form.revenue_date}
-            onChange={(e) => setField('revenue_date', e.target.value)}
+            onChange={(v) => setField('revenue_date', v)}
             className={cn(errors.revenue_date && 'border-destructive')}
             disabled={isPending}
           />

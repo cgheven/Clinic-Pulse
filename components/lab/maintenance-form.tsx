@@ -3,6 +3,7 @@
 import React, { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -154,11 +155,10 @@ export function MaintenanceForm({
               <Label htmlFor="maint-date" className="text-xs text-muted-foreground">
                 Date *
               </Label>
-              <Input
+              <DateInput
                 id="maint-date"
-                type="date"
                 value={form.maintenance_date}
-                onChange={(e) => set('maintenance_date', e.target.value)}
+                onChange={(v) => set('maintenance_date', v)}
                 className={cn(errors.maintenance_date && 'border-destructive')}
               />
               {errors.maintenance_date && (
@@ -234,11 +234,10 @@ export function MaintenanceForm({
             <Label htmlFor="next-due" className="text-xs text-muted-foreground">
               Next Due Date
             </Label>
-            <Input
+            <DateInput
               id="next-due"
-              type="date"
               value={form.next_due_date}
-              onChange={(e) => set('next_due_date', e.target.value)}
+              onChange={(v) => set('next_due_date', v)}
             />
           </div>
 

@@ -3,6 +3,7 @@
 import React, { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { cn, formatCurrencyPaisas, formatBasisPoints, getTodayPKT } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
@@ -354,12 +355,11 @@ export function ReportGenerator({ initialDate }: ReportGeneratorProps) {
               <Label htmlFor="report-date" className="text-xs text-muted-foreground">
                 Report Date
               </Label>
-              <Input
+              <DateInput
                 id="report-date"
-                type="date"
                 value={date}
-                onChange={(e) => {
-                  setDate(e.target.value)
+                onChange={(v) => {
+                  setDate(v)
                   setReportData(null)
                 }}
                 className="w-44 h-8 text-sm"

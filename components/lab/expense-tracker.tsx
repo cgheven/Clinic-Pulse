@@ -3,6 +3,7 @@
 import React, { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -301,11 +302,10 @@ export function ExpenseTracker({
               <Label htmlFor="exp-date" className="text-xs text-muted-foreground">
                 Date *
               </Label>
-              <Input
+              <DateInput
                 id="exp-date"
-                type="date"
                 value={form.expense_date}
-                onChange={(e) => setField('expense_date', e.target.value)}
+                onChange={(v) => setField('expense_date', v)}
                 className={cn(errors.expense_date && 'border-destructive')}
               />
               {errors.expense_date && (

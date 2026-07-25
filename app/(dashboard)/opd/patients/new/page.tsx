@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Plus } from 'lucide-react'
 import { createPatient } from '@/app/actions/opd'
 import { getTodayPKT } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { DateInput } from '@/components/ui/date-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -159,11 +160,10 @@ export default function NewPatientPage() {
                 <Label htmlFor="dob" className="text-[12px]">
                   Date of Birth
                 </Label>
-                <Input
+                <DateInput
                   id="dob"
-                  type="date"
                   value={dob}
-                  onChange={(e) => setDob(e.target.value)}
+                  onChange={(v) => setDob(v)}
                   max={getTodayPKT()}
                 />
               </div>

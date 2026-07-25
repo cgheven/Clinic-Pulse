@@ -377,7 +377,10 @@ export function VisitForm({
                 value={visitDate}
                 onChange={(e) => setVisitDate(e.target.value)}
                 required
+                tabIndex={-1}
+                aria-hidden="true"
                 className="sr-only"
+                style={{ colorScheme: 'dark' }}
               />
             </div>
           </div>

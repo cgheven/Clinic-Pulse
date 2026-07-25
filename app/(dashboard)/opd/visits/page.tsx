@@ -368,9 +368,10 @@ export default async function VisitsPage({ searchParams }: VisitsPageProps) {
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
-            name="date"
             type="date"
+            name="date"
             defaultValue={date}
+            style={{ colorScheme: 'dark' }}
             className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
           />
         </div>

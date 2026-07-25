@@ -6,6 +6,7 @@ import { MaintenanceForm } from '@/components/lab/maintenance-form'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -230,18 +231,16 @@ export default function LabEquipmentPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Purchase Date</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={addForm.purchase_date}
-                  onChange={(e) => setAddForm((f) => ({ ...f, purchase_date: e.target.value }))}
+                  onChange={(v) => setAddForm((f) => ({ ...f, purchase_date: v }))}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Next Service Due</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={addForm.next_service}
-                  onChange={(e) => setAddForm((f) => ({ ...f, next_service: e.target.value }))}
+                  onChange={(v) => setAddForm((f) => ({ ...f, next_service: v }))}
                 />
               </div>
               <div className="space-y-1.5">

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Filter, CalendarDays, X } from 'lucide-react'
+import { DateInput } from '@/components/ui/date-input'
 import {
   Select,
   SelectContent,
@@ -84,11 +85,10 @@ export function PatientFilters({ search: initSearch, gender: initGender, registe
       {/* Date — applies instantly on selection */}
       <div className="flex items-center gap-2">
         <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-        <input
-          type="date"
+        <DateInput
           value={date}
-          onChange={(e) => handleDateChange(e.target.value)}
-          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors [color-scheme:dark]"
+          onChange={(v) => handleDateChange(v)}
+          className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
         />
       </div>
 

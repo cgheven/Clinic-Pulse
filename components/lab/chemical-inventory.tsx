@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
@@ -413,10 +414,9 @@ export function ChemicalInventory({ initialChemicals }: ChemicalInventoryProps) 
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Expiry Date</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={addForm.expiry_date}
-                  onChange={(e) => setAddForm((f) => ({ ...f, expiry_date: e.target.value }))}
+                  onChange={(v) => setAddForm((f) => ({ ...f, expiry_date: v }))}
                 />
               </div>
             </div>

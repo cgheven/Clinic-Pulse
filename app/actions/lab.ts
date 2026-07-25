@@ -257,7 +257,7 @@ export async function createTest(rawData: unknown): Promise<ActionResult<CpLabTe
     }).select('*').single()
     if (error) return { success: false, error: error.message }
 
-    revalidateTag('lab-tests')
+    revalidateTag('lab-tests', 'default')
     revalidatePath('/lab/tests/new')
     revalidatePath('/lab/catalog')
     return { success: true, data: data as unknown as CpLabTest }
@@ -294,7 +294,7 @@ export async function updateTest(id: string, rawData: unknown): Promise<ActionRe
     const { error } = await supabase.from('cp_lab_tests').update(updatePayload).eq('id', id).is('deleted_at', null)
     if (error) return { success: false, error: error.message }
 
-    revalidateTag('lab-tests')
+    revalidateTag('lab-tests', 'default')
     revalidatePath('/lab/tests/new')
     revalidatePath('/lab/catalog')
     return { success: true, data: undefined }

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { getDailySales } from '@/app/actions/pharmacy'
 import type { DailySalesResult } from '@/app/actions/pharmacy'
 import { formatCurrencyPaisas, getTodayPKT } from '@/lib/utils'
@@ -100,10 +101,9 @@ export default function PharmacySalesPage() {
 
         <div className="relative max-w-xs flex-1">
           <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="date"
+          <DateInput
             value={dateParam}
-            onChange={(e) => e.target.value && navigateToDate(e.target.value)}
+            onChange={(v) => v && navigateToDate(v)}
             max={todayStr}
             className="pl-9"
           />

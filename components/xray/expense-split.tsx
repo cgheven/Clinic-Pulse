@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react'
 import { Plus, Receipt, Loader2, Users, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -286,10 +287,9 @@ export function ExpenseSplit({
               <Label className="text-xs text-muted-foreground">
                 Date <span className="text-destructive">*</span>
               </Label>
-              <Input
-                type="date"
+              <DateInput
                 value={form.expense_date}
-                onChange={(e) => setField('expense_date', e.target.value)}
+                onChange={(v) => setField('expense_date', v)}
                 disabled={isPending}
               />
             </div>

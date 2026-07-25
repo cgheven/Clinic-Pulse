@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -180,10 +181,9 @@ export function MedicineEditForm({ medicine }: MedicineEditFormProps) {
         <div className="space-y-1.5">
           <Label className="text-xs">Expiry Date</Label>
           {isEditing ? (
-            <Input
-              type="date"
+            <DateInput
               value={form.expiry_date}
-              onChange={(e) => set('expiry_date', e.target.value)}
+              onChange={(v) => set('expiry_date', v)}
               disabled={isPending}
               className="h-8 text-xs"
             />

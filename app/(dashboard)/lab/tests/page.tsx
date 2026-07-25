@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { TestLogTable } from '@/components/lab/test-log-table'
 import { toast } from '@/hooks/use-toast'
 import { getDailyTestLog } from '@/app/actions/lab'
@@ -93,11 +94,10 @@ export default function LabTestsPage() {
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
 
-        <Input
-          type="date"
+        <DateInput
           value={date}
           max={getTodayPKT()}
-          onChange={(e) => handleDateChange(e.target.value)}
+          onChange={(v) => handleDateChange(v)}
           className="w-40 h-8 text-sm"
         />
 

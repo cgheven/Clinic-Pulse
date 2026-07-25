@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ChevronLeft, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -191,11 +192,10 @@ export default function AddMedicinePage() {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="expiry_date">Expiry Date</Label>
-                    <Input
+                    <DateInput
                       id="expiry_date"
-                      type="date"
                       value={form.expiry_date}
-                      onChange={(e) => set('expiry_date', e.target.value)}
+                      onChange={(v) => set('expiry_date', v)}
                       disabled={isPending}
                     />
                   </div>

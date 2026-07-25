@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/ui/date-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -216,12 +217,11 @@ export default function NewTestPage() {
                   <Label htmlFor="test-date" className="text-xs text-muted-foreground">
                     Date *
                   </Label>
-                  <Input
+                  <DateInput
                     id="test-date"
-                    type="date"
                     value={form.test_date}
                     max={todayISO()}
-                    onChange={(e) => setField('test_date', e.target.value)}
+                    onChange={(v) => setField('test_date', v)}
                     className={cn(errors.test_date && 'border-destructive')}
                   />
                   {errors.test_date && (
