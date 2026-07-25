@@ -1,15 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { User, Phone, Calendar, Activity, ChevronRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { cn, formatDate, getInitials } from '@/lib/utils'
 import { DeletePatientButton } from '@/components/opd/delete-patient-button'
 import type { PatientWithVisitCount } from '@/app/actions/opd'
-
-interface PatientCardProps {
-  patient: PatientWithVisitCount
-  className?: string
-}
 
 const genderColor: Record<string, string> = {
   male: 'text-blue-400',
@@ -17,78 +12,65 @@ const genderColor: Record<string, string> = {
   other: 'text-purple-400',
 }
 
-export function PatientCard({ patient, className }: PatientCardProps) {
+interface PatientCardProps {
+  patient: PatientWithVisitCount
+}
+
+export function PatientCard({ patient }: PatientCardProps) {
+  const initials = getInitials(patient.name)
+  const gCol = genderColor[patient.gender ?? ''] ?? 'text-muted-foreground'
+
   return (
-    <div
-      className={cn(
-        'group flex items-center rounded-xl border border-border bg-card',
-        'hover:border-primary/50 hover:bg-card/80 transition-all duration-200',
-        className
-      )}
-    >
-      {/* Clickable area navigates to patient profile */}
+    <div className="group flex items-center hover:bg-muted/20 transition-colors">
+      {/* Clickable area: name + all data columns */}
       <Link
         href={`/opd/patients/${patient.id}`}
-        className="flex flex-1 items-center gap-4 p-4 min-w-0"
+        className="flex min-w-0 flex-1 items-center py-2.5 pl-4"
       >
-        {/* Avatar */}
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-sm">
-          {getInitials(patient.name)}
-        </div>
-
-        {/* Info */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+        {/* Avatar + Name (flex-1) */}
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 pr-3">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium text-foreground group-hover:text-primary transition-colors">
               {patient.name}
             </p>
-            <span
-              className={cn(
-                'text-[10px] font-medium capitalize shrink-0',
-                genderColor[patient.gender ?? ''] ?? 'text-muted-foreground'
+            <p className="truncate text-[11px] text-muted-foreground">
+              #{patient.patient_no}
+              {patient.gender && (
+                <span className={cn('ml-1.5', gCol)}>{patient.gender}</span>
               )}
-            >
-              {patient.gender}
-            </span>
-          </div>
-
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <User className="h-3 w-3 shrink-0" />
-              {patient.patient_no}
-            </span>
-
-            {patient.phone && (
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Phone className="h-3 w-3 shrink-0" />
-                {patient.phone}
-              </span>
-            )}
-
-            {patient.last_visit_date && (
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Calendar className="h-3 w-3 shrink-0" />
-                {formatDate(patient.last_visit_date)}
-              </span>
-            )}
+              {/* Phone shown in sub-text on mobile only */}
+              {patient.phone && (
+                <span className="ml-1.5 sm:hidden">· {patient.phone}</span>
+              )}
+            </p>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="shrink-0 text-right">
-          <div className="flex items-center gap-1 justify-end text-xs font-medium text-muted-foreground">
-            <Activity className="h-3 w-3" />
-            <span>{patient.visit_count}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground/60">visits</p>
-        </div>
+        {/* Phone (sm+ only) */}
+        <p className="hidden w-[130px] shrink-0 truncate pr-3 text-[12px] text-muted-foreground sm:block">
+          {patient.phone ?? '—'}
+        </p>
 
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-primary/60 transition-colors" />
+        {/* Last Visit (sm+ only) */}
+        <p className="hidden w-[110px] shrink-0 pr-3 text-[12px] text-muted-foreground sm:block">
+          {patient.last_visit_date ? formatDate(patient.last_visit_date, 'dd MMM yy') : '—'}
+        </p>
+
+        {/* Visits (always) */}
+        <p className="w-[48px] shrink-0 text-right text-[13px] font-semibold tabular-nums text-foreground">
+          {patient.visit_count}
+        </p>
       </Link>
 
-      {/* Delete — shown on hover, outside the nav link */}
-      <div className="pr-3 opacity-0 group-hover:opacity-100 transition-opacity">
-        <DeletePatientButton patientId={patient.id} patientName={patient.name} />
+      {/* Action column: arrow fades out, delete fades in on hover */}
+      <div className="relative flex w-[44px] shrink-0 items-center justify-center py-2.5">
+        <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-opacity group-hover:opacity-0" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+          <DeletePatientButton patientId={patient.id} patientName={patient.name} />
+        </div>
       </div>
     </div>
   )

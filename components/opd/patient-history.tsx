@@ -2,7 +2,16 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Stethoscope, FileText, CreditCard, ChevronDown, ChevronUp, Trash2, Loader2, AlertTriangle, Receipt } from 'lucide-react'
+import {
+  Stethoscope,
+  CreditCard,
+  ChevronDown,
+  Trash2,
+  Loader2,
+  AlertTriangle,
+  Receipt,
+  FileText,
+} from 'lucide-react'
 import { cn, formatDate, formatCurrencyPaisas } from '@/lib/utils'
 import { deleteVisit } from '@/app/actions/opd'
 import { Button } from '@/components/ui/button'
@@ -18,7 +27,6 @@ import type { VisitWithRelations } from '@/app/actions/opd'
 
 interface PatientHistoryProps {
   visits: VisitWithRelations[]
-  className?: string
 }
 
 function formatPaymentMethod(method: string): string {
@@ -31,13 +39,26 @@ function formatPaymentMethod(method: string): string {
   return labels[method] ?? method
 }
 
-function VisitItem({ visit }: { visit: VisitWithRelations }) {
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+        {label}
+      </p>
+      <p className="mt-0.5 whitespace-pre-wrap text-xs text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function VisitRow({ visit }: { visit: VisitWithRelations }) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const hasClinicalData = visit.diagnosis || visit.prescription || visit.notes
+
+  const hasClinicalData = !!(visit.diagnosis || visit.prescription || visit.notes)
+  const isDue = visit.payment_status === 'due'
 
   function handleDelete() {
     setDeleteError(null)
@@ -53,111 +74,138 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
   }
 
   return (
-    <div className="relative pl-6">
-      {/* Timeline dot */}
-      <div className="absolute left-0 top-3 flex h-4 w-4 items-center justify-center">
-        <div className="h-2.5 w-2.5 rounded-full border-2 border-primary bg-background" />
-      </div>
-
-      <div className={cn("rounded-xl border bg-card p-4 transition-colors hover:border-border/80", visit.payment_status === 'due' ? "border-amber-500/30 bg-amber-500/5" : "border-border")}>
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">
-                {formatDate(visit.visit_date)}
-              </span>
-              {visit.voucher_no && (
-                <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground">
-                  <Receipt className="h-3 w-3" />
-                  #{visit.voucher_no}
-                </span>
-              )}
-              {visit.payment_status === 'due' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
-                  <AlertTriangle className="h-2.5 w-2.5" />
-                  Due
-                </span>
-              )}
-            </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-              {visit.doctor && (
-                <span className="flex items-center gap-1">
-                  <Stethoscope className="h-3 w-3" />
-                  Dr. {visit.doctor.name}
-                  {visit.doctor.specialization ? ` · ${visit.doctor.specialization}` : ''}
-                </span>
-              )}
-              {visit.payment_method && visit.payment_status !== 'due' && (
-                <span className="flex items-center gap-1">
-                  <CreditCard className="h-3 w-3" />
-                  {formatPaymentMethod(visit.payment_method)}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Fee + delete */}
-          <div className="flex items-center gap-2 shrink-0">
-            <p className={cn("text-sm font-bold", visit.payment_status === 'due' ? "text-amber-500" : "text-primary")}>
-              {formatCurrencyPaisas(visit.fee_paisas)}
+    <div className={cn('group', isDue && 'bg-amber-500/[0.03]')}>
+      {/* ── Main row ── */}
+      <div className="flex items-center px-4 py-2.5 hover:bg-muted/20 transition-colors">
+        {/* Date + voucher */}
+        <div className="w-[90px] shrink-0">
+          <p className="text-[12px] font-medium text-foreground">
+            {formatDate(visit.visit_date, 'dd MMM yy')}
+          </p>
+          {visit.voucher_no && (
+            <p className="flex items-center gap-0.5 text-[10px] font-mono text-muted-foreground">
+              <Receipt className="h-2.5 w-2.5" />#{visit.voucher_no}
             </p>
-            <button
-              onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
-              className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all"
-              title="Delete visit"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          )}
         </div>
 
-        {/* Expand button */}
-        {hasClinicalData && (
+        {/* Doctor (sm+ only) */}
+        <div className="hidden min-w-0 flex-1 pr-3 sm:block">
+          <p className="truncate text-[12px] text-muted-foreground">
+            {visit.doctor ? `Dr. ${visit.doctor.name}` : '—'}
+          </p>
+        </div>
+
+        {/* Method / Due (sm+ only) */}
+        <div className="hidden w-[100px] shrink-0 sm:block">
+          {isDue ? (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-500">
+              <AlertTriangle className="h-2.5 w-2.5" />
+              Due
+            </span>
+          ) : (
+            <p className="text-[12px] text-muted-foreground">
+              {visit.payment_method ? formatPaymentMethod(visit.payment_method) : '—'}
+            </p>
+          )}
+        </div>
+
+        {/* Fee — flex-1 on mobile so it fills space, fixed on sm+ */}
+        <div className="flex-1 text-right sm:w-[80px] sm:flex-none">
+          <p
+            className={cn(
+              'text-[13px] font-semibold tabular-nums',
+              isDue ? 'text-amber-500' : 'text-foreground'
+            )}
+          >
+            {formatCurrencyPaisas(visit.fee_paisas)}
+          </p>
+          {isDue && (
+            <p className="text-[10px] font-semibold text-amber-500 sm:hidden">Due</p>
+          )}
+        </div>
+
+        {/* Expand + Delete */}
+        <div className="ml-2 flex shrink-0 items-center">
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {expanded ? (
-              <>
-                <ChevronUp className="h-3.5 w-3.5" />
-                Show less
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-3.5 w-3.5" />
-                Show clinical notes
-              </>
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded text-muted-foreground/40 transition-colors',
+              hasClinicalData
+                ? 'hover:bg-muted hover:text-muted-foreground'
+                : 'pointer-events-none opacity-0'
             )}
+          >
+            <ChevronDown
+              className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')}
+            />
           </button>
-        )}
-
-        {/* Expanded clinical data */}
-        {expanded && hasClinicalData && (
-          <div className="mt-3 space-y-2 border-t border-border pt-3">
-            {visit.diagnosis && <Field label="Diagnosis" value={visit.diagnosis} />}
-            {visit.prescription && <Field label="Prescription" value={visit.prescription} />}
-            {visit.notes && <Field label="Notes" value={visit.notes} />}
-          </div>
-        )}
+          <button
+            onClick={() => {
+              setDeleteError(null)
+              setDeleteOpen(true)
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground/30 opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+            title="Delete visit"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* Delete confirmation dialog */}
+      {/* ── Expanded content ── */}
+      {expanded && (
+        <div className="space-y-2 border-t border-border/50 bg-muted/20 px-4 py-3">
+          {/* Doctor + method on mobile */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground sm:hidden">
+            {visit.doctor && (
+              <span className="flex items-center gap-1">
+                <Stethoscope className="h-3 w-3" />
+                Dr. {visit.doctor.name}
+              </span>
+            )}
+            {visit.payment_method && !isDue && (
+              <span className="flex items-center gap-1">
+                <CreditCard className="h-3 w-3" />
+                {formatPaymentMethod(visit.payment_method)}
+              </span>
+            )}
+          </div>
+
+          {/* Clinical notes */}
+          {hasClinicalData ? (
+            <>
+              {visit.diagnosis && <Field label="Diagnosis" value={visit.diagnosis} />}
+              {visit.prescription && <Field label="Prescription" value={visit.prescription} />}
+              {visit.notes && <Field label="Notes" value={visit.notes} />}
+            </>
+          ) : (
+            <p className="text-[12px] text-muted-foreground">No clinical notes recorded.</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Delete dialog ── */}
       <Dialog open={deleteOpen} onOpenChange={(o) => { if (!isPending) setDeleteOpen(o) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Visit Record</DialogTitle>
             <DialogDescription>
-              Remove the visit on <span className="font-medium text-foreground">{formatDate(visit.visit_date)}</span>
-              {visit.fee_paisas > 0 && (
-                <> ({formatCurrencyPaisas(visit.fee_paisas)})</>
-              )}? This cannot be undone.
+              Remove the visit on{' '}
+              <span className="font-medium text-foreground">
+                {formatDate(visit.visit_date)}
+              </span>
+              {visit.fee_paisas > 0 && <> ({formatCurrencyPaisas(visit.fee_paisas)})</>}? This
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isPending}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={isPending}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
@@ -177,46 +225,41 @@ function VisitItem({ visit }: { visit: VisitWithRelations }) {
   )
 }
 
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
-        {label}
-      </p>
-      <p className="mt-0.5 text-xs text-foreground whitespace-pre-wrap">{value}</p>
-    </div>
-  )
-}
+export function PatientHistory({ visits }: PatientHistoryProps) {
+  if (visits.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-card/50 py-10 text-center">
+        <FileText className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">No visits recorded yet</p>
+      </div>
+    )
+  }
 
-export function PatientHistory({ visits, className }: PatientHistoryProps) {
   return (
-    <div className={cn('space-y-4', className)}>
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        <FileText className="h-4 w-4 text-primary" />
-        Visit History
-        {visits.length > 0 && (
-          <span className="ml-1 rounded-full bg-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {visits.length}
-          </span>
-        )}
-      </h3>
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Column headers */}
+      <div className="flex items-center border-b border-border bg-muted/20 px-4 py-1.5">
+        <div className="w-[90px] shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+          Date
+        </div>
+        <div className="hidden flex-1 pr-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
+          Doctor
+        </div>
+        <div className="hidden w-[100px] shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
+          Method
+        </div>
+        <div className="flex-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:w-[80px] sm:flex-none">
+          Fee
+        </div>
+        {/* spacer for expand + delete buttons */}
+        <div className="ml-2 w-14 shrink-0" />
+      </div>
 
-      {visits.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-card/50 py-10 text-center">
-          <FileText className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">No visits recorded</p>
-          <p className="mt-0.5 text-xs text-muted-foreground/60">
-            Visit history will appear here once recorded
-          </p>
-        </div>
-      ) : (
-        <div className="relative space-y-3">
-          <div className="absolute left-[7px] top-3 bottom-3 w-px bg-border" aria-hidden="true" />
-          {visits.map((visit) => (
-            <VisitItem key={visit.id} visit={visit} />
-          ))}
-        </div>
-      )}
+      <div className="divide-y divide-border/50">
+        {visits.map((visit) => (
+          <VisitRow key={visit.id} visit={visit} />
+        ))}
+      </div>
     </div>
   )
 }

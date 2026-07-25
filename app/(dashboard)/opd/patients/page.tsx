@@ -18,12 +18,18 @@ interface PatientListProps {
 }
 
 async function PatientList({ search, page, gender, registeredOn }: PatientListProps) {
-  const result = await getPatients({ search, page, limit: 20, gender: gender || undefined, registeredOn: registeredOn || undefined })
+  const result = await getPatients({
+    search,
+    page,
+    limit: 20,
+    gender: gender || undefined,
+    registeredOn: registeredOn || undefined,
+  })
 
   if (!result.success) {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-center">
-        <AlertCircle className="mx-auto mb-2 h-7 w-7 text-destructive" />
+      <div className="flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/8 px-3 py-2.5">
+        <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
         <p className="text-sm text-destructive">{result.error}</p>
       </div>
     )
@@ -31,55 +37,82 @@ async function PatientList({ search, page, gender, registeredOn }: PatientListPr
 
   const { data: patients, count, totalPages } = result.data
 
+  if (patients.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-card/50 py-16 text-center">
+        <Users className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
+        <p className="text-sm font-medium text-muted-foreground">
+          {search ? 'No patients match your search' : 'No patients registered yet'}
+        </p>
+        {!search && (
+          <p className="mt-1 text-xs text-muted-foreground/60">
+            Click &quot;New Patient&quot; to register the first patient
+          </p>
+        )}
+        <div className="mt-4">
+          <Button asChild size="sm">
+            <Link href="/opd/patients/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Patient
+            </Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
-      {/* Count */}
+    <div className="space-y-3">
+      {/* Count + page indicator */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {count === 0
-            ? 'No patients found'
-            : `${count} patient${count !== 1 ? 's' : ''} found`}
+        <p className="text-[12px] text-muted-foreground">
+          {count} patient{count !== 1 ? 's' : ''}
           {search && ` for "${search}"`}
           {gender && ` · ${gender}`}
-          {registeredOn && ` · registered ${registeredOn}`}
+          {registeredOn && ` · ${registeredOn}`}
         </p>
-        <p className="text-xs text-muted-foreground">
-          Page {page} of {totalPages}
-        </p>
+        {totalPages > 1 && (
+          <p className="text-[12px] text-muted-foreground">
+            Page {page} of {totalPages}
+          </p>
+        )}
       </div>
 
-      {/* List */}
-      {patients.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-card/50 py-16 text-center">
-          <Users className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-          <p className="text-sm font-medium text-muted-foreground">
-            {search ? 'No patients match your search' : 'No patients registered yet'}
-          </p>
-          {!search && (
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Click &quot;New Patient&quot; to register the first patient
-            </p>
-          )}
-          <div className="mt-4">
-            <Button asChild size="sm">
-              <Link href="/opd/patients/new">
-                <Plus className="mr-2 h-4 w-4" />
-                New Patient
-              </Link>
-            </Button>
+      {/* Table panel */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Column headers */}
+        <div className="flex items-center border-b border-border bg-muted/20 pl-4">
+          {/* Name */}
+          <div className="flex-1 py-1.5 pr-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            Patient
           </div>
+          {/* Phone */}
+          <div className="hidden w-[130px] shrink-0 py-1.5 pr-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
+            Phone
+          </div>
+          {/* Last Visit */}
+          <div className="hidden w-[110px] shrink-0 py-1.5 pr-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60 sm:block">
+            Last Visit
+          </div>
+          {/* Visits */}
+          <div className="w-[48px] shrink-0 py-1.5 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+            Visits
+          </div>
+          {/* Action spacer */}
+          <div className="w-[44px] shrink-0" />
         </div>
-      ) : (
-        <div className="space-y-2">
+
+        {/* Rows */}
+        <div className="divide-y divide-border/50">
           {patients.map((patient) => (
             <PatientCard key={patient.id} patient={patient} />
           ))}
         </div>
-      )}
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
+        <div className="flex items-center justify-center gap-2 pt-1">
           <Link
             href={`/opd/patients?search=${encodeURIComponent(search)}&gender=${encodeURIComponent(gender)}&date=${encodeURIComponent(registeredOn)}&page=${Math.max(1, page - 1)}`}
             aria-disabled={page <= 1}
@@ -140,18 +173,13 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
   const registeredOn = params.date ?? ''
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Patients</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Search and manage patient records
-          </p>
-        </div>
-        <Button asChild>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-bold text-foreground sm:text-xl">Patients</h1>
+        <Button asChild size="sm" className="shrink-0">
           <Link href="/opd/patients/new">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
             New Patient
           </Link>
         </Button>
@@ -160,13 +188,23 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
       {/* Filters */}
       <PatientFilters search={search} gender={gender} registeredOn={registeredOn} />
 
+      {/* List */}
       <Suspense
         key={`${search}-${page}-${gender}-${registeredOn}`}
         fallback={
-          <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-20 animate-pulse rounded-xl border border-border bg-card" />
-            ))}
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="border-b border-border bg-muted/20 px-4 py-1.5" />
+            <div className="divide-y divide-border/50">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2.5 px-4 py-2.5">
+                  <div className="h-7 w-7 animate-pulse rounded-full bg-muted" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+                    <div className="h-2.5 w-20 animate-pulse rounded bg-muted" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         }
       >
