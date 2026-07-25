@@ -157,14 +157,9 @@ export function Sidebar({ userRole, user, onClose, mobile }: SidebarProps) {
           className="flex items-center gap-2.5 group"
           onClick={onClose}
         >
-          <Image
-            src="/logo.jpeg"
-            alt="ClinicPulse"
-            width={32}
-            height={32}
-            className="rounded-lg"
-            priority
-          />
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 transition-all group-hover:bg-primary/15 overflow-hidden">
+            <Image src="/logo.jpeg" alt="Pulse" width={32} height={32} className="w-full h-full object-cover" priority />
+          </div>
           <div>
             <p className="text-foreground font-bold text-sm tracking-tight leading-none">Pulse</p>
             <p className="text-primary/70 text-[10px] mt-0.5 font-semibold tracking-[0.15em] uppercase">Pulse of Your Business</p>
