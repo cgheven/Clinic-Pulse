@@ -16,14 +16,23 @@ import {
 import { cn } from "@/lib/utils";
 import type { CpUser } from "@/types/index";
 import Link from "next/link";
+import { TrialBanner } from "@/components/layout/trial-banner";
 
 interface DashboardShellProps {
   user: CpUser;
   children: React.ReactNode;
   clinicName?: string;
+  trialEndsAt?: string | null;
+  frozen?: boolean;
 }
 
-export function DashboardShell({ user, children, clinicName }: DashboardShellProps) {
+export function DashboardShell({
+  user,
+  children,
+  clinicName,
+  trialEndsAt,
+  frozen,
+}: DashboardShellProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -55,7 +64,7 @@ export function DashboardShell({ user, children, clinicName }: DashboardShellPro
       {/* Mobile sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:hidden",
+          "fixed inset-y-0 left-0 z-50 w-60 transform border-r border-sidebar-border transition-transform duration-300 ease-in-out lg:hidden",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -68,14 +77,14 @@ export function DashboardShell({ user, children, clinicName }: DashboardShellPro
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden w-64 shrink-0 lg:flex lg:flex-col">
+      <div className="hidden w-60 shrink-0 border-r border-sidebar-border lg:flex lg:flex-col">
         <Sidebar userRole={user.role} user={user} />
       </div>
 
       {/* Main content area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:px-6">
+        {/* Top bar — sticky, blurred (matches HMS) */}
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-sidebar-border bg-sidebar/90 px-4 backdrop-blur-md lg:px-6">
           {/* Left: hamburger (mobile only) + clinic name */}
           <div className="flex items-center gap-3">
             <button
@@ -163,7 +172,10 @@ export function DashboardShell({ user, children, clinicName }: DashboardShellPro
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="p-4 lg:p-6">{children}</div>
+          <TrialBanner trialEndsAt={trialEndsAt} frozen={frozen} />
+          <div className="container mx-auto max-w-7xl px-4 py-6 sm:px-6">
+            {children}
+          </div>
         </main>
       </div>
     </div>

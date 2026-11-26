@@ -151,7 +151,7 @@ export function Sidebar({ userRole, user, onClose, mobile }: SidebarProps) {
   return (
     <div className="flex h-full flex-col bg-sidebar">
       {/* Header — logo */}
-      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-4">
         <Link
           href="/dashboard"
           className="flex items-center gap-2.5 group"
@@ -202,10 +202,10 @@ export function Sidebar({ userRole, user, onClose, mobile }: SidebarProps) {
                         href={item.href}
                         onClick={onClose}
                         className={cn(
-                          "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                          "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
                           active
                             ? "bg-primary/10 text-primary"
-                            : "text-sidebar-foreground hover:bg-sidebar-border hover:text-foreground"
+                            : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                         )}
                       >
                         {active && (

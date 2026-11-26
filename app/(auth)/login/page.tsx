@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Activity, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -239,7 +240,17 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-xs text-white/20">
+        <p className="mt-6 text-center text-sm text-white/40">
+          New to ClinicPulse?{" "}
+          <Link
+            href="/signup"
+            className="font-medium text-amber-400 transition-colors hover:text-amber-300"
+          >
+            Create an account
+          </Link>
+        </p>
+
+        <p className="mt-4 text-center text-xs text-white/20">
           ClinicPulse &copy; {new Date().getFullYear()} — All rights reserved
         </p>
       </div>

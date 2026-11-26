@@ -1,12 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
-const inter = Inter({
-  variable: "--font-inter",
+const dmSans = DM_Sans({
   subsets: ["latin"],
   display: "swap",
+  variable: "--font-dm-sans",
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const dmSerif = DM_Serif_Display({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-dm-serif",
+  weight: "400",
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -34,8 +43,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full`}>
-      <body className="h-full antialiased">
+    <html
+      lang="en"
+      className={`${dmSans.variable} ${dmSerif.variable} h-full`}
+      suppressHydrationWarning
+    >
+      <body className="h-full font-sans antialiased" suppressHydrationWarning>
         {children}
         <Toaster />
       </body>

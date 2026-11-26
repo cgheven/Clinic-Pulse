@@ -260,6 +260,7 @@ type CpXrayPartnerInsert = {
 // unified expense table — no cp_departments FK, department is direct enum
 type CpExpenseRow = {
   id: string;
+  clinic_id: string; // multi-tenant: set by DB default / trigger
   expense_date: string;
   head_id: string | null;
   head_name: string;
@@ -275,6 +276,7 @@ type CpExpenseRow = {
 
 type CpExpenseInsert = {
   id?: string;
+  clinic_id?: string; // optional on insert — DB default cp_current_clinic_id() fills it
   expense_date?: string;
   head_id?: string | null;
   head_name: string;
