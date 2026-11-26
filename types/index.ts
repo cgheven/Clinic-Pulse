@@ -45,10 +45,32 @@ export type AuditAction = "INSERT" | "UPDATE" | "DELETE";
 
 export interface CpUser {
   id: string;
+  /** Tenant the user belongs to — set at signup, scopes every query via RLS. */
+  clinic_id: string;
   email: string;
   full_name: string;
   role: UserRole;
+  phone: string | null;
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── cp_clinics (tenant) ────────────────────────────────────────────────────────
+
+export interface CpClinic {
+  id: string;
+  owner_id: string;
+  name: string;
+  /** ISO 3166-1 alpha-2, uppercase. Drives currency / locale / timezone. */
+  country: string;
+  /** ISO 4217 currency code, e.g. "PKR", "USD". */
+  currency: string;
+  phone: string | null;
+  /** 14-day free trial from signup; null once on a paid plan. */
+  trial_ends_at: string | null;
+  /** When true, the account is read-only pending billing action. */
+  frozen: boolean;
   created_at: string;
   updated_at: string;
 }

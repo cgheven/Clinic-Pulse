@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const PUBLIC_PATHS = ["/login", "/workflow"];
+const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/workflow"];
 const ADMIN_ONLY_PATHS = ["/settings"];
 
 export async function middleware(request: NextRequest) {
@@ -30,8 +30,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Already authenticated — redirect away from login
-  if (user && pathname === "/login") {
+  // Already authenticated — redirect away from login / signup
+  if (user && (pathname === "/login" || pathname === "/signup")) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/dashboard";
     dashboardUrl.search = "";

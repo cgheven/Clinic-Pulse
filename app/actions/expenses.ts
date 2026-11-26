@@ -203,13 +203,16 @@ export async function getExpenseById(
   id: string
 ): Promise<ActionResult<ExpenseWithRelations>> {
   try {
-    await requireAuth()
+    const authUser = await requireAuth()
     const admin = createAdminClient()
 
+    // Admin client bypasses RLS, so scope to the caller's clinic explicitly —
+    // otherwise any clinic could read another clinic's expense by id.
     const { data, error } = await admin
       .from('cp_expenses')
       .select('*, cp_expense_heads!head_id(name)')
       .eq('id', id)
+      .eq('clinic_id', authUser.profile.clinic_id)
       .maybeSingle()
 
     if (error) return { success: false, error: error.message }
@@ -327,11 +330,16 @@ export async function voidExpense(id: string): Promise<ActionResult<undefined>> 
 
     const admin = createAdminClient()
 
+    // Admin client bypasses RLS — scope both reads and the update to the caller's
+    // clinic so one clinic can't void another clinic's expense by id.
+    const clinicId = authUser.profile.clinic_id
+
     // Verify the expense exists and is not already voided
     const { data: existing, error: fetchError } = await admin
       .from('cp_expenses')
       .select('id, status')
       .eq('id', id)
+      .eq('clinic_id', clinicId)
       .maybeSingle()
 
     if (fetchError) return { success: false, error: fetchError.message }
@@ -346,6 +354,7 @@ export async function voidExpense(id: string): Promise<ActionResult<undefined>> 
       .from('cp_expenses')
       .update({ status: 'void' as "active" | "void" })
       .eq('id', id)
+      .eq('clinic_id', clinicId)
 
     if (updateError) return { success: false, error: updateError.message }
 

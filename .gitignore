@@ -55,3 +55,6 @@ logs/
 
 # sentry
 .sentryclirc
+
+# claude code (local settings + session worktrees)
+.claude/
